@@ -284,6 +284,130 @@ class TestSchemas:
     def test_video_analysis_brief_validates(self):
         validate_artifact("video_analysis_brief", sample_artifact("video_analysis_brief"))
 
+    def test_edit_decisions_accepts_volume_schedule(self):
+        """audio.music.volume_schedule is the new optional Path B field.
+        Edit decisions emitting it must validate against the schema."""
+        artifact = {
+            "version": "1.0",
+            "render_runtime": "remotion",
+            "cuts": [
+                {"id": "cut-1", "source": "asset-1", "in_seconds": 0, "out_seconds": 10},
+            ],
+            "audio": {
+                "music": {
+                    "asset_id": "music-1",
+                    "volume_schedule": [
+                        {"t_seconds": 0.0,  "gain_db": 0.0},
+                        {"t_seconds": 1.7,  "gain_db": 0.0},
+                        {"t_seconds": 2.0,  "gain_db": -18.0},
+                        {"t_seconds": 8.0,  "gain_db": -18.0},
+                        {"t_seconds": 8.3,  "gain_db": 0.0},
+                    ],
+                }
+            },
+        }
+        validate_artifact("edit_decisions", artifact)
+
+    def test_edit_decisions_rejects_volume_schedule_missing_gain_db(self):
+        """volume_schedule items must carry gain_db (no default)."""
+        artifact = {
+            "version": "1.0",
+            "render_runtime": "remotion",
+            "cuts": [
+                {"id": "cut-1", "source": "asset-1", "in_seconds": 0, "out_seconds": 10},
+            ],
+            "audio": {
+                "music": {
+                    "volume_schedule": [
+                        {"t_seconds": 0.0},
+                    ],
+                }
+            },
+        }
+        with pytest.raises(Exception):
+            validate_artifact("edit_decisions", artifact)
+
+    def test_edit_decisions_rejects_volume_schedule_negative_time(self):
+        artifact = {
+            "version": "1.0",
+            "render_runtime": "remotion",
+            "cuts": [
+                {"id": "cut-1", "source": "asset-1", "in_seconds": 0, "out_seconds": 10},
+            ],
+            "audio": {
+                "music": {
+                    "volume_schedule": [
+                        {"t_seconds": -0.5, "gain_db": 0.0},
+                    ],
+                }
+            },
+        }
+        with pytest.raises(Exception):
+            validate_artifact("edit_decisions", artifact)
+
+    def test_script_accepts_tts_directive(self):
+        """sections[].tts_directive is the new optional Path A field."""
+        artifact = {
+            "version": "1.0",
+            "title": "Path A test",
+            "total_duration_seconds": 30,
+            "sections": [
+                {
+                    "id": "s1",
+                    "text": "Hook line.",
+                    "start_seconds": 0,
+                    "end_seconds": 5,
+                    "tts_directive": {"speed_mult": 1.03},
+                },
+                {
+                    "id": "s2",
+                    "text": "Reveal line.",
+                    "start_seconds": 5,
+                    "end_seconds": 12,
+                    "tts_directive": {"speed_mult": 0.97},
+                },
+            ],
+        }
+        validate_artifact("script", artifact)
+
+    def test_script_rejects_tts_directive_without_speed_mult(self):
+        """speed_mult is the only field; without it the directive is meaningless."""
+        artifact = {
+            "version": "1.0",
+            "title": "Bad directive",
+            "total_duration_seconds": 10,
+            "sections": [
+                {
+                    "id": "s1",
+                    "text": "x",
+                    "start_seconds": 0,
+                    "end_seconds": 10,
+                    "tts_directive": {},
+                },
+            ],
+        }
+        with pytest.raises(Exception):
+            validate_artifact("script", artifact)
+
+    def test_script_rejects_tts_directive_speed_outside_safe_range(self):
+        """speed_mult bounded [0.5, 2.0] to match cosyvoice and keep delivery natural."""
+        artifact = {
+            "version": "1.0",
+            "title": "Out of range",
+            "total_duration_seconds": 10,
+            "sections": [
+                {
+                    "id": "s1",
+                    "text": "x",
+                    "start_seconds": 0,
+                    "end_seconds": 10,
+                    "tts_directive": {"speed_mult": 3.0},  # > 2.0
+                },
+            ],
+        }
+        with pytest.raises(Exception):
+            validate_artifact("script", artifact)
+
 
 # ---- Checkpoint ----
 
@@ -313,6 +437,31 @@ class TestCheckpoint:
     def test_invalid_stage_rejected(self, tmp_path):
         with pytest.raises(ValueError):
             write_checkpoint(tmp_path, "proj", "invalid_stage", "completed", {})
+
+    def test_ad_video_manifest_stage_accepted(self, tmp_path):
+        write_checkpoint(
+            tmp_path,
+            "proj",
+            "intake",
+            "in_progress",
+            {},
+            pipeline_type="ad-video",
+        )
+        cp = read_checkpoint(tmp_path, "proj", "intake")
+        assert cp is not None
+        assert cp["pipeline_type"] == "ad-video"
+        assert cp["stage"] == "intake"
+
+    def test_ad_video_stage_requires_pipeline_specific_artifact(self, tmp_path):
+        with pytest.raises(CheckpointValidationError, match="production_bible"):
+            write_checkpoint(
+                tmp_path,
+                "proj",
+                "bible",
+                "completed",
+                {},
+                pipeline_type="ad-video",
+            )
 
     def test_invalid_canonical_artifact_rejected(self, tmp_path):
         with pytest.raises(CheckpointValidationError):
@@ -573,6 +722,59 @@ class TestAgentContextFiles:
             "## Human Checkpoint Protocol",
         ):
             assert header in contents
+
+    def test_agent_guide_lists_every_pipeline_manifest(self):
+        contents = (PROJECT_ROOT / "AGENT_GUIDE.md").read_text(encoding="utf-8")
+        manifest_names = {path.stem for path in (PROJECT_ROOT / "pipeline_defs").glob("*.yaml")}
+        listed_names = set()
+        in_available_table = False
+        for line in contents.splitlines():
+            if line.strip() == "## Available Pipelines":
+                in_available_table = True
+                continue
+            if in_available_table and line.startswith("## "):
+                break
+            if in_available_table and line.startswith("| `"):
+                listed_names.add(line.split("`", 2)[1])
+
+        assert listed_names >= manifest_names, (
+            "AGENT_GUIDE.md Available Pipelines table is missing pipeline "
+            f"manifests: {sorted(manifest_names - listed_names)}"
+        )
+
+    def test_agent_guide_documents_ad_video_governance_contract(self):
+        contents = (PROJECT_ROOT / "AGENT_GUIDE.md").read_text(encoding="utf-8")
+        required_fragments = (
+            "`ad-video`",
+            "intake -> brief_enrichment -> intelligence -> bible -> idea -> proposal -> script -> scene_plan -> assets -> edit -> compose -> publish",
+            "production_bible",
+            "style_mode",
+            "render_runtime",
+            "sample approval",
+            "asset_review",
+            "music_review",
+        )
+        missing = [fragment for fragment in required_fragments if fragment not in contents]
+        assert not missing, (
+            "AGENT_GUIDE.md is missing ad-video governance guidance: "
+            f"{missing}"
+        )
+
+    def test_agent_guide_resume_call_passes_selected_pipeline(self):
+        contents = (PROJECT_ROOT / "AGENT_GUIDE.md").read_text(encoding="utf-8")
+        assert "get_next_stage(" in contents
+        assert "pipeline_type=<selected pipeline>" in contents, (
+            "AGENT_GUIDE.md must tell agents to pass pipeline_type when calling "
+            "get_next_stage; otherwise manifest-specific pipelines such as "
+            "ad-video resume from the legacy fallback stage order."
+        )
+
+    def test_gitignore_blocks_root_wan_provider_outputs(self):
+        contents = (PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8")
+        assert "wanx_*_output.png" in contents, (
+            ".gitignore should ignore root-level Wan provider image outputs; "
+            "generated media belongs under projects/ or another ignored output path."
+        )
 
     def test_platform_wrappers_reference_agent_guide(self):
         for path in ("CLAUDE.md", "CODEX.md", "CURSOR.md", "COPILOT.md", "AGENTS.md"):

@@ -792,6 +792,38 @@ def test_run_final_review_includes_transcript_comparison_section(tmp_path):
     assert any("not provided" in i for i in tc["issues"])
 
 
+def test_final_review_flags_audio_truncation_as_rerender_issue(tmp_path):
+    import subprocess
+
+    mp4 = tmp_path / "truncated-audio.mp4"
+    subprocess.run(
+        [
+            "ffmpeg", "-y",
+            "-f", "lavfi", "-i", "color=c=#000000:s=320x240:d=4",
+            "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", str(mp4),
+        ],
+        capture_output=True, check=True, timeout=30,
+    )
+
+    review = VideoCompose()._run_final_review(
+        mp4,
+        edit_decisions={
+            "version": "1.0",
+            "total_duration_seconds": 4.0,
+            "render_runtime": "remotion",
+            "cuts": [{"id": "c1", "source": "x", "in_seconds": 0, "out_seconds": 4}],
+        },
+    )
+
+    technical_probe = review["checks"]["technical_probe"]
+    assert "audio_truncation_check" in technical_probe
+    assert any("Audio truncation" in issue for issue in review["issues_found"])
+    assert review["status"] == "revise"
+    assert review["recommended_action"] == "re_render"
+
+
 def test_hyperframes_root_composition_has_data_start_and_duration(tmp_path):
     """Regression: the generated root composition was missing data-start
     and data-duration, violating the HyperFrames contract (SKILL.md table)."""

@@ -1,0 +1,25 @@
+# Normalize all text files to LF on commit and checkout.
+# Eliminates CRLF/LF phantom diffs on Windows/WSL2.
+* text=auto eol=lf
+
+# Explicit binary files — never touch line endings
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.mp4   binary
+*.mp3   binary
+*.wav   binary
+*.ogg   binary
+*.webp  binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.zip   binary
+*.gz    binary
+*.tar   binary
+*.pkl   binary
+*.pt    binary
+*.bin   binary

@@ -9,6 +9,7 @@ manual comparison.
 import json
 import subprocess
 import sys
+import shutil
 from pathlib import Path
 
 import pytest
@@ -16,14 +17,25 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-FOOTAGE = Path(
-    r"C:\Users\ishan\Documents\SocialMedia\IshanAIVideos\pipeline\2026-03-08\seg1_intro.mp4"
-)
-
 
 def _has_ffmpeg() -> bool:
-    import shutil
     return shutil.which("ffmpeg") is not None
+
+
+def _make_synthetic_footage(path: Path, duration: int = 5) -> Path:
+    """Generate a synthetic talking-head-like video with ffmpeg."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        [
+            "ffmpeg", "-y",
+            "-f", "lavfi", "-i", f"color=c=darkblue:s=1280x720:d={duration}:r=30",
+            "-f", "lavfi", "-i", f"sine=frequency=440:duration={duration}",
+            "-c:v", "libx264", "-crf", "23", "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-shortest", str(path),
+        ],
+        capture_output=True, check=True,
+    )
+    return path
 
 
 def _get_duration(path: str) -> float:
@@ -42,17 +54,16 @@ def _get_file_size_mb(path: str) -> float:
 @pytest.fixture(scope="module")
 def comparison_outputs(tmp_path_factory):
     """Run compose handler twice: baseline and enhanced."""
-    if not FOOTAGE.exists():
-        pytest.skip("Test footage not available")
     if not _has_ffmpeg():
         pytest.skip("FFmpeg not available")
+    tmp = tmp_path_factory.mktemp("comparison")
+    footage = _make_synthetic_footage(tmp / "source_footage.mp4")
 
     from tools.video.video_compose import VideoCompose
     from tools.enhancement.face_enhance import FaceEnhance
     from tools.enhancement.color_grade import ColorGrade
     from tools.audio.audio_enhance import AudioEnhance
 
-    tmp = tmp_path_factory.mktemp("comparison")
     results = {}
 
     # Phase 1 baseline: just encode
@@ -60,7 +71,7 @@ def comparison_outputs(tmp_path_factory):
     baseline_path = str(tmp / "phase1_baseline.mp4")
     r = composer.execute({
         "operation": "encode",
-        "input_path": str(FOOTAGE),
+        "input_path": str(footage),
         "output_path": baseline_path,
         "codec": "libx264",
         "crf": 20,
@@ -69,7 +80,7 @@ def comparison_outputs(tmp_path_factory):
     results["baseline"] = baseline_path
 
     # Phase 2 enhanced: face -> color -> audio
-    current = str(FOOTAGE)
+    current = str(footage)
     enhancements = []
 
     face = FaceEnhance()

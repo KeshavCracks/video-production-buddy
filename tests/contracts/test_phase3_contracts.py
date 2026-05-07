@@ -143,7 +143,7 @@ class TestCapabilityMetadata:
         catalog = reg.capability_catalog()
         assert "tts" in catalog
         providers = {item["provider"] for item in catalog["tts"] if item["provider"] != "selector"}
-        assert providers == {"elevenlabs", "google_tts", "openai", "piper"}
+        assert providers == {"bailian", "doubao", "elevenlabs", "google_tts", "openai", "piper"}
 
 
 # ---- Animated Explainer Pipeline ----
@@ -250,6 +250,7 @@ class TestStylePlaybooks:
 
 class TestSkillsExist:
     SKILLS_DIR = PROJECT_ROOT / "skills"
+    AGENT_SKILLS_DIR = PROJECT_ROOT / ".agents" / "skills"
 
     @pytest.mark.parametrize("skill_path", [
         "pipelines/explainer/idea-director.md",
@@ -276,6 +277,19 @@ class TestSkillsExist:
         assert full_path.exists(), f"Missing meta skill: {skill_path}"
         content = full_path.read_text(encoding="utf-8")
         assert len(content) > 500, f"Skill too short to be useful: {skill_path}"
+
+    def test_wanx_image_layer3_skill_exists(self):
+        from tools.graphics.wanx_image import WanxImage
+
+        assert "wanx-best-practices" in WanxImage.agent_skills
+        assert "flux-best-practices" not in WanxImage.agent_skills
+
+        for skill_name in WanxImage.agent_skills:
+            full_path = self.AGENT_SKILLS_DIR / skill_name / "SKILL.md"
+            assert full_path.exists(), f"wanx_image references missing Layer 3 skill: {skill_name}"
+            content = full_path.read_text(encoding="utf-8")
+            assert "Wanxiang" in content or "Wanx" in content
+            assert "negative_prompt" in content
 
     @pytest.mark.parametrize("skill_path", [
         "pipelines/explainer/idea-director.md",

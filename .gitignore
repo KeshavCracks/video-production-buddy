@@ -1,3 +1,6 @@
+# Git worktrees
+.worktrees/
+
 # Python
 __pycache__/
 *.pyc
@@ -33,6 +36,9 @@ corpus/
 
 # User music library (personal royalty-free tracks — not part of repo)
 music_library/
+# But the schema for track-timing sidecars IS part of the repo
+!schemas/music_library/
+!schemas/music_library/**
 
 # Environment & credentials
 .env
@@ -50,8 +56,11 @@ scratch/
 internal/
 
 # Local agent config (user-specific)
+.codex/
 .claude/memory/
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/scheduled_tasks.json
 
 # Agent skills lock (local install tracking)
 skills-lock.json
@@ -59,6 +68,7 @@ skills-lock.json
 # Generated images (logo drafts — final logo lives in assets/)
 logo_*.png
 generated_image.png
+wanx_*_output.png
 
 # Downloaded music files (Pixabay, Freesound — not source code)
 pixabay_music_*
@@ -66,6 +76,9 @@ pixabay_music_*
 # OS
 .DS_Store
 Thumbs.db
+
+# tmux log files (created locally when tmux logging is enabled)
+tmux-*.log
 
 # Node (for remotion-composer/)
 node_modules/
