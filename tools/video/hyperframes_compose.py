@@ -195,6 +195,15 @@ class HyperFramesCompose(BaseTool):
                     "while iterating; forbidden for final delivery."
                 ),
             },
+            "workers": {
+                "type": "integer",
+                "minimum": 1,
+                "description": (
+                    "Number of parallel Chrome workers for `hyperframes render`. "
+                    "Defaults to the CLI default (auto). On WSL2 with video-heavy "
+                    "compositions set to 2 to avoid worker timeout."
+                ),
+            },
         },
     }
 
@@ -710,6 +719,8 @@ class HyperFramesCompose(BaseTool):
             "--fps", str(fps),
             "--quality", quality,
         ]
+        if "workers" in inputs:
+            args += ["--workers", str(int(inputs["workers"]))]
         proc = self._run_hf(args, cwd=workspace, timeout=1800, check=False)
         steps["render"] = {
             "exit_code": proc.returncode,
@@ -845,21 +856,37 @@ class HyperFramesCompose(BaseTool):
 
         music = audio.get("music", {})
         m_id = music.get("asset_id")
+        # Resolve music source: prefer asset_id lookup, fall back to direct src path.
+        music_src_path: Optional[Path] = None
         if m_id and m_id in asset_lookup:
-            src = Path(asset_lookup[m_id].get("path", ""))
-            if src.exists():
-                if not self._is_inside(src, workspace):
-                    dest = assets_dir / src.name
-                    if not dest.exists() or dest.stat().st_size != src.stat().st_size:
-                        shutil.copy2(src, dest)
-                else:
-                    dest = src
-                out["music"] = {
-                    "src": str(dest),
-                    "volume": float(music.get("volume", 0.15) or 0.15),
-                    "fade_in_seconds": float(music.get("fade_in_seconds", 0) or 0),
-                    "fade_out_seconds": float(music.get("fade_out_seconds", 0) or 0),
-                }
+            music_src_path = Path(asset_lookup[m_id].get("path", ""))
+        elif music.get("src"):
+            music_src_path = Path(music["src"])
+        if music_src_path and music_src_path.exists():
+            if not self._is_inside(music_src_path, workspace):
+                dest = assets_dir / music_src_path.name
+                if not dest.exists() or dest.stat().st_size != music_src_path.stat().st_size:
+                    shutil.copy2(music_src_path, dest)
+            else:
+                dest = music_src_path
+            fade_in = float(
+                music.get("fade_in_seconds") or music.get("fadeInSeconds") or 0
+            )
+            fade_out = float(
+                music.get("fade_out_seconds") or music.get("fadeOutSeconds") or 0
+            )
+            out["music"] = {
+                "src": str(dest),
+                "volume": float(music.get("volume", 0.15) or 0.15),
+                "fade_in_seconds": fade_in,
+                "fade_out_seconds": fade_out,
+            }
+        elif music or m_id:
+            log.warning(
+                "HyperFrames compose: music asset not found at %s — "
+                "proceeding without music track.",
+                music_src_path,
+            )
 
         return out
 
@@ -1056,7 +1083,9 @@ class HyperFramesCompose(BaseTool):
                 f'data-start="{self._f(in_s)}" data-duration="{self._f(duration)}" '
                 f'data-track-index="1">{inner}</div>'
             )
-            # Mild entrance — fade + lift.
+            # Mild entrance — fade + lift. +0.1 s offset lets the cut's
+            # container fade-in complete before text animates, avoiding a
+            # simultaneous opacity flash on the first frame.
             tween = (
                 f'tl.from("#{cut_id} h1", {{ y: 40, opacity: 0, duration: 0.6, '
                 f'ease: "power3.out" }}, {self._f(in_s + 0.1)});'
@@ -1071,9 +1100,10 @@ class HyperFramesCompose(BaseTool):
                 f'data-start="{self._f(in_s)}" data-duration="{self._f(duration)}" '
                 f'data-track-index="1" alt="">'
             )
+            # +0.1 s offset matches text-card entrance delay for visual consistency.
             tween = (
                 f'tl.from("#{cut_id}", {{ scale: 1.05, opacity: 0, duration: 0.5, '
-                f'ease: "power2.out" }}, {self._f(in_s)});'
+                f'ease: "power2.out" }}, {self._f(in_s + 0.1)});'
             )
             return html, tween
 

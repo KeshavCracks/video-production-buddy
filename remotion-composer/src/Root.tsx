@@ -127,9 +127,17 @@ const calculateMetadata: CalculateMetadataFunction<ExplainerProps> = async ({
   if (cuts.length === 0) {
     return { durationInFrames: 30 * 60 };
   }
+  // total_duration_seconds drives exact duration when set (ad-video pipeline).
+  // Prevents audio/video length drift caused by implicit tail padding.
+  const totalDuration = props.total_duration_seconds as number | undefined;
+  if (totalDuration && totalDuration > 0) {
+    return { durationInFrames: Math.ceil(totalDuration * 30) };
+  }
   const lastEnd = Math.max(...cuts.map((c) => c.out_seconds || 0));
-  // Add 1 second padding for final fade
-  return { durationInFrames: Math.ceil((lastEnd + 1) * 30) };
+  // tail_padding_seconds: explicit caller control; default 0 so rendered length
+  // matches audio length. Pass tail_padding_seconds=1 for fade-out room.
+  const tail = (props.tail_padding_seconds as number | undefined) ?? 0;
+  return { durationInFrames: Math.ceil((lastEnd + tail) * 30) };
 };
 
 export const Root: React.FC = () => {

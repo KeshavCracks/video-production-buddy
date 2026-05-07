@@ -256,16 +256,33 @@ class SeedanceVideo(BaseTool):
         }
 
         try:
+            submit_url = f"https://queue.fal.run/{model_path}"
             submit_resp = requests.post(
-                f"https://queue.fal.run/{model_path}",
+                submit_url,
                 headers=headers,
                 json=payload,
                 timeout=30,
             )
             submit_resp.raise_for_status()
             queue_data = submit_resp.json()
-            status_url = queue_data["status_url"]
-            response_url = queue_data["response_url"]
+            request_id = queue_data["request_id"]
+            fallback_base = f"{submit_url}/requests/{request_id}"
+
+            # Prefer fal.ai's returned queue URLs. If they are absent or missing
+            # this model path, fall back to the same queue path used for POST.
+            returned_status_url = queue_data.get("status_url")
+            returned_response_url = queue_data.get("response_url")
+            model_request_path = f"/{model_path}/requests/"
+            status_url = (
+                returned_status_url
+                if returned_status_url and model_request_path in returned_status_url
+                else f"{fallback_base}/status"
+            )
+            response_url = (
+                returned_response_url
+                if returned_response_url and model_request_path in returned_response_url
+                else fallback_base
+            )
 
             while True:
                 time.sleep(5)

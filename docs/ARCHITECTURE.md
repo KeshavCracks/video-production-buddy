@@ -241,7 +241,7 @@ Specialized pipelines may insert domain-specific stages. For example,
 
 ## Checkpoint System
 
-Checkpoints persist pipeline state as JSON in the project's `pipeline/` directory.
+Checkpoints persist pipeline state as JSON in the project's `projects/` directory.
 
 ```json
 {
@@ -358,7 +358,7 @@ budget:
 
 checkpoint:
   policy: guided
-  storage_dir: pipeline
+  storage_dir: projects
 
 output:
   default_format: mp4
@@ -369,11 +369,11 @@ output:
   default_crf: 23
 
 paths:
-  pipeline_dir: pipeline
-  library_dir: library
+  pipeline_dir: pipeline_defs
+  library_dir: lib
   styles_dir: styles
   skills_dir: skills
-  output_dir: output
+  output_dir: projects
 ```
 
 All config is validated via Pydantic models in `lib/config_model.py`.

@@ -54,7 +54,7 @@ def ensure_demo_environment() -> str:
     if not npm_cmd:
         raise SystemExit("Error: npm is required but was not found on PATH.")
 
-    npx_cmd = find_command("npx.cmd", "npx", "npx.exe")
+    npx_cmd = find_command("npx", "npx.cmd", "npx.exe")
     if not npx_cmd:
         raise SystemExit("Error: npx is required but was not found on PATH.")
 

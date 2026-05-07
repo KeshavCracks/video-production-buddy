@@ -84,13 +84,17 @@ class VideoCompose(BaseTool):
             "input_path": {"type": "string"},
             "output_path": {"type": "string"},
             "edit_decisions": {
-                "type": "object",
-                "description": "Full edit_decisions artifact (required for compose/render)",
+                "oneOf": [{"type": "object"}, {"type": "string"}],
+                "description": (
+                    "Full edit_decisions artifact or a path to its JSON file "
+                    "(required for compose/render). Passing the object is preferred."
+                ),
             },
             "asset_manifest": {
-                "type": "object",
+                "oneOf": [{"type": "object"}, {"type": "string"}],
                 "description": (
-                    "Full asset_manifest artifact (required for render). "
+                    "Full asset_manifest artifact or a path to its JSON file "
+                    "(required for render). "
                     "Used to resolve asset IDs in cuts[].source to file paths."
                 ),
             },
@@ -338,6 +342,23 @@ class VideoCompose(BaseTool):
         return path.suffix.lower() in VideoCompose._IMAGE_EXTENSIONS
 
     @staticmethod
+    def _coerce_artifact(value: Any, field_name: str) -> dict[str, Any]:
+        """Accept an artifact dict, or load one from a JSON path for compatibility."""
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, (str, Path)):
+            path = Path(value)
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                raise ValueError(f"{field_name} JSON must contain an object: {path}")
+            return data
+        raise TypeError(
+            f"{field_name} must be an artifact object or JSON path, got "
+            f"{type(value).__name__}"
+        )
+
+    @staticmethod
     def _has_audio_stream(path: Path) -> bool:
         """Return True iff ffprobe reports at least one audio stream.
 
@@ -370,9 +391,10 @@ class VideoCompose(BaseTool):
         are routed to Remotion via the render operation — call compose
         directly only for pure video pipelines (e.g. talking-head).
         """
-        edit_decisions = inputs.get("edit_decisions")
-        if not edit_decisions:
+        raw_edit_decisions = inputs.get("edit_decisions")
+        if not raw_edit_decisions:
             return ToolResult(success=False, error="edit_decisions required for compose")
+        edit_decisions = self._coerce_artifact(raw_edit_decisions, "edit_decisions")
 
         output_path = Path(inputs.get("output_path", "composed_output.mp4"))
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -933,18 +955,30 @@ class VideoCompose(BaseTool):
         The agent should pass edit_decisions, asset_manifest, and optionally
         profile, subtitle_path, audio_path, and options.
         """
-        edit_decisions = inputs.get("edit_decisions")
-        asset_manifest = inputs.get("asset_manifest")
-        if not edit_decisions:
+        raw_edit_decisions = inputs.get("edit_decisions")
+        raw_asset_manifest = inputs.get("asset_manifest")
+        if not raw_edit_decisions:
             return ToolResult(success=False, error="edit_decisions required for render")
-        if not asset_manifest:
+        if not raw_asset_manifest:
             return ToolResult(success=False, error="asset_manifest required for render")
+        edit_decisions = self._coerce_artifact(raw_edit_decisions, "edit_decisions")
+        asset_manifest = self._coerce_artifact(raw_asset_manifest, "asset_manifest")
 
         output_path = Path(inputs.get("output_path", "renders/output.mp4"))
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Build asset lookup: id -> asset info
-        asset_lookup = {a["id"]: a for a in asset_manifest.get("assets", [])}
+        # Handles both flat list and nested dict formats:
+        #   flat:   {"assets": [{id, path, ...}, ...]}
+        #   nested: {"assets": {"narration": [...], "images": [...], ...}}
+        raw_assets = asset_manifest.get("assets", [])
+        if isinstance(raw_assets, dict):
+            flat_assets: list = []
+            for category in raw_assets.values():
+                if isinstance(category, list):
+                    flat_assets.extend(category)
+            raw_assets = flat_assets
+        asset_lookup = {a["id"]: a for a in raw_assets if isinstance(a, dict) and "id" in a}
 
         cuts = edit_decisions.get("cuts", [])
         if not cuts:
@@ -1174,6 +1208,8 @@ class VideoCompose(BaseTool):
             hf_inputs["strict"] = inputs["strict"]
         if "skip_contrast" in inputs:
             hf_inputs["skip_contrast"] = inputs["skip_contrast"]
+        if "workers" in inputs:
+            hf_inputs["workers"] = inputs["workers"]
 
         render_result = HyperFramesCompose().execute(hf_inputs)
 
@@ -1298,6 +1334,22 @@ class VideoCompose(BaseTool):
                 error="edit_decisions or composition_data required for remotion_render",
             )
 
+        # Guard: CinematicRenderer expects scenes[] not cuts[].
+        # Passing edit_decisions (cuts[] format) to CinematicRenderer causes a
+        # silent 30s empty render. Catch it early with a clear error.
+        renderer_family = composition_data.get("renderer_family", "")
+        if renderer_family == "cinematic-trailer" and "scenes" not in composition_data:
+            return ToolResult(
+                success=False,
+                error=(
+                    "CinematicRenderer (renderer_family='cinematic-trailer') requires "
+                    "'scenes[]' (CinematicRendererProps format), not 'cuts[]' (edit_decisions format). "
+                    "Build props with scenes[], soundtrack, and music keys, then call with "
+                    "operation='remotion_render'. Passing edit_decisions directly causes a silent "
+                    "30s empty render — this guard prevents that."
+                ),
+            )
+
         output_path = Path(inputs.get("output_path", "renders/remotion_output.mp4"))
         output_path.parent.mkdir(parents=True, exist_ok=True)
         # Absolutise so the CLI can resolve the output regardless of cwd.
@@ -1306,15 +1358,68 @@ class VideoCompose(BaseTool):
         # Deep-copy props so we don't mutate the original
         props = json.loads(json.dumps(composition_data))
 
-        # Convert absolute file paths to file:// URIs for Remotion's
-        # Img and OffthreadVideo components
+        # Resolve asset sources to paths Remotion's local dev server can serve.
+        # Strategy (in order of preference):
+        #   1. Already an HTTP/file/remotion: URI → pass through unchanged.
+        #   2. Relative path → leave as-is; Remotion resolves via staticFile()
+        #      against the composer's public/ directory.
+        #   3. Absolute path inside composer_dir/public/ → convert to relative.
+        #   4. Other absolute path → use file:// URI.
+        # WSL2 NOTE: /mnt/[x]/ paths CANNOT be served by Remotion's Node.js
+        # server via file:// URIs. Instead, create a symlink:
+        #   ln -sfn /path/to/projects remotion-composer/public/projects
+        # and pass paths like "projects/my-proj/assets/video/clip.mp4" (relative).
+        # Compute public_dir directly so it doesn't depend on composer_dir being
+        # defined later in the method.
+        _remotion_public = Path(__file__).resolve().parent.parent.parent / "remotion-composer" / "public"
+
+        def _to_remotion_src(src: str) -> str:
+            if not src or src.startswith(("http://", "https://", "file://", "remotion:")):
+                return src
+            if not Path(src).is_absolute():
+                return src  # already relative — staticFile() resolves it
+            resolved = Path(src).resolve()
+            try:
+                rel = resolved.relative_to(_remotion_public)
+                return str(rel)  # inside public/ → use relative path
+            except ValueError:
+                pass
+            posix = resolved.as_posix()
+            return f"file:///{posix}" if not posix.startswith("/") else f"file://{posix}"
+
+        # Apply to cuts[] (Explainer / FFmpeg path)
         for cut in props.get("cuts", []):
-            source = cut.get("source", "")
-            if source and not source.startswith(("http://", "https://", "file://")):
-                resolved = Path(source).resolve()
-                if resolved.exists():
-                    posix = resolved.as_posix()
-                    cut["source"] = f"file:///{posix}" if not posix.startswith("/") else f"file://{posix}"
+            if cut.get("source"):
+                cut["source"] = _to_remotion_src(cut["source"])
+            # anime_scene images[] — each element is a path string
+            if cut.get("images"):
+                cut["images"] = [_to_remotion_src(img) for img in cut["images"]]
+            # background asset paths (used by overlay-on-image/video scene types)
+            if cut.get("backgroundImage"):
+                cut["backgroundImage"] = _to_remotion_src(cut["backgroundImage"])
+            if cut.get("backgroundVideo"):
+                cut["backgroundVideo"] = _to_remotion_src(cut["backgroundVideo"])
+
+        # Apply to scenes[] (CinematicRenderer path) — previously unhandled
+        for scene in props.get("scenes", []):
+            if scene.get("src"):
+                scene["src"] = _to_remotion_src(scene["src"])
+
+        # Apply to soundtrack / music src fields (CinematicRenderer audio)
+        for audio_key in ("soundtrack", "music"):
+            audio_obj = props.get(audio_key)
+            if isinstance(audio_obj, dict) and audio_obj.get("src"):
+                audio_obj["src"] = _to_remotion_src(audio_obj["src"])
+
+        # Apply to Explainer audio config (audio.narration.src, audio.music.src)
+        audio_config = props.get("audio")
+        if isinstance(audio_config, dict):
+            narration = audio_config.get("narration")
+            if isinstance(narration, dict) and narration.get("src"):
+                narration["src"] = _to_remotion_src(narration["src"])
+            music = audio_config.get("music")
+            if isinstance(music, dict) and music.get("src"):
+                music["src"] = _to_remotion_src(music["src"])
 
         # Build a custom themeConfig from the playbook's actual colors.
         # This ensures every video gets a unique visual identity derived
@@ -1365,12 +1470,13 @@ class VideoCompose(BaseTool):
             except (ImportError, ValueError):
                 pass
 
+        render_timeout = int(inputs.get("render_timeout_seconds", 1800))
         try:
             # Invoke from inside the composer dir so npx can resolve the
             # local remotion binary via node_modules/.bin. Without this,
             # Windows npx cannot locate the CLI and returns "could not
             # determine executable to run".
-            self.run_command(cmd, timeout=600, cwd=composer_dir)
+            self.run_command(cmd, timeout=render_timeout, cwd=composer_dir)
         except Exception as e:
             return ToolResult(success=False, error=f"Remotion render failed: {e}")
         finally:
@@ -1627,6 +1733,21 @@ class VideoCompose(BaseTool):
                         )
                     technical_probe["target_duration"] = target_dur
                     technical_probe["duration_drift_pct"] = round(drift_pct * 100, 1)
+                    # Audio-stream truncation check — catches the class of bug where
+                    # a corrupt TTS file or broken sidechaincompress silently drops
+                    # the tail of the narration (e.g. 28.58s audio in a 31s video).
+                    if audio_stream:
+                        # ffprobe may return "N/A" for duration on some containers;
+                        # guard against ValueError so the check never silently crashes.
+                        _raw_adur = audio_stream.get("duration", "0")
+                        audio_dur = float(_raw_adur) if _raw_adur and _raw_adur != "N/A" else 0.0
+                        if audio_dur > 0 and audio_dur < target_dur - 1.0:
+                            truncation_issue = (
+                                f"Audio truncation: audio {audio_dur:.2f}s is more "
+                                f"than 1s shorter than target {target_dur:.1f}s"
+                            )
+                            technical_probe["audio_truncation_check"] = f"WARN — {truncation_issue}"
+                            technical_probe["issues"].append(truncation_issue)
                 if width < 320 or height < 240:
                     technical_probe["issues"].append(
                         f"Resolution {width}x{height} is very low"
@@ -1912,6 +2033,7 @@ class VideoCompose(BaseTool):
             if any(kw in i.lower() for kw in [
                 "silent downgrade", "delivery promise violation",
                 "effectively silent", "ffprobe failed", "suspiciously short",
+                "audio truncation",
                 "tts punctuation leak",  # reading literal punctuation aloud
             ])
         ]

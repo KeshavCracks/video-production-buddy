@@ -37,13 +37,22 @@ def _load_dotenv() -> None:
                 continue
             key, _, value = line.partition("=")
             key = key.strip()
-            value = value.strip().strip("'\"")
-            # Strip inline comments: VAR=value  # comment
-            # But only if the # is preceded by whitespace (avoid stripping from values like colors)
-            if "  #" in value:
-                value = value[:value.index("  #")].rstrip()
-            elif "\t#" in value:
-                value = value[:value.index("\t#")].rstrip()
+            value = value.strip()
+            if value.startswith(("'", '"')):
+                # Quoted value: extract content between opening and closing quote.
+                # Discards any inline comment after the closing quote.
+                quote = value[0]
+                end = value.find(quote, 1)
+                value = value[1:end] if end > 0 else value.strip(quote)
+            else:
+                # Unquoted: strip inline comments (KEY=value  # comment or KEY=  # comment)
+                for sep in ("  #", "\t#", " #"):
+                    idx = value.find(sep)
+                    if idx != -1:
+                        value = value[:idx].rstrip()
+                        break
+                if value.startswith("#"):
+                    value = ""
             if key and key not in os.environ:
                 os.environ[key] = value
 

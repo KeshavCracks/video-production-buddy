@@ -69,6 +69,7 @@ Each tool's `agent_skills[]` field bridges Layer 1 → Layer 3. See `skills/INDE
 | `tools/base_tool.py` | ToolContract base class |
 | `tools/tool_registry.py` | Tool discovery and reporting |
 | `tools/cost_tracker.py` | Budget governance |
+| `tools/compliance/compliance_check.py` | Deterministic structural compliance checks for `compliance_manifest` checkpoints (timing/presence/beat-mapping) |
 | `tools/video/video_stitch.py` | Multi-clip assembly (stitch, spatial, validate, preview) |
 | `tools/video/video_compose.py` | Runtime-aware composition orchestrator — routes to Remotion / HyperFrames / FFmpeg based on `edit_decisions.render_runtime` |
 | `tools/video/hyperframes_compose.py` | HyperFrames runtime — workspace materialization, `hyperframes lint`/`validate`/`render`, FFmpeg floor check |
@@ -91,8 +92,10 @@ Each tool's `agent_skills[]` field bridges Layer 1 → Layer 3. See `skills/INDE
 | `podcast-repurpose` | `pipeline_defs/podcast-repurpose.yaml` | Podcast repurposing |
 | `cinematic` | `pipeline_defs/cinematic.yaml` | Cinematic edit |
 | `animation` | `pipeline_defs/animation.yaml` | Animation-first |
+| `ad-video` | `pipeline_defs/ad-video.yaml` | Ad/commercial orchestration with pre-production governance and approval gates |
 | `character-animation` | `pipeline_defs/character-animation.yaml` | Local rigged character animation |
 | `hybrid` | `pipeline_defs/hybrid.yaml` | Source-plus-support hybrid |
+| `documentary-montage` | `pipeline_defs/documentary-montage.yaml` | Documentary montage assembly |
 | `avatar-spokesperson` | `pipeline_defs/avatar-spokesperson.yaml` | Avatar presenter |
 | `localization-dub` | `pipeline_defs/localization-dub.yaml` | Localization and dubbing |
 | `framework-smoke` | `pipeline_defs/framework-smoke.yaml` | Test harness |

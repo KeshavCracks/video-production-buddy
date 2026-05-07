@@ -98,7 +98,21 @@ class ToolRegistry:
                     continue
                 key, _, value = line.partition("=")
                 key = key.strip()
-                value = value.strip().strip("'\"")
+                value = value.strip()
+                if value.startswith(("'", '"')):
+                    # Quoted value: extract content between quotes, discard inline comment
+                    quote = value[0]
+                    end = value.find(quote, 1)
+                    value = value[1:end] if end > 0 else value.strip(quote)
+                else:
+                    # Unquoted: strip inline comments
+                    for sep in ("  #", "\t#", " #"):
+                        idx = value.find(sep)
+                        if idx != -1:
+                            value = value[:idx].rstrip()
+                            break
+                    if value.startswith("#"):
+                        value = ""
                 if key and key not in os.environ:
                     os.environ[key] = value
 

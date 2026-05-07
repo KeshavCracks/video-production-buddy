@@ -1,3 +1,8 @@
+---
+name: synthetic-screen-recording
+description: Use for CLI and terminal demo videos where synthetic rendering is better than live capture. Covers Remotion TerminalScene authoring, pacing to narration, and when to use real screen recording instead.
+---
+
 # Synthetic Screen Recording (Remotion TerminalScene)
 
 **Decision this skill answers:** When the user wants a screen-recording-looking demo of a terminal, CLI tool, or coding workflow — do I **capture the real desktop** (OS screen recording via `screen_recorder`, Windows-MCP, Cap, or Playwright), or do I **synthesize it in Remotion** with the `TerminalScene` component?
