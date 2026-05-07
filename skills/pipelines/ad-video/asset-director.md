@@ -1,0 +1,510 @@
+# Asset Director — Ad Video Pipeline (Base)
+
+## When to Use
+
+You are the Asset Director (base). You receive `scene_plan`, `script`, `production_bible`, and `production_proposal` and generate all assets. You run the **sample sub-stage first** (always), await human approval, then proceed to full generation.
+
+**Always read the mode supplement before generating visual assets:**
+- `EP_STATE.style_mode == "animated"` → read `asset-director-animated.md`
+- `EP_STATE.style_mode == "cinematic"` → read `asset-director-cinematic.md`
+
+## Tool Call Pattern
+
+All asset generation uses the tool registry — never construct raw shell commands or API calls manually. Import the tool class, call `.execute(inputs_dict)`, check `result.error` before proceeding. Never assume success.
+
+**Cost capture (use `result.cost_usd`, NOT hand-authored estimates):**
+
+Every paid tool's `execute()` returns a `ToolResult` with a top-level `cost_usd: float` field (see `tools/base_tool.py` line 135 — this is part of the BaseTool contract, not inside `result.data`). Most paid tools populate it from `self.estimate_cost(inputs)` automatically; some can use real billing info from the API response when available.
+
+Read `result.cost_usd` after every call and accumulate into `asset_manifest.costs[]`:
+
+```python
+# After every paid tool call, BEFORE moving to the next tool:
+asset_manifest["costs"].append({
+    "tool": tool.name,
+    "cost_usd": result.cost_usd,  # Read from the ToolResult, NOT from a manual estimate
+})
+asset_manifest["total_cost_usd"] = sum(c["cost_usd"] for c in asset_manifest["costs"])
+```
+
+Anti-pattern: writing the cost dict with a hand-authored number ("`0.30` because that's roughly what a 3s clip costs"). The agent's intuition about API pricing is a poor substitute for the tool's own estimate. Free tools (Pexels, Pixabay, FFmpeg) report `cost_usd=0.0` which is also the correct manifest entry.
+
+When `result.cost_usd == 0.0` on a tool you expected to be paid: log a `cost_capture_warning` in `asset_manifest.metadata` rather than guessing — that signals the tool's `estimate_cost` may be incomplete and prompts a follow-up audit.
+
+```python
+from tools.audio.cosyvoice_tts import CosyVoiceTTS
+from tools.graphics.wanx_image import WanxImage
+from tools.video.wan_video_api import WanVideoAPI
+from tools.audio.minimax_music import MinimaxMusic
+from tools.video.pexels_video import PexelsVideo
+
+# TTS narration — one call per script section.
+# Path A: when script-director sets section["tts_directive"], the speed
+# multiplier per section is derived from the bible's beat intensity. Quieter
+# build sections pace slightly faster; peak sections slow down for emphasis.
+# Legacy briefs without tts_directive use the historical 0.95 baseline.
+speed = section.get("tts_directive", {}).get("speed_mult", 0.95)
+audio_contract = production_proposal["audio_contract"]
+
+tts = CosyVoiceTTS()
+result = tts.execute({
+    "text": section["text"],
+    "voice": audio_contract["voice_id"],  # e.g. "Ethan"
+    "model": "qwen3-tts-flash",
+    "language_type": "English",
+    "speed": speed,
+    "instructions": section.get("speaker_directions", ""),
+    "format": "mp3",
+    "output_path": f"assets/audio/{section['id']}_narration.mp3",
+})
+if result.error:
+    # STOP — do not silently fall back to another provider.
+    # Surface to user per the Provider Swap Emergency Rule in proposal-director.md.
+    raise RuntimeError(f"TTS failed for {section['id']}: {result.error}")
+
+# Bible-derived prompt suffixes — applied to every visual prompt (image and
+# video) so the generation lands on-brief instead of using model defaults.
+# Both helpers return the prompt unchanged when the bible field is unset
+# (legacy briefs).
+from lib.color_direction import apply_color_direction
+from lib.resolution_treatment import apply_resolution_treatment
+
+color_direction = production_bible["visual"].get("color_direction")
+resolution_type = production_bible["narrative"].get("resolution_type")
+
+# Identify whether this scene maps to the resolution beat. The resolution
+# beat is the highest-intensity beat before cta_brand — its beat_id varies
+# by arc_type ("resolution"|"fulfillment"|"after"|"triumph"|"product_reveal"|
+# "payoff"). Look up the bible's emotional_beat_sequence: the beat whose
+# intensity is the maximum among non-cta beats is the resolution.
+# Filter ONLY by beat_id (the authoritative identifier). Substring matching
+# on the free-form `name` field would falsely exclude beats whose name
+# happens to contain "cta" as a substring.
+beats = production_bible["narrative"]["emotional_beat_sequence"]
+non_cta = [b for b in beats if b.get("beat_id") != "cta_brand"]
+resolution_beat_id = max(non_cta, key=lambda b: b["intensity"])["beat_id"] if non_cta else None
+is_resolution_scene = (scene.get("beat_id") == resolution_beat_id) or (scene.get("beat") == resolution_beat_id)
+
+
+# Use default-arg capture so this helper carries the per-iteration value of
+# `is_resolution_scene` even if the snippet is later refactored to define
+# `_wrap` outside the per-scene loop. Without the default-arg trick a
+# closure would capture the loop variable's *final* value for every scene.
+def _wrap(prompt: str, *, _is_resolution=is_resolution_scene) -> str:
+    """Apply color_direction always; apply resolution_treatment only on the
+    resolution-beat scene so the emotional register doesn't leak into other
+    beats' generation."""
+    out = apply_color_direction(prompt, color_direction)
+    if _is_resolution:
+        out = apply_resolution_treatment(out, resolution_type)
+    return out
+
+
+# Still image — one call per non-motion scene
+img = WanxImage()
+img_prompt = f"{playbook['asset_generation']['image_prompt_prefix']} {scene_description}"
+result = img.execute({
+    "prompt": _wrap(img_prompt),
+    "negative_prompt": playbook["asset_generation"]["image_negative_prompt"],
+    "size": "1920*1080",
+    "model": "wan2.7-image-pro",
+    "output_path": f"assets/images/{scene_id}_img.png",
+})
+if result.error:
+    raise RuntimeError(f"Image gen failed for {scene_id}: {result.error}")
+
+# Video clip — one call per motion_required scene
+vid = WanVideoAPI()
+result = vid.execute({
+    "prompt": _wrap(scene_prompt),
+    "negative_prompt": playbook["asset_generation"]["image_negative_prompt"],
+    "operation": "text_to_video",
+    "model_variant": "wan2.6-t2v",
+    "duration": str(int(scene["duration_seconds"])),
+    "resolution": "1080P",
+    "output_path": f"assets/video/{scene_id}_video.mp4",
+})
+if result.error:
+    raise RuntimeError(f"Video gen failed for {scene_id}: {result.error}")
+
+# Stock video — free, for generic establishing shots where AI gen is unnecessary
+stock = PexelsVideo()
+result = stock.execute({
+    "query": "city summer heat haze skyline",
+    "orientation": "landscape",
+    "size": "large",
+    "preferred_quality": "hd",
+    "output_path": f"assets/video/{scene_id}_stock.mp4",
+})
+
+# Music — one call for the full track
+music = MinimaxMusic()
+result = music.execute({
+    "prompt": playbook["audio"]["music_mood"],
+    "is_instrumental": True,
+    "model": "music-2.6",
+    "format": "mp3",
+    "sample_rate": 44100,
+    "output_path": "assets/music/background_music.mp3",
+})
+if result.error:
+    raise RuntimeError(f"Music gen failed: {result.error}")
+```
+
+**Stills fallback rule:** If WanVideoAPI fails for a lifestyle/product/environmental scene, retry once with a simplified prompt, then fall back to PexelsVideo stock — **never** substitute a WanxImage still for a scene that should be moving. A still image lasting more than ~1 second in a commercial is always wrong. If stock has no suitable clip, log it and skip the scene rather than insert a still.
+
+**Provider failure rule:** If any tool returns an error (401 Unauthorized, 429 Too Many Requests, quota exceeded): STOP. Do NOT fall back to a different provider silently. Surface to user with the exact error and the proposed alternative. Wait for explicit approval before retrying with a different provider. Log the swap as a `provider_selection` decision in `decision_log` with `user_approved: true`.
+
+## Required Assets (Non-Negotiable)
+
+These are REQUIRED for ALL style modes and ALL ads:
+
+1. **TTS narration audio** — one audio file per `script.sections[]` item
+   - Provider: ElevenLabs (default) or equivalent TTS
+   - Format: MP3 or WAV, 44.1 kHz
+   - Voice style: `EP_STATE.playbook.audio.voice_style`
+   - Hero moment variation: apply `playbook.audio.hero_moment_voice_shift` on `cta_brand` section
+
+2. **Subtitle file** — one file covering all narration
+   - Format: SRT (preferred) or VTT
+   - Timecodes must align to TTS audio files (use actual TTS durations)
+   - Must be legible at 720p on mobile (minimum 24px equivalent)
+
+Missing either of these is a CRITICAL failure. Abort and alert the EP.
+
+## Sample Sub-Stage (Always Runs)
+
+The sample sub-stage generates a preview clip from the **first 2–3 scenes** before full asset generation proceeds.
+
+### Sample Generation Protocol
+
+1. Generate assets for scenes 1–3 only (or first 2 if scenes are long)
+2. Generate TTS for the hook section only
+3. Assemble the sample clip using compose tools (10–15 second target)
+**Sample scene selection rule:** The sample MUST include at least one scene where the advertised product is visible — even if the creative concept hides the product until a late-stage reveal. If the first 2 chronological scenes contain no product, build the sample as a teaser cut instead: pick one early life-moment scene + one product-visible scene + the tagline/end card. This gives the user enough context to evaluate the concept and the product fit.
+
+4. **Message 1 — announce the file path ONLY:**
+
+> "Sample preview ready at: `renders/sample_preview.mp4`
+> Please open this file and watch it now. I'll wait."
+
+   Do NOT describe what is in the clip. Do NOT ask for approval in this message. The user must engage with the actual video, not a text description of it.
+
+5. **Message 2 — request decision (after user has had time to open the file):**
+
+> "Once you've watched the sample: reply **Approve** to proceed to full generation, or **Reject: [feedback]** to adjust the approach before I generate any more assets."
+
+6. If **approved**: set `EP_STATE.sample_approved = true`. Proceed to full generation.
+7. If **rejected**: set `EP_STATE.sample_approved = false`. Return the user's feedback to the EP.
+   - EP will determine whether to send back to `scene_plan` (visual issue) or `script` (content issue).
+
+**The EP gates all further work on `sample_approved == true`.**
+
+## Full Generation Protocol
+
+After sample approval, generate all remaining assets:
+
+### Step 1: TTS Narration (Complete)
+For each `script.sections[]` item not yet generated, call `CosyVoiceTTS().execute(…)` (see Tool Call Pattern above):
+- Use voice from `production_proposal.audio_contract.voice_id`
+- Apply `playbook.audio.hero_moment_voice_shift` instruction on `cta_brand` section
+- Store output at `assets/audio/{section_id}_narration.mp3`
+- After each call: record actual duration. Prefer `result.duration_seconds` if present; if absent, probe via `ffprobe -show_entries format=duration` on the output file. Record in `asset_manifest.narration_durations`.
+
+### Step 2: Visual Assets
+Delegate to mode supplement for all visual asset generation (images, video clips). The supplement specifies per-scene-type which tool class to use (`WanxImage` for stills, `WanVideoAPI` for motion clips, `PexelsVideo` for free stock). All calls follow the Tool Call Pattern above.
+
+### Step 3: Subtitle File
+Generate subtitle file from actual TTS durations.
+
+**CRITICAL: Generate ASS format, NOT SRT.** When ffmpeg's `subtitles=` filter renders an SRT file, it uses libass's internal default resolution (~384×288) to interpret font sizes and margins, making them scale up massively and appear at wrong positions. An ASS file with explicit `PlayResX`/`PlayResY` headers forces exact pixel-level sizing.
+
+Generate a `.ass` file with headers matching the video resolution:
+
+```python
+def build_ass(cues, video_w, video_h, font_size, margin_v):
+    """cues: list of (start_secs, end_secs, text_with_\N_for_linebreaks)"""
+    def ts(s):
+        h, r = divmod(s, 3600); m, r = divmod(r, 60)
+        return f"{int(h)}:{int(m):02d}:{r:05.2f}"
+    lines = [
+        "[Script Info]",
+        "ScriptType: v4.00+",
+        f"PlayResX: {video_w}",
+        f"PlayResY: {video_h}",
+        "WrapStyle: 0",
+        "",
+        "[V4+ Styles]",
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+        f"Style: Default,DejaVu Sans,{font_size},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,1,1,2,10,10,{margin_v},1",
+        "",
+        "[Events]",
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+    ]
+    for start, end, text in cues:
+        lines.append(f"Dialogue: 0,{ts(start)},{ts(end)},Default,,0,0,0,,{text}")
+    return "\n".join(lines)
+
+# 16:9 (1920x1080): Fontsize=20, MarginV=20
+# 9:16 (1080x1920): Fontsize=24, MarginV=160
+video_w = 1080 if primary_is_9x16 else 1920
+video_h = 1920 if primary_is_9x16 else 1080
+font_size = 28 if primary_is_9x16 else 24
+margin_v = 160 if primary_is_9x16 else 20
+
+ass_content = build_ass(narration_cues, video_w, video_h, font_size, margin_v)
+Path("assets/subtitles.ass").write_text(ass_content, encoding="utf-8")
+```
+
+Store: `subtitles.ass` (not `subtitles.srt`). Pass this path to `video_compose` as `subtitle_path`.
+
+### Step 4: Music
+
+**Music Strategy Branch (read FIRST):**
+
+Read `production_proposal.music_strategy` (default `generative_loose` if unset for legacy briefs):
+
+| Strategy | Path | Use when |
+|---|---|---|
+| `generative_loose` | MiniMax / Suno text-to-music with arc-shaped prompt (current default behavior — see snippet below) | Atmospheric ads where ±2-5s drift on bass-drop timing is acceptable |
+| `library_locked` | Pick a track from `music_library/` whose `<track>.timing.json` sidecar declares `drop_seconds` close to `production_bible.narrative.tension_peak_at_seconds`. Validate the sidecar against `schemas/music_library/track_timing.schema.json`. Trim/pad the track so the chosen drop lands at the target time. | Bar-precise sync required (cinematic trailers, hero product reveals where the bass drop must hit a visual peak within ±0.5s) |
+| `search_align` | Search `pixabay_music` for a track matching `bible.audio.music_direction`, run beat detection (future: `lib.audio.beat_detector`), align the detected drop to `tension_peak_at_seconds`. | Bar-precise sync needed but no curated library track fits |
+| `none` | Skip music entirely. Final mix = narration + ambient SFX only. | Brief explicitly calls for silent or SFX-only audio bed |
+
+**library_locked workflow:**
+
+```python
+import json
+from pathlib import Path
+import jsonschema
+
+ml = Path("music_library")
+target_drop = production_bible["narrative"]["tension_peak_at_seconds"]
+
+candidates = []
+for sidecar in ml.glob("*.timing.json"):
+    sidecar_schema = json.load(open("schemas/music_library/track_timing.schema.json"))
+    timing = json.load(open(sidecar))
+    jsonschema.validate(timing, sidecar_schema)  # refuse malformed sidecars
+    track_path = ml / timing["track_file"]
+    if not track_path.exists():
+        continue  # sidecar references a missing file
+    if timing["duration_seconds"] < scene_plan["total_duration_seconds"]:
+        continue  # too short, can't cover the ad
+    if timing.get("license") == "personal-only":
+        continue  # license forbids ad use
+    drops = timing.get("drop_seconds", [])
+    if not drops:
+        continue  # no declared drop — useless for library_locked
+    nearest_drop = min(drops, key=lambda d: abs(d - target_drop))
+    distance = abs(nearest_drop - target_drop)
+    candidates.append({
+        "track": track_path,
+        "timing": timing,
+        "nearest_drop": nearest_drop,
+        "distance": distance,
+    })
+
+if not candidates:
+    raise RuntimeError(
+        f"music_strategy=library_locked requires at least one music_library/ track "
+        f"with a valid <track>.timing.json declaring drop_seconds. None found. "
+        f"Options: (a) drop a track + sidecar into music_library/, "
+        f"(b) switch music_strategy to generative_loose with documented drift risk, "
+        f"(c) switch to search_align."
+    )
+
+# Pick the best candidate (closest drop, then preferring matching arc_shape).
+chosen = min(candidates, key=lambda c: c["distance"])
+# Trim/pad so chosen.nearest_drop lands at target_drop in the final mix.
+# (See compose-director for the audio-mixer call that does the alignment.)
+```
+
+**generative_loose workflow** (default — the existing MiniMax path):
+
+Generate or select background music:
+- Duration: match total video duration
+- Mood: `EP_STATE.playbook.audio.music_mood`
+- At CTA beat: music rises to full volume (ducking lifted)
+- Store: `background_music.mp3`
+
+**Path B — emotion-aware arc prompting.** When
+`production_bible.narrative.intensity_curve` is present, prepend an arc summary
+to the MiniMax prompt so the generated track climbs and resolves with the
+emotional contour. The duck schedule (set by edit-director) carries the
+rhythm even when MiniMax misses timestamps, so this is reinforcement, not
+the sole signal.
+
+```python
+from lib.intensity_curve import describe_intensity_arc
+from lib.av_sync import apply_av_sync_notes
+
+curve = production_bible["narrative"].get("intensity_curve", [])
+arc = describe_intensity_arc(curve)  # "" when absent
+
+base_mood = playbook["audio"]["music_mood"]
+prompt = f"{base_mood}. Arc: {arc}." if arc else base_mood
+
+# Bible's audio.av_sync_notes (free-form prose like "Music swell on B3
+# solution reveal") is appended last so prompt-conditioned music models
+# can attempt the sync at generation time. Pass-through when notes unset.
+av_sync_notes = production_bible.get("audio", {}).get("av_sync_notes")
+prompt = apply_av_sync_notes(prompt, av_sync_notes)
+
+music = MinimaxMusic()
+result = music.execute({
+    "prompt": prompt,
+    "is_instrumental": True,
+    "model": "music-2.6",
+    "format": "mp3",
+    "sample_rate": 44100,
+    "output_path": "assets/music/background_music.mp3",
+})
+```
+
+The helpers are deterministic; do not hand-author the arc or sync strings.
+Empty intensity_curve → empty arc → falls back to the legacy mood-only
+prompt. Empty av_sync_notes → no suffix appended. No behavior change for
+legacy briefs without these fields.
+
+### Step 4.5: Agent Visual Sanity Check (REQUIRED before asset review)
+
+**Purpose:** catch obvious tool failures (no product visible, wrong aspect ratio, severe artifacts, fingerprints of compositing) BEFORE bothering the user with asset_review. The user's review should be about creative judgment ("does the Hasselblad color sing?"), not about catching gross failures the agent should have flagged.
+
+**Workflow:**
+
+1. For each video clip in `asset_manifest.assets[]`, extract 3 keyframes (start / middle / end) using the existing `frame_sampler` tool:
+
+   ```python
+   from tools.analysis.frame_sampler import FrameSampler
+   from pathlib import Path
+
+   sampler = FrameSampler()
+   for asset in [a for a in asset_manifest["assets"] if a["type"] == "video"]:
+       scene_id = asset["scene_id"]
+       duration = asset.get("duration_seconds", 5)
+       output_dir = Path(f"assets/keyframes/{scene_id}")
+       output_dir.mkdir(parents=True, exist_ok=True)
+
+       result = sampler.execute({
+           "input_path": asset["path"],
+           "strategy": "timestamps",
+           "timestamps": [0.5, duration / 2, max(0.5, duration - 0.5)],
+           "output_dir": str(output_dir),
+       })
+       if not result.success:
+           # Frame extraction failures are non-blocking — flag and continue
+           continue
+   ```
+
+2. Read each keyframe PNG and check:
+
+   | Check | What it catches |
+   |---|---|
+   | Brand-mandatory element visible? | Wan generated a generic phone instead of the OPPO/Hasselblad reference; the orange dot is missing; the device isn't in frame at all |
+   | Aspect ratio correct? | Tool defaulted to landscape when 9:16 was required (the wan2.6-t2v + resolution-preset trap) |
+   | Severe artifacts? | Hand has 6 fingers; product is impossibly distorted; obvious AI-generation tells |
+   | Real-light continuity intact? | Greenscreen seam visible; floating-product compositing fingerprint |
+   | Color science on-brief? | Hasselblad-Natural-Color was specified but the output is over-saturated or blown out |
+
+3. For each scene, record a one-line verdict in `asset_manifest.metadata.visual_sanity[]`:
+
+   ```json
+   "visual_sanity": [
+     {"scene_id": "scene-1", "verdict": "PASS", "notes": "Orange dot visible at t=2.0s; 9:16 confirmed; no artifacts"},
+     {"scene_id": "scene-3", "verdict": "FLAG", "notes": "Lagos market scene generated without device in frame — must regen with explicit prompt"},
+     {"scene_id": "scene-7", "verdict": "WARN", "notes": "Hero ring rotation looks plausibly OPPO but lens deck has 4 lenses, not the spec'd 3"}
+   ]
+   ```
+
+4. **If any FLAG verdicts:** regenerate those scenes (or surface to user with the keyframes attached) BEFORE presenting Step 5 asset_review. WARN verdicts can pass through to user — they're judgment calls.
+
+5. **Skip rule:** if frame_sampler is unavailable (ffmpeg missing) OR the agent's runtime cannot read PNGs (no multimodal capability), skip this step and surface the limitation in `asset_manifest.metadata.visual_sanity_skipped` with the reason. Asset_review remains the human safety net.
+
+**Why this matters:** Wan 2.6 t2v has no reliable mechanism to render specific brand product geometry from prose alone — it generates plausible-looking generic objects. Without this sanity check, agents present the user with clips where the device may not match the brand at all, wasting the user's review time and forcing late-stage regeneration. This step is cheap (FFmpeg keyframe extraction is free) and catches the most expensive class of failure.
+
+### Step 5: Asset Review Gate (REQUIRED before compose)
+
+After all visual assets are generated, present them to the user for review. Do this in two messages.
+
+**Message 1 — list all asset paths:**
+> "All assets generated. Please open and review the following files before I proceed to the final render:
+>
+> **Video clips** (motion-required scenes — check quality and style):
+> - `assets/video/s04_*.mp4` — [brief: what scene]
+> - `assets/video/s05_*.mp4` — …
+> - (all motion-required clips)
+>
+> **Still images** (check visual consistency and brand palette):
+> - `assets/images/s02_*.png` — …
+> - (all stills)
+>
+> Pay particular attention to the hero scene clip (the frost-wave / product moment) — if that one misses, the ad misses."
+
+**Message 2 — request decision:**
+> "Reply **Approve** to proceed, or **Flag: [scene_id] — [issue]** for any clip or image that needs regeneration."
+
+If any asset is flagged: regenerate the specified asset, re-present only that file, wait for approval before proceeding.
+
+### Step 6: Music Review Gate (REQUIRED before compose)
+
+After music is generated, present it for approval. Two messages.
+
+**Message 1 — announce music path ONLY:**
+> "Music track ready at: `assets/music/background_music.mp3`
+> Please listen to the full track. I'll wait."
+
+**Message 2 — request decision:**
+> "Does the music match the brief direction ([e.g., cicada intro → guzheng+electronic → calm outro])? Reply **Approve** or **Reject: [feedback]**."
+
+If rejected: regenerate with adjusted prompt or try a different music provider. Do NOT mix any music into the render without explicit music_review_approved.
+
+## Asset Manifest Format
+
+```json
+{
+  "version": "1.0",
+  "assets": [],
+  "style_mode": "animated",
+  "narration_files": [
+    {"section_id": "hook", "file": "assets/hook_narration.mp3", "duration_seconds": 5.2},
+    {"section_id": "build_1", "file": "assets/build_1_narration.mp3", "duration_seconds": 6.1}
+  ],
+  "subtitle_file": "assets/subtitles.ass",
+  "music_file": "assets/background_music.mp3",
+  "narration_durations": {
+    "hook": 5.2,
+    "build_1": 6.1,
+    "build_2": 7.3,
+    "reveal": 7.8,
+    "cta_brand": 4.1
+  },
+  "visual_assets": [],
+  "sample_clip": "assets/sample_preview.mp4",
+  "total_narration_seconds": 30.5,
+  "costs": [
+    {"tool": "elevenlabs_tts", "cost_usd": 0.30},
+    {"tool": "flux_image_gen", "cost_usd": 0.12}
+  ],
+  "total_cost_usd": 0.42
+}
+```
+
+## Budget Tracking
+
+After each tool call, record the cost in the asset_manifest:
+- Add to `asset_manifest.costs[]`: `{"tool": "{tool_name}", "cost_usd": {amount}}`
+- Accumulate `asset_manifest.total_cost_usd`
+- If `total_cost_usd > EP_STATE.budget_total * 0.9` and asset generation is not complete: include a budget warning in the artifact.
+- If `total_cost_usd > EP_STATE.budget_total`: STOP. Return partial artifact to EP. Do not continue without new budget approval.
+
+The EP will read `asset_manifest.total_cost_usd` and update `EP_STATE.budget_spent_usd` after reviewing the artifact. Directors never write to EP_STATE directly.
+
+## Validation Before Submitting
+
+- [ ] `sample_approved == true` in EP_STATE
+- [ ] TTS file present for every `script.sections[]` item
+- [ ] `subtitle_file` present in asset_manifest
+- [ ] All visual assets listed in asset_manifest exist on disk
+- [ ] `narration_durations` populated for all sections
+- [ ] Budget not exceeded

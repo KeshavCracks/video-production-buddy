@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/intake_brief",
+  "title": "Intake Brief",
+  "description": "Brand context collected by intake-director. Minimum research-direction fields.",
+  "type": "object",
+  "required": ["product", "platform", "duration_target_seconds", "intake_completeness", "round1_questions_asked"],
+  "properties": {
+    "product": { "type": "string", "minLength": 1 },
+    "brand_name": { "type": ["string", "null"] },
+    "platform": {
+      "type": "string",
+      "enum": ["youtube", "tiktok", "instagram", "linkedin", "tv", "generic"]
+    },
+    "duration_target_seconds": { "type": "number", "minimum": 5, "default": 60 },
+    "demographic": { "type": ["string", "null"] },
+    "emotional_intent": { "type": ["string", "null"] },
+    "key_message": { "type": ["string", "null"] },
+    "cta": { "type": ["string", "null"] },
+    "tone": { "type": ["string", "null"] },
+    "reference_files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["filename", "inferred_role", "reason"],
+        "properties": {
+          "filename": { "type": "string" },
+          "inferred_role": {
+            "type": "string",
+            "enum": ["brand_guideline", "competitor_ad", "mood_reference", "product_asset", "style_reference", "existing_ad"]
+          },
+          "reason": { "type": "string" }
+        }
+      },
+      "default": []
+    },
+    "style_mode_candidate": {
+      "type": ["string", "null"],
+      "enum": ["animated", "cinematic", null]
+    },
+    "round1_questions_asked": {
+      "type": "array",
+      "items": { "type": "string" },
+      "maxItems": 3
+    },
+    "intake_completeness": {
+      "type": "string",
+      "enum": ["rich", "adequate", "thin"]
+    }
+  },
+  "additionalProperties": false
+}

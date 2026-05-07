@@ -34,7 +34,56 @@
         "additionalProperties": false
       }
     },
-    "metadata": { "type": "object" }
+    "metadata": { "type": "object" },
+    "pipeline": {
+      "type": "string",
+      "description": "Pipeline that produced this publish log (e.g. 'ad-video'). Optional informational field."
+    },
+    "brand_name": {
+      "type": "string",
+      "description": "Brand name for ad-video and similar branded outputs. Optional."
+    },
+    "total_files_rendered": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of rendered output files across all variants. Optional."
+    },
+    "budget_summary": {
+      "type": "object",
+      "description": "Budget governance summary captured at publish time. Optional.",
+      "additionalProperties": false,
+      "properties": {
+        "approved_usd": { "type": "number", "minimum": 0 },
+        "spent_usd": { "type": "number", "minimum": 0 },
+        "remaining_usd": { "type": "number" }
+      }
+    },
+    "output_file_matrix": {
+      "type": "array",
+      "description": "Per-variant rendered file inventory with per-platform metadata. Optional planning/inventory structure that complements entries[] (which captures the publish actions). Used by ad-video to track derivative cuts and their distribution intent.",
+      "items": {
+        "type": "object",
+        "required": ["file", "variant"],
+        "additionalProperties": false,
+        "properties": {
+          "file": { "type": "string" },
+          "variant": { "type": "string", "description": "Aspect-ratio or duration variant (e.g. '16:9', '9:16', '15s_short')." },
+          "duration_seconds": { "type": "number", "minimum": 0 },
+          "target_platforms": { "type": "array", "items": { "type": "string" } },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "title": { "type": "string" },
+              "description": { "type": "string" },
+              "tags": { "type": "array", "items": { "type": "string" } },
+              "cta_url": { "type": "string" }
+            }
+          },
+          "thumbnail_concept": { "type": "string" }
+        }
+      }
+    }
   },
   "additionalProperties": false
 }

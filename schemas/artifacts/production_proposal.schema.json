@@ -1,0 +1,217 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/production_proposal",
+  "title": "Production Proposal",
+  "description": "Technical-parameter proposal produced by proposal-director. Locks style_mode, render_runtime, subtitles, dubbing, derivatives, audio_contract, and visual_contract for the ad-video pipeline. Creative direction is owned upstream by the production_bible — this artifact carries only execution decisions.",
+  "type": "object",
+  "required": [
+    "selected_idea_id",
+    "style_mode",
+    "render_runtime",
+    "subtitles",
+    "dubbing",
+    "derivatives_added",
+    "budget_confirmed",
+    "audio_contract",
+    "visual_contract"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Schema version pin."
+    },
+    "selected_idea_id": {
+      "type": "string",
+      "pattern": "^C[0-9]+$",
+      "description": "References idea_options.selected_concept_id — must match the concept the user picked."
+    },
+    "style_mode": {
+      "type": "string",
+      "enum": ["animated", "cinematic"],
+      "description": "Visual production mode locked at proposal. EP_STATE and downstream stages read this field; production_bible.visual.style_mode remains upstream audit context."
+    },
+    "render_runtime": {
+      "type": "string",
+      "enum": ["remotion", "hyperframes", "ffmpeg"],
+      "description": "Composition engine locked at proposal. Animated→remotion, cinematic→ffmpeg by default; HyperFrames opt-in. Carried unchanged into edit_decisions.render_runtime."
+    },
+    "subtitles": {
+      "type": "object",
+      "required": ["mode"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["off", "burnt-in", "sidecar"],
+          "description": "off = no subtitles; burnt-in = ASS burned via ffmpeg subtitles filter; sidecar = separate .srt/.vtt file."
+        },
+        "language": {
+          "type": "string",
+          "description": "BCP-47 language tag for the subtitle track (e.g. 'en', 'zh-CN')."
+        },
+        "user_confirmed": {
+          "type": "boolean",
+          "description": "True only after explicit user choice — proposal-director must not silently default."
+        }
+      }
+    },
+    "dubbing": {
+      "type": "array",
+      "description": "Localization dub tracks the user opted into. Empty when no dubs requested.",
+      "items": {
+        "type": "object",
+        "required": ["language"],
+        "additionalProperties": false,
+        "properties": {
+          "language": {
+            "type": "string",
+            "description": "BCP-47 target language for the dub."
+          },
+          "voice_id": {
+            "type": "string",
+            "description": "Provider-specific voice id for the dub track."
+          }
+        }
+      }
+    },
+    "derivatives_added": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Variant ids the user opted into (e.g. '9:16', '1:1', '15s_short'). Empty when only the primary aspect ratio is rendered."
+    },
+    "budget_confirmed": {
+      "type": "boolean",
+      "description": "True only after the user has reviewed and approved the itemized budget. EP must not advance the pipeline while false."
+    },
+    "approved_budget_usd": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Confirmed budget cap in USD. EP carries this into EP_STATE for spend governance."
+    },
+    "music_strategy": {
+      "type": "string",
+      "enum": ["generative_loose", "library_locked", "search_align", "none"],
+      "description": "How the asset stage acquires the music track. generative_loose = MiniMax/Suno text-to-music; arc-shaped output, NOT bar-precise (bass drops drift ±2-5s). Use for atmospheric ads where bar-locked drops are unnecessary. library_locked = require a track from music_library/ with a sidecar <track>.timing.json declaring known structural moments (drop_seconds, downbeats[]). REQUIRED when production_bible.narrative.tension_peak_at_seconds is set AND ±0.5s sync is needed. search_align = search a stock-music provider, use lib.beat_detector to align the drop to tension_peak_at_seconds via trim/pad. none = no background music."
+    },
+    "audio_contract": {
+      "type": "object",
+      "required": [
+        "voice_provider",
+        "voice_id",
+        "target_speed_wps",
+        "target_lufs",
+        "max_section_drift_pct",
+        "duck_depth_db"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "voice_provider": {
+          "type": "string",
+          "enum": ["cosyvoice", "elevenlabs", "openai", "qwen3"],
+          "description": "TTS provider the asset stage must use for ALL narration sections."
+        },
+        "voice_id": {
+          "type": "string",
+          "description": "Provider-specific voice id (e.g. 'Dylan' for cosyvoice)."
+        },
+        "target_speed_wps": {
+          "type": "number",
+          "minimum": 1.0,
+          "maximum": 5.0,
+          "description": "Target words per second; script-director uses this for word-budget calculations."
+        },
+        "target_lufs": {
+          "type": "number",
+          "minimum": -30.0,
+          "maximum": -1.0,
+          "description": "Target loudness in LUFS (TikTok/Reels/Shorts=-14, YouTube=-13, broadcast=-23)."
+        },
+        "max_section_drift_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 50,
+          "description": "Asset-director auto-retries if a section's actual TTS duration overruns the planned duration by more than this percentage."
+        },
+        "duck_depth_db": {
+          "type": "number",
+          "maximum": 0,
+          "description": "Music ducking depth (negative dB) during speech windows."
+        }
+      }
+    },
+    "visual_contract": {
+      "type": "object",
+      "required": [
+        "style_direction",
+        "typography_pairing",
+        "color_rhythm",
+        "atmosphere",
+        "anti_template_checklist"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "style_direction": {
+          "type": "string",
+          "enum": [
+            "editorial-tech",
+            "neo-brutalist",
+            "glassmorphism",
+            "bento",
+            "scrollytelling",
+            "dark-luxury",
+            "swiss"
+          ],
+          "description": "Anti-template visual direction; deliberate, not generic."
+        },
+        "typography_pairing": {
+          "type": "object",
+          "required": ["display", "body"],
+          "additionalProperties": false,
+          "properties": {
+            "display": {
+              "type": "string",
+              "description": "Display / headline font family + weight (e.g. 'Inter 800 italic')."
+            },
+            "body": {
+              "type": "string",
+              "description": "Body font family + weight."
+            }
+          }
+        },
+        "color_rhythm": {
+          "type": "string",
+          "enum": ["intentional-rotation", "held-accent", "gradient-shift"],
+          "description": "How color is paced across beats."
+        },
+        "atmosphere": {
+          "type": "object",
+          "required": ["default_layers"],
+          "additionalProperties": false,
+          "properties": {
+            "default_layers": {
+              "type": "array",
+              "description": "Style layers applied to every scene unless overridden.",
+              "items": { "type": "object" }
+            },
+            "per_beat_overrides": {
+              "type": "object",
+              "description": "Map of beat-id (B1, B2, ...) to layer overrides for that beat.",
+              "additionalProperties": {
+                "type": "array",
+                "items": { "type": "object" }
+              }
+            }
+          }
+        },
+        "anti_template_checklist": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "Concrete anti-template assertions the scene/asset/compose stages must satisfy."
+        }
+      }
+    }
+  }
+}

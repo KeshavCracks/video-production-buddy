@@ -20,6 +20,7 @@ from schemas.artifacts import ARTIFACT_NAMES, validate_artifact
 ALL_KNOWN_STAGES = frozenset([
     "research", "proposal", "idea", "script", "scene_plan",
     "assets", "edit", "compose", "publish",
+    "intake", "brief_enrichment", "intelligence", "bible",
 ])
 
 # Backward-compatible alias — existing code / tests that import STAGES still work.
@@ -38,6 +39,28 @@ CANONICAL_STAGE_ARTIFACTS = {
     "compose": "render_report",
     "publish": "publish_log",
 }
+
+AD_VIDEO_CANONICAL_STAGE_ARTIFACTS = {
+    "intake": "intake_brief",
+    "brief_enrichment": "enriched_brief",
+    "intelligence": "intelligence_brief",
+    "bible": "production_bible",
+    "idea": "idea_options",
+    "proposal": "production_proposal",
+    "script": "script",
+    "scene_plan": "scene_plan",
+    "assets": "asset_manifest",
+    "edit": "edit_decisions",
+    "compose": "render_report",
+    "publish": "publish_log",
+}
+
+
+def _canonical_artifact_for_stage(stage: str, pipeline_type: str | None) -> str:
+    """Return the canonical artifact name for a stage in its pipeline context."""
+    if pipeline_type == "ad-video":
+        return AD_VIDEO_CANONICAL_STAGE_ARTIFACTS[stage]
+    return CANONICAL_STAGE_ARTIFACTS[stage]
 
 # Additional artifacts that may be produced alongside canonical ones.
 # These are not stage-defining but are required by governance contracts.
@@ -96,8 +119,9 @@ def _validate_artifacts_for_stage(
     stage: str,
     status: str,
     artifacts: dict[str, Any],
+    pipeline_type: str | None = None,
 ) -> None:
-    required_artifact = CANONICAL_STAGE_ARTIFACTS[stage]
+    required_artifact = _canonical_artifact_for_stage(stage, pipeline_type)
     if status in {"completed", "awaiting_human"} and required_artifact not in artifacts:
         raise CheckpointValidationError(
             f"Stage {stage!r} with status {status!r} must include "
@@ -145,7 +169,7 @@ def validate_checkpoint(checkpoint: dict[str, Any]) -> None:
     if not isinstance(artifacts, dict):
         raise CheckpointValidationError("Checkpoint artifacts must be a dictionary")
 
-    _validate_artifacts_for_stage(stage, status, artifacts)
+    _validate_artifacts_for_stage(stage, status, artifacts, pipeline_type)
 
     try:
         jsonschema.validate(instance=checkpoint, schema=_load_checkpoint_schema())

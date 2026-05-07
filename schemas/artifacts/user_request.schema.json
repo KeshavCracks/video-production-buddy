@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/user_request",
+  "title": "User Request",
+  "description": "Verbatim record of the user's original instruction(s) that started this project. Written at project init, before any stage runs. The canonical source of truth for user intent — every downstream artifact (intake_brief, brief, research_brief, etc.) is an interpretation of this. Never edited or rewritten; revisions are appended as additional turns.",
+  "type": "object",
+  "required": ["version", "project_id", "created_at", "prompt"],
+  "properties": {
+    "version": { "type": "string", "const": "1.0" },
+    "project_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Kebab-case project name matching projects/<project_id>/."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of when the request was first captured."
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Verbatim text of the user's first actionable instruction. Stored exactly as written — no paraphrasing, no cleanup, no translation."
+    },
+    "prompt_turns": {
+      "type": "array",
+      "description": "Subsequent verbatim user messages that materially refined the brief during intake. Append-only; do not edit prior entries.",
+      "items": {
+        "type": "object",
+        "required": ["at", "text"],
+        "properties": {
+          "at": { "type": "string", "format": "date-time" },
+          "text": { "type": "string", "minLength": 1 },
+          "note": {
+            "type": "string",
+            "description": "Optional one-line agent annotation explaining why this turn matters (e.g., 'changed target platform', 'added reference video')."
+          }
+        },
+        "additionalProperties": false
+      },
+      "default": []
+    },
+    "references": {
+      "type": "array",
+      "description": "Concrete materials the user pointed to in their request — URLs, local file paths, music_library tracks. Captured verbatim; not yet validated.",
+      "items": {
+        "type": "object",
+        "required": ["kind", "value"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["url", "file", "music_library", "other"]
+          },
+          "value": { "type": "string", "minLength": 1 },
+          "role": {
+            "type": "string",
+            "description": "User-stated or agent-inferred role, e.g. 'reference_video', 'product_asset', 'mood_reference'."
+          },
+          "note": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
+      "default": []
+    },
+    "pipeline_hint": {
+      "type": ["string", "null"],
+      "description": "Pipeline name if the user explicitly named one (e.g., 'cinematic', 'screen-demo'). Null when the agent must infer."
+    },
+    "session_id": {
+      "type": ["string", "null"],
+      "description": "Optional Claude Code (or other harness) session id pointing back to the originating transcript. Best-effort; not required."
+    },
+    "language": {
+      "type": ["string", "null"],
+      "description": "BCP 47 tag of the prompt language, e.g. 'en', 'zh-CN'. Optional but useful for downstream localization decisions."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Free-form bag for harness-specific context (operator name, channel, ticket id, etc.).",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

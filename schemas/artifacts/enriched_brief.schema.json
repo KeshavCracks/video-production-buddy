@@ -1,0 +1,244 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Enriched Brief",
+  "description": "AI-expanded creative brief produced by brief-enrichment-director. Reviewed and approved by the user at Gate G-0 before intelligence research begins. Contents are a HYPOTHESIS — subject to validation and challenge by intelligence-director.",
+  "type": "object",
+  "required": [
+    "product_brief",
+    "ad_specification",
+    "narrative_arc",
+    "brand_guideline",
+    "narration_notes",
+    "hypothesis_flags",
+    "user_approved"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "product_brief": {
+      "type": "object",
+      "description": "Core product identity section.",
+      "required": ["product_name", "product_type", "tagline", "product_description", "target_demographic"],
+      "additionalProperties": false,
+      "properties": {
+        "product_name": {
+          "type": "string",
+          "description": "Full product name including edition or variant."
+        },
+        "product_type": {
+          "type": "string",
+          "description": "Category and primary function (e.g. 'Personal care / mosquito-repellent floral water')."
+        },
+        "tagline": {
+          "type": "string",
+          "description": "Short punchy tagline. Original or inferred — must feel designed, not generic."
+        },
+        "product_description": {
+          "type": "string",
+          "description": "2-3 vivid, specific sentences covering ingredients or features, the product's signature effect, and packaging/presentation."
+        },
+        "target_demographic": {
+          "type": "string",
+          "description": "Age range, lifestyle context, and primary usage occasion. Specific and non-generic."
+        }
+      }
+    },
+    "ad_specification": {
+      "type": "object",
+      "description": "Production parameters for the ad.",
+      "required": [
+        "duration_seconds",
+        "platform",
+        "language",
+        "visual_style",
+        "aspect_ratio",
+        "tone",
+        "music_direction"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "duration_seconds": {
+          "type": "number",
+          "minimum": 5,
+          "description": "Target runtime in seconds."
+        },
+        "platform": {
+          "type": "string",
+          "enum": ["youtube", "tiktok", "instagram", "linkedin", "tv", "generic"],
+          "description": "Primary distribution platform."
+        },
+        "language": {
+          "type": "string",
+          "description": "Narration language (e.g. 'English', 'Mandarin Chinese')."
+        },
+        "visual_style": {
+          "type": "string",
+          "enum": ["cinematic", "animated"],
+          "description": "Render mode — cinematic (photorealistic / live-action aesthetic) or animated (motion graphics)."
+        },
+        "aspect_ratio": {
+          "type": "string",
+          "description": "Primary aspect ratio (e.g. '16:9', '9:16')."
+        },
+        "derivative_variants": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Suggested derivative cuts (e.g. ['15s', '9:16']). May be empty."
+        },
+        "tone": {
+          "type": "string",
+          "description": "Minimum 3 adjectives describing the ad's emotional register."
+        },
+        "music_direction": {
+          "type": "string",
+          "description": "Full paragraph: opening texture to mid-section energy to climax to outro resolution. Must include dB ducking spec under narration."
+        },
+        "budget_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Estimated AI generation budget in USD."
+        }
+      }
+    },
+    "narrative_arc": {
+      "type": "array",
+      "description": "Exactly 5 named story beats with timestamps that sum to the full duration. HYPOTHESIS — subject to research validation.",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["beat_name", "time_range", "visual_description", "emotional_target", "key_action"],
+        "additionalProperties": false,
+        "properties": {
+          "beat_name": {
+            "type": "string",
+            "description": "CAPITALISED name for this beat (e.g. THE HEAT, THE HERITAGE, THE MOMENT)."
+          },
+          "time_range": {
+            "type": "string",
+            "description": "Timestamp range (e.g. '0-10s', '22-35s')."
+          },
+          "visual_description": {
+            "type": "string",
+            "description": "Cinematographic, sensory description of what is seen. Specific — no vague placeholders."
+          },
+          "emotional_target": {
+            "type": "string",
+            "description": "The emotional state the viewer should reach by the end of this beat."
+          },
+          "key_action": {
+            "type": "string",
+            "description": "The pivotal action or transition that drives this beat forward."
+          }
+        }
+      }
+    },
+    "brand_guideline": {
+      "type": "object",
+      "description": "Visual identity rules for the production.",
+      "required": ["primary_color", "font_style", "prohibited_elements"],
+      "additionalProperties": false,
+      "properties": {
+        "primary_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "description": "Primary brand colour in hex (e.g. '#006B3F')."
+        },
+        "accent_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "description": "Secondary / accent colour in hex."
+        },
+        "font_style": {
+          "type": "string",
+          "description": "Headline font style and body font style."
+        },
+        "logo_placement": {
+          "type": "string",
+          "description": "Where and when the logo appears."
+        },
+        "prohibited_elements": {
+          "type": "array",
+          "minItems": 3,
+          "items": { "type": "string" },
+          "description": "At least 3 explicit prohibitions relevant to this product category."
+        }
+      }
+    },
+    "narration_notes": {
+      "type": "object",
+      "description": "Voice direction and key script lines.",
+      "required": ["voice_description", "key_lines", "target_word_count"],
+      "additionalProperties": false,
+      "properties": {
+        "voice_description": {
+          "type": "string",
+          "description": "Gender, age range, vocal quality, energy level, and delivery style."
+        },
+        "key_lines": {
+          "type": "array",
+          "minItems": 3,
+          "items": { "type": "string" },
+          "description": "At least 3 complete sentences (not placeholders) that must appear in or inspire the narration."
+        },
+        "target_word_count": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Target word count derived from duration x words-per-second (typically 2.5 wps for English)."
+        }
+      }
+    },
+    "hypothesis_flags": {
+      "type": "array",
+      "description": "Every dimension the brief contains, labelled INFERRED or FROM BRIEF. Intelligence uses this as its validation agenda.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["dimension", "status", "basis"],
+        "additionalProperties": false,
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "description": "Name of the creative or production dimension (e.g. 'arc_type', 'music_direction', 'target_demographic')."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["INFERRED", "FROM BRIEF"],
+            "description": "INFERRED = director filled this in from creative judgment; FROM BRIEF = user explicitly stated this."
+          },
+          "basis": {
+            "type": "string",
+            "description": "One-line rationale: why this value was chosen (INFERRED) or what the user said (FROM BRIEF)."
+          }
+        }
+      }
+    },
+    "user_approved": {
+      "type": "boolean",
+      "default": false,
+      "description": "Set to true only after the user explicitly replies APPROVE at Gate G-0."
+    },
+    "user_edits": {
+      "type": "array",
+      "description": "Log of changes the user made via EDIT replies before approving.",
+      "items": {
+        "type": "object",
+        "required": ["section", "field", "original", "revised"],
+        "properties": {
+          "section":  { "type": "string" },
+          "field":    { "type": "string" },
+          "original": {},
+          "revised":  {}
+        }
+      }
+    },
+    "arc_type": {
+      "type": "string",
+      "enum": ["problem-solution", "desire-fulfillment", "contrast", "journey", "social-proof", "demo-reveal"],
+      "description": "Hypothesised narrative arc. Optional — INFERRED by brief-enrichment-director when present, surfaced via hypothesis_flags. bible-director compares this against intelligence's classification (uses the same enum as production_bible.narrative.arc_type)."
+    },
+    "hook_mechanic": {
+      "type": "string",
+      "description": "Hypothesised hook mechanic (e.g. 'question', 'visual-contrast', 'stat'). Optional. Same role as arc_type — surfaced via hypothesis_flags and validated by intelligence."
+    }
+  }
+}

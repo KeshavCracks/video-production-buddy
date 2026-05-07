@@ -1,0 +1,329 @@
+name: Ad Video Pipeline
+version: '1.0'
+category: custom
+stability: beta
+description: Orchestrated ad/commercial video pipeline. Supports animated and cinematic
+  render modes, derivative aspect-ratio variants (9:16, 1:1, 15s short), mandatory
+  sample approval, and required TTS + subtitle generation.
+orchestration:
+  skill: pipelines/ad-video/executive-producer
+  budget_default_usd: 5.0
+  max_wall_time_minutes: 30
+  max_revisions_per_stage: 3
+  max_send_backs: 3
+compatible_playbooks:
+- ad-brand
+- flat-motion-graphics
+- clean-professional
+required_skills:
+- skills/pipelines/ad-video/intake-director.md
+- skills/pipelines/ad-video/brief-enrichment-director.md
+- skills/pipelines/ad-video/intelligence-director.md
+- skills/pipelines/ad-video/bible-director.md
+- skills/pipelines/ad-video/executive-producer.md
+- skills/pipelines/ad-video/idea-director.md
+- skills/pipelines/ad-video/proposal-director.md
+- skills/pipelines/ad-video/script-director.md
+- skills/pipelines/ad-video/scene-director.md
+- skills/pipelines/ad-video/scene-director-animated.md
+- skills/pipelines/ad-video/scene-director-cinematic.md
+- skills/pipelines/ad-video/asset-director.md
+- skills/pipelines/ad-video/asset-director-animated.md
+- skills/pipelines/ad-video/asset-director-cinematic.md
+- skills/pipelines/ad-video/edit-director.md
+- skills/pipelines/ad-video/compose-director.md
+- skills/pipelines/ad-video/publish-director.md
+stages:
+- name: intake
+  skill: pipelines/ad-video/intake-director
+  produces:
+    - intake_brief
+  checkpoint_required: false
+  human_approval_default: false
+  review_focus:
+    - intake_completeness is honest (not "rich" when prompt was actually thin)
+    - round1_questions_asked contains only research-direction questions
+    - round1_questions_asked.length <= 3
+  success_criteria:
+    - Schema-valid intake_brief produced
+
+- name: brief_enrichment
+  skill: pipelines/ad-video/brief-enrichment-director
+  required_artifacts_in:
+    - intake_brief
+  produces:
+    - enriched_brief
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+    - user_approved == true (G-0 requires explicit APPROVE reply — not implicit agreement)
+    - All 5 narrative arc beats populated with full visual + emotional + key_action detail
+    - hypothesis_flags non-empty — every INFERRED dimension listed with specific basis
+    - No empty strings in product_brief or ad_specification
+    - prohibited_elements contains at least 3 category-specific rules
+  success_criteria:
+    - Schema-valid enriched_brief produced
+    - enriched_brief.user_approved == true
+
+- name: intelligence
+  skill: pipelines/ad-video/intelligence-director
+  required_artifacts_in:
+    - intake_brief
+    - enriched_brief
+  produces:
+    - intelligence_brief
+  checkpoint_required: false
+  human_approval_default: false
+  review_focus:
+    - All recommendations carry a confidence tier
+    - rejected_approaches is non-empty (empty = insufficient research)
+    - audience_psychographics are specific and research-cited, not generic
+    - At least 3 hit ads analyzed
+  success_criteria:
+    - Schema-valid intelligence_brief with recommendations
+
+- name: bible
+  skill: pipelines/ad-video/bible-director
+  required_artifacts_in:
+    - intake_brief
+    - enriched_brief
+    - intelligence_brief
+  produces:
+    - production_bible
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+    - strategic_approved == true before advancing
+    - execution_approved == true before advancing
+    - compliance_manifest checkpoints are derived not hardcoded
+    - default-heuristic checkpoints use failure_action=flag only
+    - deliverables.primary aspect_ratio matches platform default
+    - rejected_approaches present in intelligence section
+    - cta is non-null (must be set before execution_approved=true)
+  success_criteria:
+    - Schema-valid production_bible with both approval flags true
+
+- name: idea
+  skill: pipelines/ad-video/idea-director
+  required_artifacts_in:
+  - intake_brief
+  - intelligence_brief
+  - production_bible
+  produces:
+  - idea_options
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - All concepts satisfy every beat in production_bible.narrative.emotional_beat_sequence
+  - All mandatory visual_motifs appear in each concept's beat mapping
+  - No rejected_approaches used
+  - Concepts differ in scenario/character/metaphor but NOT in arc_type/beats/hook_mechanic
+  success_criteria:
+  - Schema-valid idea_options with selected_concept_id set by user
+- name: proposal
+  skill: pipelines/ad-video/proposal-director
+  required_artifacts_in:
+  - idea_options
+  - production_bible
+  produces:
+  - production_proposal
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - style_mode locked (confirmed or changed from bible candidate)
+  - 'render_runtime selected and logged (HARD RULE: present both if both available)'
+  - Derivatives explicitly opted in or out (9:16, 1:1, 15s short)
+  - Subtitles and dubbing preferences explicitly confirmed
+  - CTA confirmed non-null
+  - Budget confirmed and itemized by stage
+  success_criteria:
+  - Schema-valid production_proposal artifact produced
+  - style_mode locked in production_bible.visual.style_mode
+  - render_runtime locked in production_bible.visual.render_runtime
+  - deliverables.derivatives populated in production_bible
+- name: script
+  skill: pipelines/ad-video/script-director
+  required_artifacts_in:
+  - production_proposal
+  - production_bible
+  - idea_options
+  produces:
+  - script
+  optional_tools:
+  - compliance_check
+  checkpoint_required: true
+  human_approval_default: true
+  review_focus:
+  - 'Four beats present: hook, build, reveal, cta_brand'
+  - Word count within ±10% of duration_target_seconds × 2.5
+  - Mode annotations present on lines where animated/cinematic treatment differs
+  - CTA section ends with brand name — non-negotiable
+  - User has READ and APPROVED the full narration text before TTS generation begins
+  success_criteria:
+  - script artifact produced with sections array
+  - total_words within ±10% of target
+  - script.user_approved == true (user explicitly approved the narration text)
+- name: scene_plan
+  skill: pipelines/ad-video/scene-director
+  required_artifacts_in:
+  - script
+  - production_proposal
+  - production_bible
+  - idea_options
+  produces:
+  - scene_plan
+  optional_tools:
+  - compliance_check
+  checkpoint_required: false
+  review_focus:
+  - 'All broll and generated scenes have motion_required: true — stills only permitted
+    for text_card and packshot scene types'
+  - Total scene duration covers script duration (±0.5s)
+  - crop_regions present for every scene when derivatives opted in
+  - core field present on every scene
+  - No more than 3 consecutive scenes of same type
+  - motion_required field present on scenes requiring actual video
+  success_criteria:
+  - scene_plan artifact produced
+  - sum(scene.duration) within ±0.5s of total script duration
+  - 'If derivative_variants non-empty: all scenes have crop_regions'
+- name: assets
+  skill: pipelines/ad-video/asset-director
+  required_artifacts_in:
+  - scene_plan
+  - script
+  produces:
+  - asset_manifest
+  checkpoint_required: false
+  required_tools:
+  - cosyvoice_tts
+  - wanx_image
+  - wan_video_api
+  - minimax_music
+  - audio_mixer
+  optional_tools:
+  - pexels_video
+  - pixabay_video
+  tools_available:
+  - cosyvoice_tts
+  - wanx_image
+  - wan_video_api
+  - minimax_music
+  - audio_mixer
+  - pexels_video
+  - pixabay_video
+  sub_stages:
+  - name: sample
+    description: Generate 10–15s preview clip from first 2–3 scenes. Always runs.
+      State the file PATH only — do NOT describe visual content. Wait for user to
+      open and watch the file before asking for approval.
+    human_approval_default: true
+    review_focus:
+    - File path communicated — NOT a content description
+    - Approval requested in a SEPARATE message after user has had time to view the
+      file
+    - sample_clip file exists and is playable
+    - sample_approved == true in EP_STATE after user decision
+  - name: full_generation
+    description: Generate all remaining assets after sample approval.
+    human_approval_default: false
+    review_focus:
+    - TTS audio file generated for every script section
+    - Subtitle file (SRT/VTT) generated
+    - All scene assets match scene_plan required_assets
+    - Style consistency across all generated images
+    - asset_manifest complete with all required files
+    - narration_durations populated in EP_STATE
+    - subtitle_file present in asset_manifest
+  - name: asset_review
+    description: Present all generated stills and video clips to user before compose.
+      List every asset file path. User must explicitly approve visual quality before
+      renders begin.
+    human_approval_default: true
+    review_focus:
+    - All generated image and video paths listed for user
+    - User has opened and reviewed at least the hero scenes (especially motion-required
+      clips)
+    - asset_review_approved == true
+  - name: music_review
+    description: Present the generated music track to user for approval before mixing.
+      State the file path. Do NOT proceed to compose until user has listened and approved.
+    human_approval_default: true
+    review_focus:
+    - Music track file path communicated
+    - User has listened to the full track
+    - Music arc confirmed matches brief direction specified in production_plan.music_source.mood_direction
+    - music_review_approved == true
+  review_focus:
+  - Sample sub-stage includes at least one product-visible scene (not chronological-only
+    if product appears late)
+  - sample_approved == true before full generation proceeds
+  - asset_review_approved == true before compose begins
+  - music_review_approved == true before compose begins
+  - TTS files present for all sections
+  - Budget not exceeded
+  success_criteria:
+  - asset_manifest artifact produced
+  - sample_approved == true
+  - asset_review_approved == true
+  - music_review_approved == true
+  - subtitle_file present
+- name: edit
+  skill: pipelines/ad-video/edit-director
+  required_artifacts_in:
+  - scene_plan
+  - asset_manifest
+  - production_bible
+  produces:
+  - edit_decisions
+  optional_tools:
+  - compliance_check
+  checkpoint_required: false
+  review_focus:
+  - Timeline covers 0 to total_duration with no gaps
+  - Music ducking set to -18 dB during all narration segments
+  - Subtitle burn configured
+  - Derivative edit specs present when derivative_variants non-empty
+  success_criteria:
+  - edit_decisions artifact produced
+  - audio.target_db == -18 for all narration windows
+  - edit_decisions.subtitles.enabled captured (user opt-in, not forced)
+- name: compose
+  skill: pipelines/ad-video/compose-director
+  required_artifacts_in:
+  - edit_decisions
+  - asset_manifest
+  produces:
+  - render_report
+  checkpoint_required: false
+  required_tools:
+  - video_compose
+  - audio_mixer
+  tools_available:
+  - video_compose
+  - audio_mixer
+  review_focus:
+  - Primary render complete at declared aspect_ratio_primary (16:9 or 9:16)
+  - crop_regions verified present before each derivative render
+  - Each derivative is a separate output file
+  - Duration within ±5% of target
+  - 'Audio channels: stereo'
+  success_criteria:
+  - render_report artifact produced
+  - output_files contains primary file at declared aspect_ratio_primary
+  - output_files contains one entry per opted-in derivative
+- name: publish
+  skill: pipelines/ad-video/publish-director
+  required_artifacts_in:
+  - render_report
+  - production_proposal
+  produces:
+  - publish_log
+  checkpoint_required: false
+  review_focus:
+  - output_file_matrix present with all rendered files
+  - 'Metadata complete: title, description, tags, platform targets'
+  - Thumbnail concept written
+  success_criteria:
+  - publish_log artifact produced
+  - output_file_matrix non-empty

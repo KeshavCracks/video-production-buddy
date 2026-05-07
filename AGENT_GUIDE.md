@@ -167,12 +167,22 @@ This applies especially to:
 
 The agent itself orchestrates the production state machine:
 
-`research -> proposal -> script -> scene_plan -> assets -> edit -> compose`
+Pipeline stage order is defined by the selected manifest, not by a global hardcoded
+sequence. Common generated-video pipelines follow a core pattern such as:
+
+`research -> proposal -> script -> scene_plan -> assets -> edit -> compose -> publish`
+
+Some pipelines add governance stages before the creative plan. For `ad-video`, the
+current manifest sequence is:
+
+`intake -> brief_enrichment -> intelligence -> bible -> idea -> proposal -> script -> scene_plan -> assets -> edit -> compose -> publish`
+
+Do not skip these extra stages just because another pipeline uses a shorter graph.
 
 The agent:
 
 1. Reads the pipeline manifest (`pipeline_defs/*.yaml`) to know the process
-2. Calls `checkpoint.get_next_stage()` to find where to resume
+2. Calls `checkpoint.get_next_stage(projects_dir, project_id, pipeline_type=<selected pipeline>)` to find where to resume
 3. Reads the stage's director skill (`skills/pipelines/<pipeline>/<stage>-director.md`) to know HOW
 4. Uses tools (`tools/`) for concrete capabilities
 5. Self-reviews using the reviewer meta skill (`skills/meta/reviewer.md`)
@@ -191,13 +201,21 @@ Every production run creates a project workspace under `projects/`. This directo
 
 ```
 projects/<project-name>/
-├── artifacts/          # JSON artifacts from each stage (research_brief, script, scene_plan, etc.)
+├── USER_PROMPT.md      # Verbatim record of the user's original instruction (human-readable mirror)
+├── reference_assets/   # OPTIONAL — user-supplied brand reference inputs (gitignored)
+│   ├── product_*.{png,jpg}    # Product photography (used as image-to-video sources)
+│   ├── brand_logo.{png,svg}   # Brand wordmark / logotype
+│   └── style_*.{png,jpg}      # Mood / style reference images
+├── artifacts/
+│   ├── user_request.json   # Canonical user_request artifact (schemas/artifacts/user_request.schema.json)
+│   └── ...                  # JSON artifacts from each stage (research_brief, script, scene_plan, etc.)
 ├── assets/
 │   ├── images/         # Generated images (PNG)
 │   ├── video/          # Generated video clips (MP4)
 │   ├── audio/          # Narration segments + final mix (MP3/WAV)
 │   ├── music/          # Background music track (MP3)
-│   └── subtitles.srt   # Generated subtitles
+│   ├── keyframes/      # Per-scene PNG keyframes (extracted by frame_sampler for visual sanity check)
+│   └── subtitles.{srt,ass}  # Generated subtitles
 └── renders/
     └── final.mp4       # Final rendered video (the deliverable)
 ```
@@ -205,6 +223,39 @@ projects/<project-name>/
 **Naming convention**: Use kebab-case derived from the video title (e.g., `hidden-math-of-nature`, `how-music-rewires-brain`).
 
 Create the project directory at pipeline initialization, before any stage runs. All tools and agents should write outputs to these paths — never to the repo root or ad-hoc locations.
+
+### Reference Assets (physical-product brands)
+
+For brands selling physical products with recognizable geometry (smartphones, vehicles, cosmetics, apparel, hardware), the user should drop one or more product photos into `projects/<project-name>/reference_assets/` as `product_*.png` or `product_*.jpg`. The asset-director will use these as image-to-video sources via `wan2.7-i2v` / `wan2.6-i2v-flash` when the product is visible in a scene.
+
+**Why this matters:** text-to-video models (Wan, Kling, Seedance) cannot render specific product geometry from prose alone — they generate plausible-looking generic objects. Without a reference image, a "Find X9 Pro hero shot" prompt produces a generic premium black phone, not OPPO's specific device. For brand-paying advertisers, this is unacceptable risk; for personal projects, it's acceptable but should be flagged.
+
+The intake-director asks for product photos when the brief is for a physical product and the directory is empty. The asset-director-cinematic refuses to silently text-to-video a hero shot without a reference and surfaces the choice to the user.
+
+### Capture the User Request First (HARD RULE)
+
+The first action when initializing a project workspace — before research, before `intake_brief`, before any tool call that costs money — is to record the user's verbatim instruction inside the project. The transcript that lives in the harness (Claude Code session log, IDE chat history, etc.) is **not** part of this repo and is not portable; the canonical record of intent must travel with the project.
+
+Use the helper:
+
+```python
+from pathlib import Path
+from lib.user_request import record_user_request, Reference
+
+record_user_request(
+    Path("projects/<project-name>"),
+    prompt="<the user's first actionable instruction, verbatim — no paraphrasing, no translation>",
+    pipeline_hint="cinematic",          # optional, only if user explicitly named one
+    language="en",                       # optional BCP 47 tag
+    references=[                         # optional, anything the user pointed to
+        Reference(kind="url", value="https://...", role="reference_video"),
+    ],
+)
+```
+
+This writes both `artifacts/user_request.json` (schema-validated against `schemas/artifacts/user_request.schema.json`) and `USER_PROMPT.md` (human-readable mirror at the project root). The call is **idempotent** — re-running it is a no-op so re-entering intake never clobbers the original prompt. When the user materially refines the brief mid-intake (changed platform, added a reference, swapped tone), append a new turn with `lib.user_request.append_turn(...)`; never edit prior text.
+
+Every downstream artifact (`intake_brief`, `brief`, `research_brief`, …) is an *interpretation* of `user_request`. Keeping the verbatim source separate makes the pipeline auditable and lets a future agent re-run from original intent without fishing through chat logs.
 
 ## Music Library
 
@@ -230,8 +281,10 @@ If the folder has tracks, the proposal and asset stages should present them as o
 | `podcast-repurpose` | Podcast highlights and derivatives | beta |
 | `cinematic` | Trailer, teaser, and mood-led edits | production |
 | `animation` | Motion-graphics and animation-first videos | production |
+| `ad-video` | Ads and commercials with pre-production governance, product-fidelity checks, and sample approval | beta |
 | `character-animation` | Local rigged cartoon characters and reusable character acting | beta |
 | `hybrid` | Source footage plus support visuals | production |
+| `documentary-montage` | Retrieval-first thematic montage from real-world footage sources | beta |
 | `avatar-spokesperson` | Presenter-led avatar or lip-sync videos | production |
 | `localization-dub` | Subtitle, dub, and translated variants | beta |
 | `framework-smoke` | Test: minimal 2-stage smoke test | test |
@@ -522,18 +575,66 @@ Record the music decision in the proposal/brief artifact so the asset director k
 
 Each pipeline manifest's `tools_available` field declares what tools a stage can use. Use selectors for multi-provider capabilities — the selector handles routing to whatever is available. Read the pipeline manifest for the authoritative list per stage.
 
+## Ad Video Pipeline Contract
+
+Use `ad-video` for ad and commercial briefs where the output has to sell or
+position a product, service, brand, app, or campaign. This pipeline is not a
+simple topic-to-video flow. It has explicit pre-production governance before
+scripts or assets are generated.
+
+Manifest: `pipeline_defs/ad-video.yaml`
+
+Stage flow:
+
+`intake -> brief_enrichment -> intelligence -> bible -> idea -> proposal -> script -> scene_plan -> assets -> edit -> compose -> publish`
+
+Key contract points:
+
+- `intake` asks only research-direction questions: product, platform,
+  demographic, emotional intent. Logistics such as subtitles, dubbing,
+  derivatives, runtime, and budget belong in `proposal`.
+- `brief_enrichment`, `intelligence`, and `bible` create the strategic contract.
+  `production_bible` owns the approved arc, beats, emotional targets, visual
+  motifs, audio direction, primary format, CTA, compliance checkpoints, and
+  rejected approaches.
+- `idea` generates execution concepts inside the approved `production_bible`;
+  it must not reopen the arc, beats, hook mechanic, or mandatory motifs.
+- `proposal` locks technical production parameters: derivative variants,
+  subtitles, dubbing, `style_mode`, `render_runtime`, budget, CTA verification,
+  voice/audio contract, and visual contract.
+- `scene_plan` must keep real-world ad content motion-first. Lifestyle,
+  environment, product-interaction, and b-roll scenes need real video clips.
+  Stills are only acceptable for text cards, packshots, and end cards.
+- `assets` always runs a sample approval sub-stage before full generation.
+  The sample must include at least one product-visible scene when the product is
+  visible anywhere in the ad. After the sample is approved, the asset stage still
+  requires explicit `asset_review` and `music_review` approvals before compose.
+- Physical-product briefs should use `projects/<project>/reference_assets/`
+  product images for product-visible shots. If no reference image is available,
+  surface the brand-fidelity risk instead of silently text-to-video prompting a
+  generic product.
+- Runtime and provider substitutions are governance events. If the selected
+  `render_runtime`, TTS provider, video provider, image provider, or music path
+  becomes unavailable, stop and ask before swapping. Record the decision.
+
 ## Stage Agents
 
 Each stage produces one canonical artifact that becomes the contract for the next stage. The stage director skill teaches the agent HOW to produce it.
 
 | Stage | Director Skill | Canonical output | Core quality bar |
 |------|---------------|------------------|------------------|
-| `idea` | `*-director.md` | `brief` | Clear hook, target platform, duration, tone, and user intent |
+| `intake` | `*-director.md` | `intake_brief` | Minimum research-direction fields captured without over-asking |
+| `brief_enrichment` | `*-director.md` | `enriched_brief` | Explicit user-approved product/ad specification |
+| `intelligence` | `*-director.md` | `intelligence_brief` | Cited category, audience, and rejected-approach insight |
+| `bible` | `*-director.md` | `production_bible` | Approved strategic and execution contract |
+| `idea` | `*-director.md` | `brief` / `idea_options` | Clear hook, target platform, duration, tone, and user intent |
+| `proposal` | `*-director.md` | `production_proposal` | User-approved technical plan, runtime, audio, visual, budget, and variants |
 | `script` | `*-director.md` | `script` | Structured sections, valid timing, coherent narration |
 | `scene_plan` | `*-director.md` | `scene_plan` | Ordered scenes, timings, asset requirements |
 | `assets` | `*-director.md` | `asset_manifest` | Provenance, paths, model/tool metadata, scene linkage |
 | `edit` | `*-director.md` | `edit_decisions` | Concrete cuts, overlays, subtitle/music decisions |
 | `compose` | `*-director.md` | `render_report` | Output paths, encoding profile, verification notes |
+| `publish` | `*-director.md` | `publish_log` | Output matrix, metadata, and delivery notes |
 
 Stage contract rules:
 
@@ -581,7 +682,7 @@ Primary files:
 
 Checkpoint rules:
 
-- Checkpoints live at `pipelines/<project_id>/checkpoint_<stage>.json`.
+- Checkpoints live at `projects/<project_id>/checkpoint_<stage>.json`.
 - `status` may be `completed`, `failed`, `awaiting_human`, or `in_progress`.
 - `completed` and `awaiting_human` checkpoints must include the canonical artifact.
 - Invalid checkpoints or invalid canonical artifacts are contract violations and should fail fast.

@@ -152,7 +152,7 @@
         "key_term": { "$ref": "#/$defs/overlay_style" },
         "code_block": { "$ref": "#/$defs/overlay_style" }
       },
-      "additionalProperties": false
+      "additionalProperties": { "$ref": "#/$defs/overlay_style" }
     },
     "quality_rules": {
       "type": "array",

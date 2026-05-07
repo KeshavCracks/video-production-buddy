@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/intelligence_brief",
+  "title": "Intelligence Brief",
+  "description": "Market research and hit-ad analysis produced by intelligence-director.",
+  "type": "object",
+  "required": ["audience_psychographics", "platform_trends", "hit_ads_analyzed", "rejected_approaches", "recommendations"],
+  "properties": {
+    "audience_psychographics": {
+      "type": "object",
+      "required": ["emotional_profile", "core_pain_point", "aspiration"],
+      "properties": {
+        "emotional_profile": { "type": "string", "minLength": 1 },
+        "core_pain_point": { "type": "string", "minLength": 1 },
+        "aspiration": { "type": "string", "minLength": 1 }
+      }
+    },
+    "platform_trends": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["signal", "source", "relevance"],
+        "properties": {
+          "signal": { "type": "string" },
+          "source": { "type": "string" },
+          "relevance": { "type": "string" },
+          "observed_at": {
+            "type": "string",
+            "format": "date",
+            "description": "ISO 8601 date (YYYY-MM-DD) when the trend was identified by intelligence-director's search. Consumed by lib.trend_recency.score_trend_recency to filter stale trends. Optional: undated trends are treated as current for backward compatibility."
+          },
+          "retrieved_at": {
+            "type": "string",
+            "format": "date",
+            "description": "ISO 8601 date when the search result was retrieved. Captured for audit; not required for recency scoring."
+          },
+          "decay_window_days": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Days during which this trend is considered 'current'. Past 2x this window the trend is fully stale and filtered out by lib.trend_recency.filter_stale_trends. Default: 180."
+          },
+          "is_evergreen": {
+            "type": "boolean",
+            "description": "When true, this trend is exempt from decay (e.g. 'narrative arcs centred on aspiration'). Recency score stays 1.0 regardless of age."
+          },
+          "engagement_proxy": {
+            "type": "object",
+            "description": "Optional engagement signals captured from the source (views/likes/shares). Free-form because providers vary widely.",
+            "properties": {
+              "views": { "type": "integer", "minimum": 0 },
+              "likes": { "type": "integer", "minimum": 0 },
+              "shares": { "type": "integer", "minimum": 0 },
+              "note": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "hit_ads_analyzed": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["title", "platform", "arc_type", "hook_mechanic", "what_works", "adopted"],
+        "properties": {
+          "title": { "type": "string" },
+          "platform": { "type": "string" },
+          "arc_type": { "type": "string" },
+          "hook_mechanic": { "type": "string" },
+          "what_works": { "type": "string" },
+          "adopted": { "type": "boolean" },
+          "adaptation": { "type": "string", "default": "" },
+          "url": {
+            "type": "string",
+            "description": "Public URL to the hit ad (YouTube / Shorts / TikTok / Instagram). When present, intelligence-director should invoke video_analyzer and capture pacing_measured."
+          },
+          "analyzed_at": {
+            "type": "string",
+            "format": "date",
+            "description": "ISO 8601 date when video_analyzer was run on this ad. Audit trail."
+          },
+          "pacing_measured": {
+            "type": "object",
+            "description": "Real measured pacing from video_analyzer (not article-text inference). Aggregated across hit ads by lib.hit_ad_pacing.aggregate_pacing_from_hit_ads to upgrade editing_rhythm from pattern-inferred to research-grounded.",
+            "required": ["cuts_per_minute", "avg_scene_duration_seconds", "total_scenes", "source"],
+            "properties": {
+              "cuts_per_minute": { "type": "number", "minimum": 0 },
+              "avg_scene_duration_seconds": { "type": "number", "minimum": 0 },
+              "total_scenes": { "type": "integer", "minimum": 0 },
+              "source": { "type": "string", "const": "video_analyzer" }
+            },
+            "additionalProperties": false
+          },
+          "classification": {
+            "type": "object",
+            "description": "Rule-based narrative-pattern classification produced by lib.hit_ad_classification.classify_hit_ad_from_video_brief from the VideoAnalysisBrief. Aggregated across hit ads by aggregate_classifications to upgrade arc_type/hook_mechanic confidence to research-grounded when sample size + agreement support it.",
+            "required": ["arc_type", "hook_mechanic", "source"],
+            "properties": {
+              "arc_type": {
+                "type": "string",
+                "enum": ["problem-solution", "desire-fulfillment", "contrast", "journey", "social-proof", "demo-reveal"],
+                "description": "Must match production_bible.narrative.arc_type enum exactly."
+              },
+              "hook_mechanic": {
+                "type": "string",
+                "enum": ["question", "statement", "visual-contrast", "sound-interrupt", "stat"],
+                "description": "Must match production_bible.narrative.hook_mechanic enum. The visual classifier never emits sound-interrupt; the schema permits it for completeness."
+              },
+              "what_works": { "type": "string" },
+              "source": { "type": "string", "const": "video_analyzer_classification" },
+              "signals": {
+                "type": "object",
+                "description": "Audit trail of the rule's evidence (energy_profile, visual_type_distribution, etc.). Free-form for forward-compat across rule versions."
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "rejected_approaches": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["approach", "reason"],
+        "properties": {
+          "approach": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "recommendations": {
+      "type": "object",
+      "required": ["arc_type", "pacing_model", "hook_mechanic", "hook_window_seconds", "overall_rationale"],
+      "properties": {
+        "arc_type": { "$ref": "#/$defs/recommendation_field" },
+        "pacing_model": { "$ref": "#/$defs/recommendation_field" },
+        "hook_mechanic": { "$ref": "#/$defs/recommendation_field" },
+        "hook_window_seconds": { "$ref": "#/$defs/recommendation_field" },
+        "editing_rhythm_by_beat": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["value", "confidence"],
+            "properties": {
+              "value": {
+                "type": "object",
+                "required": ["cuts_density", "avg_shot_duration_seconds", "transition_style"],
+                "properties": {
+                  "cuts_density": { "type": "string", "enum": ["rapid", "moderate", "slow", "held"] },
+                  "avg_shot_duration_seconds": { "type": "number", "minimum": 0.5 },
+                  "transition_style": { "type": "string", "enum": ["hard_cut", "dissolve", "whip", "match_cut"] }
+                }
+              },
+              "confidence": { "$ref": "#/$defs/confidence_tier" }
+            }
+          }
+        },
+        "overall_rationale": { "type": "string", "minLength": 1 }
+      }
+    },
+    "dimension_verdicts": {
+      "type": "array",
+      "description": "Verdict for each INFERRED dimension from enriched_brief.hypothesis_flags. Produced by Step 5b of intelligence-director.",
+      "items": {
+        "type": "object",
+        "required": ["dimension", "confidence", "verdict"],
+        "additionalProperties": false,
+        "properties": {
+          "dimension": { "type": "string", "minLength": 1 },
+          "confidence": { "$ref": "#/$defs/confidence_tier" },
+          "verdict": {
+            "type": "string",
+            "enum": ["SUPPORTED", "CONTRADICTED", "INSUFFICIENT-DATA"]
+          },
+          "challenge_evidence": {
+            "type": "string",
+            "description": "Required when verdict=CONTRADICTED AND confidence=research-grounded. Named, verifiable evidence only."
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "confidence_tier": {
+      "type": "string",
+      "enum": ["research-grounded", "pattern-inferred", "default-heuristic"]
+    },
+    "recommendation_field": {
+      "type": "object",
+      "required": ["value", "confidence", "rationale"],
+      "properties": {
+        "value": {},
+        "confidence": { "$ref": "#/$defs/confidence_tier" },
+        "rationale": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": false
+}

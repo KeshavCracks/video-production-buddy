@@ -8,6 +8,21 @@
   "properties": {
     "version": { "type": "string", "const": "1.0" },
     "style_playbook": { "type": "string", "description": "Name of the active style playbook" },
+    "style_mode": {
+      "type": "string",
+      "enum": ["animated", "cinematic"],
+      "description": "Render mode locked at proposal. Carried into scene_plan so scene/asset directors can branch on it without re-reading production_proposal."
+    },
+    "total_duration_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Total scene-plan duration; should match the sum of scenes[].end_seconds and equal script.total_duration within ±0.5s."
+    },
+    "derivative_variants": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Variant ids (e.g. '9:16', '1:1', '15s_short') the user opted into at proposal. When non-empty, every scene must declare crop_regions. Mirrors production_proposal.derivatives_added."
+    },
     "scenes": {
       "type": "array",
       "items": {
@@ -93,6 +108,61 @@
             "type": "array",
             "items": { "type": "string" },
             "description": "Visual texture descriptors: grain, clean, anamorphic, gritty, ethereal, etc."
+          },
+          "scene_type": {
+            "type": "string",
+            "description": "Optional fine-grained subtype used by ad-video animated/cinematic supplements (e.g. anime_scene, stat_card, text_card, callout). Free-form because the supplements add new types over time. Coexists with the coarse top-level `type` enum, which remains required."
+          },
+          "fulfills_kvm": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": [],
+            "description": "Key visual moment IDs from production_bible.visual.key_visual_moments fulfilled by this scene. Empty array means this scene fulfills no mandatory KVM."
+          },
+          "motion_specs": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": [],
+            "description": "Motion primitive IDs required for this scene. For animated ad-video scenes, every value must be supported by the selected remotion-composer scene_type_registry entry."
+          },
+          "style_layers": {
+            "type": "array",
+            "items": { "type": "object" },
+            "description": "Optional atmosphere/style layers for animated ad-video scenes. Layer object shapes are defined by remotion-composer/scene_type_registry.json#style_layers."
+          },
+          "duration_seconds": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Convenience field; equals end_seconds - start_seconds. Optional — start_seconds and end_seconds remain the canonical timing fields."
+          },
+          "beat": {
+            "type": "string",
+            "description": "Optional ad-video beat label (e.g. 'hook', 'build', 'reveal', 'cta'). Maps the scene to its production_bible.narrative.emotional_beat_sequence position."
+          },
+          "core": {
+            "type": "boolean",
+            "default": false,
+            "description": "True if this scene must appear in the 15s_short derivative cut. When derivative_variants includes '15s', sum of core-true scene durations must be ≤ 15s."
+          },
+          "motion_required": {
+            "type": "boolean",
+            "default": false,
+            "description": "True when the scene needs actual motion video (not a still). Enforces the motion-required hard rule for animated/cinematic ad-video runs."
+          },
+          "crop_regions": {
+            "type": "object",
+            "description": "Per-aspect-ratio crop rectangles for derivative renders. Keys are aspect-ratio strings (e.g. '9:16', '1:1'); values are {x, y, w, h} pixel rectangles into the primary frame.",
+            "additionalProperties": {
+              "type": "object",
+              "required": ["x", "y", "w", "h"],
+              "additionalProperties": false,
+              "properties": {
+                "x": { "type": "integer", "minimum": 0 },
+                "y": { "type": "integer", "minimum": 0 },
+                "w": { "type": "integer", "minimum": 1 },
+                "h": { "type": "integer", "minimum": 1 }
+              }
+            }
           },
           "required_assets": {
             "type": "array",
