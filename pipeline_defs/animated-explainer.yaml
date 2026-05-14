@@ -85,7 +85,9 @@ stages:
     produces:
       - proposal_packet
       - decision_log
-    tools_available: []
+    tools_available:
+      - genui_interaction
+      - genui_session
     checkpoint_required: true
     human_approval_default: true
     review_focus:
@@ -106,7 +108,14 @@ stages:
         description: "10-15 second preview clip for reference-driven productions"
         condition: "video_analysis_brief_exists"
         human_approval_default: true
-        tools_available: [tts_selector, image_selector, video_selector, video_compose, audio_mixer]
+        tools_available:
+          - genui_interaction
+          - genui_session
+          - tts_selector
+          - image_selector
+          - video_selector
+          - video_compose
+          - audio_mixer
         review_focus:
           - "Sample represents the approved concept faithfully"
           - "Audio levels and voice match approved direction"
@@ -122,7 +131,9 @@ stages:
       - research_brief
     produces:
       - script
-    tools_available: []
+    tools_available:
+      - genui_interaction
+      - genui_session
     checkpoint_required: true
     human_approval_default: true
     review_focus:
@@ -143,7 +154,9 @@ stages:
       - proposal_packet
     produces:
       - scene_plan
-    tools_available: []
+    tools_available:
+      - genui_interaction
+      - genui_session
     checkpoint_required: true
     human_approval_default: true
     review_focus:
@@ -197,6 +210,7 @@ stages:
     required_artifacts_in:
       - scene_plan
       - asset_manifest
+      - proposal_packet
     optional_artifacts_in:
       - script
     produces:
@@ -218,6 +232,8 @@ stages:
     required_artifacts_in:
       - edit_decisions
       - asset_manifest
+      - proposal_packet
+      - decision_log
     optional_artifacts_in:
       - scene_plan
     produces:
@@ -254,7 +270,9 @@ stages:
       - proposal_packet
     produces:
       - publish_log
-    tools_available: []
+    tools_available:
+      - genui_interaction
+      - genui_session
     checkpoint_required: true
     human_approval_default: true
     review_focus:

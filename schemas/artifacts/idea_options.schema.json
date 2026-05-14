@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "video-production-buddy/artifacts/idea_options",
+  "title": "Idea Options",
+  "description": "Set of execution-concept variants produced by idea-director. Each concept is a distinct creative treatment of the same approved arc — concepts must NOT differ in arc_type, beat structure, emotional targets, or hook_mechanic. The user picks one via selected_concept_id.",
+  "type": "object",
+  "required": ["version", "concepts", "selected_concept_id"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Schema version pin."
+    },
+    "concepts": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 3,
+      "description": "2–3 execution-concept variants. Idea-director generates this set then waits for user selection.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "scenario",
+          "selected",
+          "hook_execution",
+          "visual_metaphor",
+          "beat_mapping",
+          "why_this_works",
+          "knowledge_alignment_refs"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^C[0-9]+$",
+            "description": "Concept id, format C<n> (e.g. C1, C2, C3)."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Short title for the concept."
+          },
+          "scenario": {
+            "type": "string",
+            "minLength": 1,
+            "description": "2–3 sentences describing world and characters."
+          },
+          "selected": {
+            "type": "boolean",
+            "description": "True for the chosen concept; exactly one concept in the array should have selected=true."
+          },
+          "hook_execution": {
+            "type": "string",
+            "minLength": 1,
+            "description": "How the locked hook_mechanic lands in this specific treatment — first 3 seconds described."
+          },
+          "visual_metaphor": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Central image that carries the story through all beats."
+          },
+          "beat_mapping": {
+            "type": "object",
+            "minProperties": 1,
+            "description": "Map of beat-id (B1, B2, ...) to what specifically happens in this scenario.",
+            "additionalProperties": { "type": "string" }
+          },
+          "why_this_works": {
+            "type": "string",
+            "minLength": 1,
+            "description": "One sentence connecting the concept to intelligence findings."
+          },
+          "knowledge_alignment_refs": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^knowledge_alignment:[A-Za-z0-9._:-]+$"
+            },
+            "description": "Canonical producer-knowledge refs that shape this concept. Use an empty array only when no selected knowledge refs apply."
+          }
+        }
+      }
+    },
+    "selected_concept_id": {
+      "type": "string",
+      "pattern": "^C[0-9]+$",
+      "description": "ID of the concept the user chose — must match an entry in concepts[].id."
+    }
+  }
+}

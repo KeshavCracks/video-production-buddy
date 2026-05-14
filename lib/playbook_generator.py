@@ -1,6 +1,6 @@
 """Custom playbook generator.
 
-When none of the existing 4 playbooks match the production brief, the agent
+When none of the existing preset playbooks match the production brief, the agent
 can generate a custom playbook. This replaces the old behavior of forcing
 everything through the closest preset.
 

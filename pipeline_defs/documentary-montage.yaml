@@ -47,7 +47,10 @@ stages:
     skill: pipelines/documentary-montage/idea-director
     produces:
       - brief
-    tools_available: []
+      - decision_log
+    tools_available:
+      - genui_interaction
+      - genui_session
     checkpoint_required: true
     human_approval_default: true
     review_focus:
@@ -69,7 +72,9 @@ stages:
       - brief
     produces:
       - scene_plan
-    tools_available: []
+    tools_available:
+      - genui_interaction
+      - genui_session
     checkpoint_required: true
     human_approval_default: true
     review_focus:
@@ -120,9 +125,12 @@ stages:
     required_artifacts_in:
       - scene_plan
       - asset_manifest
+      - brief
     produces:
       - edit_decisions
-    tools_available: []
+    tools_available:
+      - genui_interaction
+      - genui_session
     checkpoint_required: true
     human_approval_default: true
     review_focus:
@@ -144,6 +152,7 @@ stages:
       - edit_decisions
       - asset_manifest
       - brief
+      - decision_log
     produces:
       - render_report
     required_tools:

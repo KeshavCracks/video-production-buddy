@@ -1,0 +1,70 @@
+{
+  "card_id": "visual.product-hero-continuity.001",
+  "version": "1.0",
+  "domain": "visual_rhetoric",
+  "summary": "Product-visible ads need a repeated visual anchor so generated clips feel like one campaign rather than unrelated shots.",
+  "principles": [
+    "Give the product one recurring hero angle, color cue, or interaction motif that appears in every product-visible scene.",
+    "Repeat the visual anchor at hook, proof, and CTA with increasing clarity — the product should feel like it's arriving, not appearing randomly.",
+    "Preserve geometry, logo placement, material cues, and proportions across every generated shot — inconsistency destroys credibility.",
+    "The product's first appearance should be the most visually striking — subsequent appearances reinforce, not re-introduce.",
+    "Environmental context should change between scenes but product treatment should remain constant — same lighting quality, same angle bias, same visual weight.",
+    "If the product has a signature feature (camera bump, notch, curve), that feature should be visible in every hero shot as a recognition anchor.",
+    "Product continuity extends to the CTA frame: the final product shot should be the cleanest, most confident rendering in the entire ad."
+  ],
+  "apply_when": [
+    "The ad shows a physical product, package, device, app UI, or recognizable brand asset.",
+    "The production uses generated video where product identity drift is likely.",
+    "The campaign depends on premium product memory."
+  ],
+  "avoid_when": [
+    "The product is intentionally abstract or invisible.",
+    "The user accepts a risk waiver for generic concept visuals.",
+    "The ad is only a typography or voice-led announcement."
+  ],
+  "downstream_targets": [
+    "scene_plan",
+    "visual",
+    "reveal",
+    "cta_brand"
+  ],
+  "keywords": [
+    "product",
+    "hero",
+    "continuity",
+    "geometry",
+    "logo",
+    "reference",
+    "smartphone",
+    "device",
+    "packshot"
+  ],
+  "source_type": "video-production-buddy-curated",
+  "content_hash": "sha256:cb7207224222c9959d4b7754d643138eb8c1c380062ff3711a69ca07ab571891",
+  "failure_patterns": [
+    "Product looks different in every scene: different proportions, color, or material quality across generated clips — the viewer questions if it's the same product.",
+    "Product visible but not heroed: the product is in the frame but not the visual focus, making the ad feel like a lifestyle video that happens to include a product.",
+    "Reference image drift: generated scenes gradually move away from the original product reference, especially after multiple generation rounds.",
+    "Logo or brand mark inconsistent: rotated, resized, or repositioned between scenes in a way that looks careless."
+  ],
+  "cross_domain_notes": [
+    {
+      "domain": "cinematography",
+      "note": "Consistent camera angle across product-visible scenes reinforces continuity — the viewer's eye recognizes the product by its silhouette before processing details."
+    },
+    {
+      "domain": "color_theory",
+      "note": "Product color must remain consistent across scenes even as the background palette shifts — the product is the color anchor."
+    },
+    {
+      "domain": "editing_technique",
+      "note": "Match cuts between product-visible scenes create visual continuity even when the environment changes around the product."
+    }
+  ],
+  "execution_techniques": [
+    "Define the hero angle in the scene plan: '3/4 left, slight overhead, product filling 60% of frame' — this gives every generation prompt a consistent base.",
+    "Extract a product keyframe from the reference image and compare it against every generated clip's first frame before accepting.",
+    "Lock the product's color values (hex codes) in the production bible and include them in every generation prompt.",
+    "Use the same light direction on the product across all scenes: if the key light is from upper-left in the hero, it stays upper-left in the proof."
+  ]
+}

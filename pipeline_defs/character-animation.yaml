@@ -81,7 +81,9 @@ stages:
     produces:
       - proposal_packet
       - decision_log
-    tools_available: []
+    tools_available:
+      - genui_interaction
+      - genui_session
     checkpoint_required: true
     human_approval_default: true
     review_focus:
@@ -100,6 +102,8 @@ stages:
         condition: "approved_concept_exists"
         human_approval_default: true
         tools_available:
+          - genui_interaction
+          - genui_session
           - character_spec_generator
           - svg_rig_builder
           - pose_library_builder
@@ -120,6 +124,8 @@ stages:
     produces:
       - script
     tools_available:
+      - genui_interaction
+      - genui_session
       - transcriber
     checkpoint_required: true
     human_approval_default: true
@@ -139,6 +145,8 @@ stages:
     produces:
       - character_design
     tools_available:
+      - genui_interaction
+      - genui_session
       - character_spec_generator
       - image_selector
     checkpoint_required: true
@@ -183,7 +191,9 @@ stages:
       - proposal_packet
     produces:
       - scene_plan
-    tools_available: []
+    tools_available:
+      - genui_interaction
+      - genui_session
     checkpoint_required: true
     human_approval_default: true
     review_focus:
@@ -229,6 +239,7 @@ stages:
       - scene_plan
       - asset_manifest
       - pose_library
+      - proposal_packet
     optional_artifacts_in:
       - script
       - rig_plan
@@ -254,10 +265,11 @@ stages:
       - edit_decisions
       - action_timeline
       - asset_manifest
+      - proposal_packet
+      - decision_log
     optional_artifacts_in:
       - rig_plan
       - pose_library
-      - proposal_packet
     produces:
       - render_report
       - final_review
@@ -291,7 +303,9 @@ stages:
       - script
     produces:
       - publish_log
-    tools_available: []
+    tools_available:
+      - genui_interaction
+      - genui_session
     checkpoint_required: true
     human_approval_default: true
     review_focus:

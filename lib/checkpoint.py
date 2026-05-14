@@ -14,18 +14,20 @@ from typing import Any, Optional
 
 import jsonschema
 
-from schemas.artifacts import ARTIFACT_NAMES, validate_artifact
+from schemas.artifacts import ARTIFACT_NAMES, FORMAT_CHECKER, validate_artifact
 
 # All known stages across all pipelines (used only for artifact name lookup).
 ALL_KNOWN_STAGES = frozenset([
     "research", "proposal", "idea", "script", "scene_plan",
     "assets", "edit", "compose", "publish",
+    "intake", "brief_enrichment", "intelligence", "bible",
 ])
 
 # Backward-compatible alias — existing code / tests that import STAGES still work.
 # New code should use get_pipeline_stages(pipeline_type) instead.
 STAGES = ["research", "proposal", "idea", "script", "scene_plan",
           "assets", "edit", "compose", "publish"]
+LEGACY_PIPELINE_TYPE = "unknown"
 
 CANONICAL_STAGE_ARTIFACTS = {
     "research": "research_brief",
@@ -39,40 +41,137 @@ CANONICAL_STAGE_ARTIFACTS = {
     "publish": "publish_log",
 }
 
+AD_VIDEO_CANONICAL_STAGE_ARTIFACTS = {
+    "research.intake": "intake_brief",
+    "research.brief_enrichment": "enriched_brief",
+    "research.intelligence": "intelligence_brief",
+    "proposal.bible": "production_bible",
+    "proposal.idea": "idea_options",
+    "proposal.technical_proposal": "production_proposal",
+    "script": "script",
+    "scene_plan": "scene_plan",
+    "assets": "asset_manifest",
+    "edit": "edit_decisions",
+    "compose": "render_report",
+    "publish": "publish_log",
+}
+
+AD_VIDEO_STAGE_ALIASES = {
+    "intake": "research.intake",
+    "brief_enrichment": "research.brief_enrichment",
+    "intelligence": "research.intelligence",
+    "bible": "proposal.bible",
+    "idea": "proposal.idea",
+    "proposal": "proposal.technical_proposal",
+}
+
+AD_VIDEO_REVERSE_STAGE_ALIASES = {
+    normalized: legacy for legacy, normalized in AD_VIDEO_STAGE_ALIASES.items()
+}
+
+
+def _normalize_stage_for_pipeline(stage: str, pipeline_type: str | None) -> str:
+    if pipeline_type == "ad-video":
+        return AD_VIDEO_STAGE_ALIASES.get(stage, stage)
+    return stage
+
+
+def _canonical_artifact_for_stage(stage: str, pipeline_type: str | None) -> str:
+    """Return the canonical artifact name for a stage in its pipeline context."""
+    stage = _normalize_stage_for_pipeline(stage, pipeline_type)
+    if pipeline_type == "ad-video":
+        return AD_VIDEO_CANONICAL_STAGE_ARTIFACTS[stage]
+
+    if pipeline_type not in (None, LEGACY_PIPELINE_TYPE):
+        from lib.pipeline_loader import get_stage_definition, load_pipeline
+
+        manifest = load_pipeline(pipeline_type)
+        stage_def = get_stage_definition(manifest, stage)
+        if stage_def is not None:
+            for artifact_name in stage_def.get("produces", []):
+                if artifact_name in ARTIFACT_NAMES:
+                    return artifact_name
+
+    return CANONICAL_STAGE_ARTIFACTS[stage]
+
+
+def _manifest_required_outputs_for_stage(
+    stage: str, pipeline_type: str | None
+) -> list[str]:
+    """Return schema-backed outputs declared by the stage manifest."""
+    if pipeline_type in (None, LEGACY_PIPELINE_TYPE):
+        return []
+    stage = _normalize_stage_for_pipeline(stage, pipeline_type)
+
+    from lib.pipeline_loader import get_stage_definition, load_pipeline
+
+    manifest = load_pipeline(pipeline_type)
+    stage_def = get_stage_definition(manifest, stage)
+    if stage_def is None:
+        return []
+
+    return [
+        artifact_name
+        for artifact_name in stage_def.get("produces", [])
+        if artifact_name in ARTIFACT_NAMES
+    ]
+
 # Additional artifacts that may be produced alongside canonical ones.
 # These are not stage-defining but are required by governance contracts.
 SUPPLEMENTARY_ARTIFACTS = {
     "source_media_review",  # Required before first planning stage when user media exists
     "final_review",         # Required by compose stage before presenting to user
     "video_analysis_brief", # Reference-video grounding artifact carried alongside stages
+    "product_identity_reference",  # Required alongside ad-video asset manifests
+}
+
+REQUIRED_SUPPLEMENTARY_STAGE_ARTIFACTS = {
+    ("ad-video", "proposal.technical_proposal"): ("decision_log",),
+    ("ad-video", "assets"): (
+        "product_identity_reference",
+        "production_proposal",
+        "production_bible",
+        "script",
+        "scene_plan",
+        "decision_log",
+    ),
+    ("ad-video", "edit"): ("production_proposal", "asset_manifest", "scene_plan"),
+    ("ad-video", "compose"): (
+        "final_review",
+        "production_proposal",
+        "production_bible",
+    ),
+    ("ad-video", "publish"): (
+        "final_review",
+        "production_proposal",
+        "production_bible",
+    ),
 }
 
 
 def get_pipeline_stages(pipeline_type: str | None) -> list[str]:
     """Return the ordered stage list for a specific pipeline.
 
-    Falls back to STAGES (deterministic canonical order) when pipeline_type
-    is not provided or the manifest cannot be loaded.
+    Falls back to STAGES (deterministic canonical order) only when pipeline_type
+    is not provided or uses the legacy "unknown" sentinel.
 
     Previous versions used a set intersection here, which produced
-    nondeterministic ordering. The fallback now uses a stable list.
+    nondeterministic ordering. The fallback now uses a stable list. Explicit
+    pipeline names must load successfully; typos should fail fast instead of
+    resuming the wrong stage order.
     """
-    if pipeline_type is None:
+    if pipeline_type in (None, LEGACY_PIPELINE_TYPE):
         # Deterministic canonical fallback — sorted to ensure stable ordering
         import logging
         logging.getLogger(__name__).warning(
-            "get_pipeline_stages called without pipeline_type — "
+            "get_pipeline_stages called without a concrete pipeline_type — "
             "using canonical fallback order. Pass pipeline_type for correctness."
         )
         return list(STAGES)
 
-    try:
-        from lib.pipeline_loader import load_pipeline, get_stage_order
-        manifest = load_pipeline(pipeline_type)
-        return get_stage_order(manifest)
-    except (FileNotFoundError, Exception):
-        # Graceful fallback: return all known stages in canonical order
-        return list(STAGES)
+    from lib.pipeline_loader import get_checkpoint_stage_order, load_pipeline
+    manifest = load_pipeline(pipeline_type)
+    return get_checkpoint_stage_order(manifest)
 
 CHECKPOINT_SCHEMA_PATH = (
     Path(__file__).resolve().parent.parent
@@ -92,17 +191,104 @@ def _load_checkpoint_schema() -> dict[str, Any]:
         return json.load(f)
 
 
+def _decision_option_ids(decision: dict[str, Any]) -> set[str]:
+    options = decision.get("options_considered")
+    if not isinstance(options, list):
+        return set()
+    return {
+        option.get("option_id")
+        for option in options
+        if isinstance(option, dict) and isinstance(option.get("option_id"), str)
+    }
+
+
 def _validate_artifacts_for_stage(
     stage: str,
     status: str,
     artifacts: dict[str, Any],
+    pipeline_type: str | None = None,
 ) -> None:
-    required_artifact = CANONICAL_STAGE_ARTIFACTS[stage]
-    if status in {"completed", "awaiting_human"} and required_artifact not in artifacts:
+    required_artifact = _canonical_artifact_for_stage(stage, pipeline_type)
+    required_artifacts = [required_artifact]
+    required_artifacts.extend(
+        _manifest_required_outputs_for_stage(stage, pipeline_type)
+    )
+    required_artifacts.extend(
+        REQUIRED_SUPPLEMENTARY_STAGE_ARTIFACTS.get((pipeline_type or "", stage), ())
+    )
+    missing_artifacts = [
+        artifact_name
+        for artifact_name in dict.fromkeys(required_artifacts)
+        if artifact_name not in artifacts
+    ]
+    if status in {"completed", "awaiting_human"} and missing_artifacts:
         raise CheckpointValidationError(
             f"Stage {stage!r} with status {status!r} must include "
-            f"canonical artifact {required_artifact!r}"
+            f"required artifact(s) {missing_artifacts!r}"
         )
+
+    if (
+        pipeline_type == "ad-video"
+        and stage == "proposal.technical_proposal"
+        and status in {"completed", "awaiting_human"}
+    ):
+        decision_log = artifacts.get("decision_log")
+        decisions = decision_log.get("decisions") if isinstance(decision_log, dict) else None
+        if not isinstance(decisions, list):
+            raise CheckpointValidationError(
+                "Ad-video proposal checkpoint must include decision_log.decisions"
+            )
+        required_categories = {
+            "music_strategy_selection",
+            "render_runtime_selection",
+            "product_identity_reference_selection",
+        }
+        approved_categories = {
+            decision.get("category")
+            for decision in decisions
+            if isinstance(decision, dict) and decision.get("user_approved") is True
+        }
+        missing_categories = sorted(required_categories - approved_categories)
+        if missing_categories:
+            raise CheckpointValidationError(
+                "Ad-video proposal checkpoint decision_log must include "
+                f"user-approved decisions for: {missing_categories}"
+            )
+
+        production_proposal = artifacts.get("production_proposal")
+        if isinstance(production_proposal, dict):
+            latest_approved_decisions = {
+                decision.get("category"): decision
+                for decision in decisions
+                if isinstance(decision, dict) and decision.get("user_approved") is True
+            }
+            for category, proposal_field in (
+                ("music_strategy_selection", "music_strategy"),
+                ("render_runtime_selection", "render_runtime"),
+                ("product_identity_reference_selection", "product_reference_strategy"),
+            ):
+                decision = latest_approved_decisions.get(category)
+                selected = decision.get("selected") if isinstance(decision, dict) else None
+                expected = production_proposal.get(proposal_field)
+                if selected != expected:
+                    raise CheckpointValidationError(
+                        "Ad-video proposal checkpoint decision_log "
+                        f"{category!r} selected {selected!r}, but "
+                        f"production_proposal.{proposal_field} is {expected!r}"
+                    )
+                if category == "render_runtime_selection":
+                    runtime_options = _decision_option_ids(decision)
+                    required_runtime_options = {"remotion", "hyperframes"}
+                    missing_runtime_options = sorted(
+                        required_runtime_options - runtime_options
+                    )
+                    if missing_runtime_options:
+                        raise CheckpointValidationError(
+                            "Ad-video proposal checkpoint "
+                            "render_runtime_selection decision must include "
+                            "Remotion and HyperFrames in options_considered; "
+                            f"missing: {missing_runtime_options}"
+                        )
 
     for artifact_name, artifact_data in artifacts.items():
         if artifact_name not in ARTIFACT_NAMES:
@@ -112,11 +298,220 @@ def _validate_artifacts_for_stage(
                 f"Artifact {artifact_name!r} must be a JSON object matching its schema"
             )
         try:
-            validate_artifact(artifact_name, artifact_data)
+            validate_artifact(
+                artifact_name,
+                artifact_data,
+                pipeline_type=pipeline_type,
+                related_artifacts=artifacts,
+                validation_context={
+                    "checkpoint_stage": stage,
+                    "checkpoint_status": status,
+                },
+            )
         except Exception as exc:
             raise CheckpointValidationError(
                 f"Artifact {artifact_name!r} failed schema validation: {exc}"
             ) from exc
+
+
+def _checkpoint_ep_state(checkpoint: dict[str, Any]) -> dict[str, Any]:
+    metadata = checkpoint.get("metadata")
+    if not isinstance(metadata, dict):
+        return {}
+    ep_state = metadata.get("ep_state")
+    if isinstance(ep_state, dict):
+        return ep_state
+    ep_state = metadata.get("EP_STATE")
+    if isinstance(ep_state, dict):
+        return ep_state
+    return metadata
+
+
+def _verdict_details(verdict: dict[str, Any]) -> str:
+    issues = verdict.get("issues")
+    if not isinstance(issues, list):
+        return ""
+    return "; ".join(str(issue) for issue in issues[:3])
+
+
+def _raise_on_failed_assets_validator(
+    validator_name: str,
+    verdict: dict[str, Any],
+    *,
+    allow_warn: bool = False,
+) -> None:
+    allowed = {"PASS"}
+    if allow_warn:
+        allowed.add("WARN")
+    if verdict.get("status") in allowed:
+        return
+
+    details = _verdict_details(verdict)
+    suffix = f": {details}" if details else ""
+    raise CheckpointValidationError(
+        f"Completed ad-video assets checkpoint {validator_name} failed{suffix}"
+    )
+
+
+def _validate_ad_video_assets_cross_stage_contract(artifacts: dict[str, Any]) -> None:
+    """Run asset-stage validators that require upstream context artifacts."""
+    from tools.validation.hallucination_contract_check import (
+        check_hallucination_contract,
+    )
+    from tools.validation.product_identity_consistency_check import (
+        check_product_identity_consistency,
+    )
+    from tools.validation.provider_consistency_check import check_provider_consistency
+
+    production_proposal = artifacts["production_proposal"]
+    production_bible = artifacts["production_bible"]
+    script = artifacts["script"]
+    scene_plan = artifacts["scene_plan"]
+    asset_manifest = artifacts["asset_manifest"]
+    product_identity_reference = artifacts["product_identity_reference"]
+    decision_log = artifacts["decision_log"]
+
+    provider_verdict = check_provider_consistency(
+        production_proposal,
+        asset_manifest,
+        decision_log,
+        script=script,
+    )
+    _raise_on_failed_assets_validator(
+        "provider_consistency_check",
+        provider_verdict,
+    )
+
+    product_identity_verdict = check_product_identity_consistency(
+        product_identity_reference,
+        scene_plan,
+        asset_manifest,
+        decision_log,
+    )
+    _raise_on_failed_assets_validator(
+        "product_identity_consistency_check",
+        product_identity_verdict,
+        allow_warn=True,
+    )
+
+    hallucination_verdict = check_hallucination_contract(
+        production_bible,
+        scene_plan,
+        asset_manifest,
+        decision_log,
+    )
+    _raise_on_failed_assets_validator(
+        "hallucination_contract_check",
+        hallucination_verdict,
+        allow_warn=True,
+    )
+
+
+def _validate_ad_video_checkpoint_gate_state(checkpoint: dict[str, Any]) -> None:
+    """Validate ad-video gate state that belongs to the checkpoint snapshot."""
+    artifacts = checkpoint.get("artifacts")
+    status = checkpoint.get("status")
+    stage = checkpoint.get("stage")
+    pipeline_type = checkpoint.get("pipeline_type")
+
+    final_review_required = "final_review" in set(
+        _manifest_required_outputs_for_stage(stage, pipeline_type)
+        if isinstance(stage, str)
+        else ()
+    ) or "final_review" in REQUIRED_SUPPLEMENTARY_STAGE_ARTIFACTS.get(
+        (pipeline_type or "", stage or ""),
+        (),
+    )
+
+    if (
+        stage == "compose"
+        and status in {"completed", "awaiting_human"}
+        and final_review_required
+    ):
+        final_review = (
+            artifacts.get("final_review") if isinstance(artifacts, dict) else None
+        )
+        if not isinstance(final_review, dict) or final_review.get("status") != "pass":
+            raise CheckpointValidationError(
+                "Completed compose checkpoint requires "
+                "final_review.status == 'pass'"
+            )
+
+    if (
+        pipeline_type == "ad-video"
+        and stage == "publish"
+        and status in {"completed", "awaiting_human"}
+    ):
+        final_review = (
+            artifacts.get("final_review") if isinstance(artifacts, dict) else None
+        )
+        if not isinstance(final_review, dict) or final_review.get("status") != "pass":
+            raise CheckpointValidationError(
+                "Completed ad-video publish checkpoint requires "
+                "final_review.status == 'pass'"
+            )
+
+        render_report = (
+            artifacts.get("render_report") if isinstance(artifacts, dict) else None
+        )
+        if not isinstance(render_report, dict):
+            raise CheckpointValidationError(
+                "Completed ad-video publish checkpoint requires render_report "
+                "so publish_log can be validated against rendered outputs"
+            )
+
+    if (
+        pipeline_type != "ad-video"
+        or stage != "assets"
+        or status != "completed"
+    ):
+        return
+
+    ep_state = _checkpoint_ep_state(checkpoint)
+    required_true_flags = (
+        "sample_approved",
+        "asset_review_approved",
+        "music_review_approved",
+    )
+    missing_or_false = [
+        flag
+        for flag in required_true_flags
+        if ep_state.get(flag) is not True
+    ]
+    if missing_or_false:
+        raise CheckpointValidationError(
+            "Completed ad-video assets checkpoint must include "
+            "metadata.ep_state approval flags set to true: "
+            f"{missing_or_false}"
+        )
+
+    artifacts = checkpoint.get("artifacts")
+    reference = artifacts.get("product_identity_reference") if isinstance(artifacts, dict) else None
+    if not isinstance(reference, dict):
+        return
+
+    source_type = reference.get("source_type")
+    approval_status = reference.get("approval_status")
+    if source_type in {"user_provided", "generated", "external_url"}:
+        if approval_status != "approved":
+            raise CheckpointValidationError(
+                "Completed ad-video assets checkpoint product_identity_reference "
+                f"must be approved; got approval_status={approval_status!r}"
+            )
+    elif source_type == "risk_accepted":
+        if approval_status != "approved":
+            raise CheckpointValidationError(
+                "Completed ad-video assets checkpoint risk_accepted "
+                "product_identity_reference must be approved"
+            )
+    elif source_type == "not_applicable":
+        if approval_status != "not_required":
+            raise CheckpointValidationError(
+                "Completed ad-video assets checkpoint not_applicable "
+                "product_identity_reference must have approval_status='not_required'"
+            )
+
+    _validate_ad_video_assets_cross_stage_contract(artifacts)
 
 
 def validate_checkpoint(checkpoint: dict[str, Any]) -> None:
@@ -129,6 +524,12 @@ def validate_checkpoint(checkpoint: dict[str, Any]) -> None:
     status = checkpoint.get("status")
     artifacts = checkpoint.get("artifacts")
     pipeline_type = checkpoint.get("pipeline_type")
+    if isinstance(stage, str):
+        normalized_stage = _normalize_stage_for_pipeline(stage, pipeline_type)
+        if normalized_stage != stage:
+            checkpoint = dict(checkpoint)
+            checkpoint["stage"] = normalized_stage
+            stage = normalized_stage
 
     valid_stages = (
         set(get_pipeline_stages(pipeline_type)) if pipeline_type
@@ -145,16 +546,36 @@ def validate_checkpoint(checkpoint: dict[str, Any]) -> None:
     if not isinstance(artifacts, dict):
         raise CheckpointValidationError("Checkpoint artifacts must be a dictionary")
 
-    _validate_artifacts_for_stage(stage, status, artifacts)
+    _validate_artifacts_for_stage(stage, status, artifacts, pipeline_type)
+    _validate_ad_video_checkpoint_gate_state(checkpoint)
 
     try:
-        jsonschema.validate(instance=checkpoint, schema=_load_checkpoint_schema())
+        jsonschema.validate(
+            instance=checkpoint,
+            schema=_load_checkpoint_schema(),
+            format_checker=FORMAT_CHECKER,
+        )
     except jsonschema.ValidationError as exc:
-        raise CheckpointValidationError(f"Checkpoint failed schema validation: {exc.message}") from exc
+        location = ".".join(str(part) for part in exc.path)
+        location_suffix = f" at {location}" if location else ""
+        raise CheckpointValidationError(
+            f"Checkpoint failed schema validation{location_suffix}: {exc.message}"
+        ) from exc
 
 
 def _checkpoint_path(pipeline_dir: Path, project_id: str, stage: str) -> Path:
     return pipeline_dir / project_id / f"checkpoint_{stage}.json"
+
+
+def _legacy_checkpoint_path(
+    pipeline_dir: Path,
+    project_id: str,
+    stage: str,
+) -> Path | None:
+    legacy_stage = AD_VIDEO_REVERSE_STAGE_ALIASES.get(stage)
+    if legacy_stage is None:
+        return None
+    return _checkpoint_path(pipeline_dir, project_id, legacy_stage)
 
 
 def _decision_log_path(pipeline_dir: Path, project_id: str) -> Path:
@@ -209,6 +630,7 @@ def write_checkpoint(
     metadata: Optional[dict] = None,
 ) -> Path:
     """Write a checkpoint file for a pipeline stage."""
+    stage = _normalize_stage_for_pipeline(stage, pipeline_type)
     valid_stages = (
         set(get_pipeline_stages(pipeline_type)) if pipeline_type
         else ALL_KNOWN_STAGES
@@ -222,7 +644,7 @@ def write_checkpoint(
     checkpoint = {
         "version": "1.0",
         "project_id": project_id,
-        "pipeline_type": pipeline_type or "unknown",
+        "pipeline_type": pipeline_type or LEGACY_PIPELINE_TYPE,
         "stage": stage,
         "status": status,
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -242,6 +664,10 @@ def write_checkpoint(
     if metadata is not None:
         checkpoint["metadata"] = metadata
 
+    # Validate before any side effect such as merging decision_log.json. This
+    # prevents rejected checkpoints from leaving a corrupted cumulative log.
+    validate_checkpoint(checkpoint)
+
     # Merge decision_log: if this checkpoint carries new decisions,
     # append them to the project-level decision log file, then write the
     # reference back into relevant artifacts so downstream consumers can find it.
@@ -249,9 +675,8 @@ def write_checkpoint(
         _merge_decision_log(pipeline_dir, project_id, artifacts["decision_log"])
         log_ref = str(_decision_log_path(pipeline_dir, project_id))
 
-        # Write decision_log_ref into proposal_packet and render_report
-        # artifacts if they are present in this checkpoint.
-        for artifact_key in ("proposal_packet", "render_report"):
+        # Write decision_log_ref into proposal/render artifacts when present.
+        for artifact_key in ("proposal_packet", "production_proposal", "render_report"):
             if artifact_key in artifacts and isinstance(artifacts[artifact_key], dict):
                 plan_or_top = artifacts[artifact_key]
                 # proposal_packet stores it under production_plan
@@ -273,14 +698,37 @@ def write_checkpoint(
 
 
 def read_checkpoint(
-    pipeline_dir: Path, project_id: str, stage: str
+    pipeline_dir: Path,
+    project_id: str,
+    stage: str,
+    *,
+    pipeline_type: Optional[str] = None,
 ) -> Optional[dict[str, Any]]:
     """Read a checkpoint file. Returns None if not found."""
-    path = _checkpoint_path(pipeline_dir, project_id, stage)
-    if not path.exists():
+    normalized_stage = _normalize_stage_for_pipeline(stage, pipeline_type)
+    candidate_paths: list[Path] = []
+    if normalized_stage != stage:
+        candidate_paths.append(_checkpoint_path(pipeline_dir, project_id, normalized_stage))
+    candidate_paths.append(_checkpoint_path(pipeline_dir, project_id, stage))
+    if pipeline_type is None and stage in AD_VIDEO_STAGE_ALIASES:
+        candidate_paths.append(
+            _checkpoint_path(pipeline_dir, project_id, AD_VIDEO_STAGE_ALIASES[stage])
+        )
+    legacy_path = _legacy_checkpoint_path(pipeline_dir, project_id, normalized_stage)
+    if legacy_path is not None:
+        candidate_paths.append(legacy_path)
+
+    path = next((candidate for candidate in candidate_paths if candidate.exists()), None)
+    if path is None:
         return None
     with open(path) as f:
         checkpoint = json.load(f)
+    checkpoint_pipeline_type = checkpoint.get("pipeline_type") or pipeline_type
+    if isinstance(checkpoint.get("stage"), str):
+        checkpoint["stage"] = _normalize_stage_for_pipeline(
+            checkpoint["stage"],
+            checkpoint_pipeline_type,
+        )
     validate_checkpoint(checkpoint)
     return checkpoint
 
@@ -303,6 +751,12 @@ def get_latest_checkpoint(
 
     with open(checkpoints[0]) as f:
         checkpoint = json.load(f)
+    pipeline_type = checkpoint.get("pipeline_type")
+    if isinstance(checkpoint.get("stage"), str):
+        checkpoint["stage"] = _normalize_stage_for_pipeline(
+            checkpoint["stage"],
+            pipeline_type,
+        )
     validate_checkpoint(checkpoint)
     return checkpoint
 
@@ -320,7 +774,11 @@ def get_completed_stages(
     completed = []
     for stage in stages_to_check:
         cp = read_checkpoint(pipeline_dir, project_id, stage)
-        if cp and cp.get("status") == "completed":
+        if not cp or cp.get("status") != "completed":
+            continue
+        if pipeline_type and cp.get("pipeline_type") != pipeline_type:
+            continue
+        if cp:
             completed.append(stage)
     return completed
 

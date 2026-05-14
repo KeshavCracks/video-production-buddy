@@ -52,6 +52,9 @@ def _planning_stages(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     for stage in manifest.get("stages", []):
         if stage.get("name") in {"proposal", "idea"}:
             out.append(stage)
+        for sub_stage in stage.get("sub_stages", []):
+            if stage.get("name") in {"proposal", "idea"} or sub_stage.get("name") in {"proposal", "idea", "technical_proposal"}:
+                out.append(sub_stage)
     return out
 
 
@@ -67,6 +70,58 @@ def _load_skill(skill_ref: str) -> tuple[Path, str]:
         f"Manifest references skill {skill_ref!r} but {candidate} does not exist."
     )
     return candidate, candidate.read_text(encoding="utf-8")
+
+
+def _stage_named(manifest: dict[str, Any], name: str) -> dict[str, Any] | None:
+    return next((s for s in manifest.get("stages", []) if s.get("name") == name), None)
+
+
+def _stage_uses_tool(stage: dict[str, Any] | None, tool_name: str) -> bool:
+    if not stage:
+        return False
+    declared = (
+        stage.get("required_tools", [])
+        + stage.get("optional_tools", [])
+        + stage.get("tools_available", [])
+    )
+    return tool_name in declared
+
+
+def _produced_artifacts(manifest: dict[str, Any]) -> set[str]:
+    out: set[str] = set()
+    for stage in manifest.get("stages", []):
+        out.update(stage.get("produces") or [])
+        for sub_stage in stage.get("sub_stages", []):
+            out.update(sub_stage.get("produces") or [])
+    return out
+
+
+def _runtime_lock_artifact(manifest: dict[str, Any]) -> str | None:
+    """Return the planning artifact that carries the render_runtime lock."""
+    produced = _produced_artifacts(manifest)
+    for candidate in ("production_proposal", "proposal_packet", "brief"):
+        if candidate in produced:
+            return candidate
+    return None
+
+
+def _skill_bodies_for_stages(manifest: dict[str, Any], stage_names: set[str]) -> str:
+    bodies: list[str] = []
+    for stage in manifest.get("stages", []):
+        if stage.get("name") in stage_names:
+            skill_ref = stage.get("skill")
+            if skill_ref:
+                _, body = _load_skill(skill_ref)
+                bodies.append(body)
+        for sub_stage in stage.get("sub_stages", []):
+            if stage.get("name") not in stage_names and sub_stage.get("name") not in stage_names:
+                continue
+            skill_ref = sub_stage.get("skill")
+            if not skill_ref:
+                continue
+            _, body = _load_skill(skill_ref)
+            bodies.append(body)
+    return "\n".join(bodies)
 
 
 ALL_MANIFESTS = sorted(PIPELINE_DIR.glob("*.yaml"))
@@ -163,6 +218,90 @@ def test_compose_stage_references_runtime_routing(manifest_path: Path):
     )
 
 
+@pytest.mark.parametrize(
+    "manifest_path",
+    [p for p in ALL_MANIFESTS if p.stem not in _EXCLUDED_PIPELINES],
+    ids=lambda p: p.stem,
+)
+def test_video_compose_stages_receive_runtime_lock_artifact(manifest_path: Path):
+    """Edit and compose must receive the artifact that owns render_runtime."""
+    manifest = _load_manifest(manifest_path)
+    compose_stage = _stage_named(manifest, "compose")
+    if not _stage_uses_tool(compose_stage, "video_compose"):
+        pytest.skip(f"{manifest_path.stem} does not render through video_compose")
+
+    runtime_artifact = _runtime_lock_artifact(manifest)
+    assert runtime_artifact, (
+        f"{manifest_path.stem} uses video_compose but has no planning artifact "
+        "that can carry the proposal-time render_runtime lock."
+    )
+
+    for stage_name in ("edit", "compose"):
+        stage = _stage_named(manifest, stage_name)
+        if stage is None:
+            continue
+        required = set(stage.get("required_artifacts_in") or [])
+        assert runtime_artifact in required, (
+            f"{manifest_path.stem}.{stage_name} must require {runtime_artifact!r} "
+            "so edit_decisions.render_runtime can be copied from the approved "
+            "planning artifact and compose can verify it before rendering."
+        )
+
+
+@pytest.mark.parametrize(
+    "manifest_path",
+    [p for p in ALL_MANIFESTS if p.stem not in _EXCLUDED_PIPELINES],
+    ids=lambda p: p.stem,
+)
+def test_brief_runtime_lock_pipelines_name_required_metadata_field(
+    manifest_path: Path,
+):
+    """Brief-first pipelines must tell agents where the runtime lock lives."""
+    manifest = _load_manifest(manifest_path)
+    compose_stage = _stage_named(manifest, "compose")
+    if not _stage_uses_tool(compose_stage, "video_compose"):
+        pytest.skip(f"{manifest_path.stem} does not render through video_compose")
+    if _runtime_lock_artifact(manifest) != "brief":
+        pytest.skip(f"{manifest_path.stem} does not use brief as the runtime lock")
+
+    planning_text = _skill_bodies_for_stages(manifest, {"idea", "proposal"})
+    assert "brief.metadata.render_runtime" in planning_text, (
+        f"{manifest_path.stem} uses brief as its runtime lock, but its planning "
+        "skill does not name brief.metadata.render_runtime. Agents can produce "
+        "schema-invalid briefs or skip final-review runtime-swap detection."
+    )
+
+
+@pytest.mark.parametrize(
+    "manifest_path",
+    [p for p in ALL_MANIFESTS if p.stem not in _EXCLUDED_PIPELINES],
+    ids=lambda p: p.stem,
+)
+def test_video_compose_stage_receives_decision_log_when_runtime_skills_use_it(
+    manifest_path: Path,
+):
+    """If runtime skills tell agents to log decisions, compose must receive them."""
+    manifest = _load_manifest(manifest_path)
+    compose_stage = _stage_named(manifest, "compose")
+    if not _stage_uses_tool(compose_stage, "video_compose"):
+        pytest.skip(f"{manifest_path.stem} does not render through video_compose")
+
+    runtime_skill_text = _skill_bodies_for_stages(manifest, {"idea", "proposal", "compose"})
+    if "decision_log" not in runtime_skill_text:
+        pytest.skip(f"{manifest_path.stem} runtime skills do not mention decision_log")
+
+    produced = _produced_artifacts(manifest)
+    assert "decision_log" in produced, (
+        f"{manifest_path.stem} runtime skills mention decision_log, but no stage "
+        "declares it in produces."
+    )
+    required = set(compose_stage.get("required_artifacts_in") or [])
+    assert "decision_log" in required, (
+        f"{manifest_path.stem}.compose must require decision_log so approved "
+        "runtime substitutions can be audited before video_compose renders."
+    )
+
+
 def test_agent_guide_carries_hard_rule():
     """The top-level agent contract must carry the HARD RULE banner so every
     fresh-session agent reads it before picking a pipeline."""
@@ -189,3 +328,18 @@ def test_reviewer_has_critical_finding_for_single_option_runtime():
         "Reviewer skill doesn't flag single-option render_runtime_selection "
         "as CRITICAL — the conversation contract has no teeth."
     )
+
+
+def test_user_facing_hyperframes_docs_use_public_npx_command():
+    """User-facing HyperFrames docs must point at the runtime command Video Production Buddy uses."""
+    docs = [
+        ROOT / "PROMPT_GALLERY.md",
+        SKILLS_DIR / "meta" / "onboarding.md",
+    ]
+    for path in docs:
+        body = path.read_text(encoding="utf-8")
+        assert "npx @hyperframes/cli" not in body, (
+            f"{path.relative_to(ROOT)} still recommends the monorepo-internal "
+            "HyperFrames package name; use `npx hyperframes` instead."
+        )
+        assert "npx hyperframes" in body

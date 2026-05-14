@@ -1,0 +1,700 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "video-production-buddy/artifacts/production_bible",
+  "title": "Production Bible",
+  "description": "Machine-readable contract between pre-production and production. Downstream stages validate against compliance_manifest.",
+  "type": "object",
+  "required": ["version", "pipeline", "project_id", "approval", "identity", "narrative", "intelligence", "truth_contract", "visual", "audio", "brand_constraints", "deliverables", "compliance_manifest"],
+  "properties": {
+    "version": { "type": "string", "const": "1.0" },
+    "pipeline": { "type": "string", "const": "ad-video" },
+    "project_id": { "type": "string" },
+    "approval": {
+      "type": "object",
+      "required": ["strategic_approved", "execution_approved", "modifications_log"],
+      "properties": {
+        "strategic_approved": { "type": "boolean" },
+        "execution_approved": { "type": "boolean" },
+        "modifications_log": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "required": ["product", "platform", "duration_target_seconds", "key_message", "cta", "tone"],
+      "properties": {
+        "product": { "type": "string" },
+        "brand_name": { "type": "string" },
+        "target_audience": {
+          "type": "object",
+          "properties": {
+            "demographic": { "type": "string" },
+            "emotional_profile": { "type": "string" },
+            "core_pain_point": { "type": "string" },
+            "aspiration": { "type": "string" }
+          }
+        },
+        "platform": { "type": "string", "enum": ["youtube", "tiktok", "instagram", "linkedin", "tv", "generic"] },
+        "duration_target_seconds": { "type": "number" },
+        "key_message": { "type": "string" },
+        "cta": { "type": ["string", "null"] },
+        "tone": { "type": "string" }
+      }
+    },
+    "narrative": {
+      "type": "object",
+      "required": ["arc_type", "pacing_model", "hook_mechanic", "hook_window_seconds", "tension_peak_at_seconds", "resolution_type", "emotional_beat_sequence"],
+      "properties": {
+        "arc_type": { "type": "string", "enum": ["problem-solution", "desire-fulfillment", "contrast", "journey", "social-proof", "demo-reveal"] },
+        "pacing_model": { "type": "string", "enum": ["slow-burn", "punchy", "escalating", "wave"] },
+        "hook_mechanic": { "type": "string", "enum": ["question", "statement", "visual-contrast", "sound-interrupt", "stat"] },
+        "hook_window_seconds": {
+          "type": "number",
+          "description": "MAX duration of the hook section in seconds. Enforced by lib.hook_window.check_hook_window_compliance against the script's hook section duration: the section's narration must finish within this window or viewers scroll past. This is the SECTION duration constraint, NOT the visual-hook-landing time. For visual-hook-landing intent (e.g. 'orange dot ignites at 1.5s'), use visual_hook_landing_seconds instead."
+        },
+        "visual_hook_landing_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "description": "When the FIRST visual hook moment lands on screen — e.g. the first chromatic ignition mark, sound-interrupt sting, or visible gesture. This is platform-derived (TikTok ~1.5s scroll-decision threshold, YouTube ~3-5s). Optional. Used by intelligence-director to validate hook_mechanic timing and by scene-director to gate first-keyframe content. Distinct from hook_window_seconds, which is the hook narration's section duration constraint."
+        },
+        "tension_peak_at_seconds": { "type": "number" },
+        "resolution_type": { "type": "string", "enum": ["relief", "aspiration", "social-validation", "authority"] },
+        "emotional_beat_sequence": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "required": ["beat_id", "name", "duration_seconds", "emotional_target", "intensity", "script_constraint", "visual_constraint"],
+            "properties": {
+              "beat_id": { "type": "string" },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Beat name is arc-type-specific. See spec for valid names per arc_type. Not enum-constrained because the set is determined dynamically by arc_type selection."
+              },
+              "duration_seconds": { "type": "number", "minimum": 1 },
+              "emotional_target": { "type": "string" },
+              "intensity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+              "script_constraint": { "type": "string" },
+              "visual_constraint": { "type": "string" }
+            }
+          }
+        },
+        "intensity_curve": {
+          "type": "array",
+          "description": "Time-indexed emotional intensity curve derived from emotional_beat_sequence by lib.intensity_curve.derive_intensity_curve. Consumed by edit-director (duck schedule), audio_mixer (volume envelope), and asset-director (music-gen prompt). Required by ad-video contextual validation; legacy non-ad callers may omit it.",
+          "items": {
+            "type": "object",
+            "required": ["t_seconds", "value"],
+            "properties": {
+              "t_seconds": { "type": "number", "minimum": 0 },
+              "value": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "intelligence": {
+      "type": "object",
+      "required": ["trend_alignment", "knowledge_alignment"],
+      "properties": {
+        "trend_alignment": {
+          "type": "object",
+          "description": "Selected brand-safe trend applications that downstream script and scene_plan stages must visibly thread. Stale, negative, cautionary, or unsafe research trends may remain in intelligence_brief but must not appear here.",
+          "required": ["selected_trend_ids", "alignments"],
+          "additionalProperties": false,
+          "properties": {
+            "selected_trend_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Trend ids selected from intelligence_brief.platform_trends after recency, dedupe, sentiment, and brand-safety filtering."
+            },
+            "alignments": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "trend_id",
+                  "signal",
+                  "source",
+                  "sentiment",
+                  "brand_safety",
+                  "trend_type",
+                  "application_targets",
+                  "target_beat",
+                  "script_usage",
+                  "scene_usage",
+                  "do_not_imitate"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "trend_id": { "type": "string", "minLength": 1 },
+                  "signal": { "type": "string", "minLength": 1 },
+                  "source": { "type": "string", "minLength": 1 },
+                  "sentiment": {
+                    "type": "string",
+                    "enum": ["positive", "neutral"],
+                    "description": "Selected trends must be positive or neutral for the brand."
+                  },
+                  "brand_safety": {
+                    "type": "string",
+                    "const": "safe",
+                    "description": "Selected trends must be brand safe."
+                  },
+                  "trend_type": {
+                    "type": "string",
+                    "enum": ["engagement_signal", "visual_style", "audio_pattern", "editing_pacing", "hook_format", "platform_format_norm", "cultural_moment", "topic_signal"]
+                  },
+                  "application_targets": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "enum": ["hook", "build", "reveal", "cta_brand", "script", "scene_plan", "visual", "pacing", "audio", "format"]
+                    }
+                  },
+                  "target_beat": {
+                    "type": "string",
+                    "enum": ["hook", "build", "reveal", "cta_brand", "multi"]
+                  },
+                  "script_usage": {
+                    "type": "object",
+                    "required": ["required_section_ids", "source_ref", "usage_note"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "required_section_ids": {
+                        "type": "array",
+                        "minItems": 1,
+                        "uniqueItems": true,
+                        "items": { "type": "string", "minLength": 1 }
+                      },
+                      "source_ref": {
+                        "type": "string",
+                        "pattern": "^trend_alignment:[A-Za-z0-9._:-]+$",
+                        "description": "Exact source_ref value script sections use to prove trend propagation."
+                      },
+                      "usage_note": { "type": "string", "minLength": 1 }
+                    }
+                  },
+                  "scene_usage": {
+                    "type": "object",
+                    "required": ["required", "required_scene_count", "visual_or_pacing_instruction"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "required": { "type": "boolean" },
+                      "required_scene_count": { "type": "integer", "minimum": 0 },
+                      "visual_or_pacing_instruction": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "How scenes may use the trend without imitating source content."
+                      }
+                    }
+                  },
+                  "do_not_imitate": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": { "type": "string", "minLength": 1 }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "knowledge_alignment": {
+          "type": "object",
+          "description": "Selected professional producer-knowledge applications that downstream idea, script, and scene_plan stages must visibly thread. This is stable doctrine from curated knowledge cards, separate from fresh platform trend alignment.",
+          "required": ["selected_card_ids", "alignments"],
+          "additionalProperties": false,
+          "properties": {
+            "selected_card_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Knowledge card ids selected from intelligence_brief.professional_knowledge.cards_used."
+            },
+            "alignments": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "card_id",
+                  "domain",
+                  "summary",
+                  "source_ref",
+                  "application_targets",
+                  "target_beat",
+                  "script_usage",
+                  "scene_usage",
+                  "do_not_overapply"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "card_id": { "type": "string", "minLength": 1 },
+                  "domain": {
+                    "type": "string",
+                    "enum": ["positioning", "audience_insight", "hook_mechanic", "narrative_arc", "emotional_rhythm", "visual_rhetoric", "proof_logic", "product_demo_logic", "platform_format", "commercial_compliance", "cinematography", "color_theory", "editing_technique", "sound_design", "music_direction"]
+                  },
+                  "summary": { "type": "string", "minLength": 1 },
+                  "source_ref": {
+                    "type": "string",
+                    "pattern": "^knowledge_alignment:[A-Za-z0-9._:-]+$",
+                    "description": "Canonical source_ref value script sections and scene_plan scenes use to prove professional-knowledge propagation. Must equal knowledge_alignment:<card_id> and script_usage.source_ref."
+                  },
+                  "application_targets": {
+                    "type": "array",
+                    "minItems": 1,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "enum": ["idea", "script", "scene_plan", "visual", "pacing", "audio", "format", "hook", "build", "reveal", "cta_brand", "color", "sound", "music", "editing"]
+                    }
+                  },
+                  "target_beat": {
+                    "type": "string",
+                    "enum": ["hook", "build", "reveal", "cta_brand", "multi"]
+                  },
+                  "script_usage": {
+                    "type": "object",
+                    "required": ["required_section_ids", "source_ref", "usage_note"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "required_section_ids": {
+                        "type": "array",
+                        "minItems": 1,
+                        "uniqueItems": true,
+                        "items": { "type": "string", "minLength": 1 }
+                      },
+                      "source_ref": {
+                        "type": "string",
+                        "pattern": "^knowledge_alignment:[A-Za-z0-9._:-]+$"
+                      },
+                      "usage_note": { "type": "string", "minLength": 1 }
+                    }
+                  },
+                  "scene_usage": {
+                    "type": "object",
+                    "required": ["required", "required_scene_count", "visual_or_pacing_instruction"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "required": { "type": "boolean" },
+                      "required_scene_count": { "type": "integer", "minimum": 0 },
+                      "visual_or_pacing_instruction": { "type": "string", "minLength": 1 }
+                    }
+                  },
+                  "do_not_overapply": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": { "type": "string", "minLength": 1 }
+                  },
+                  "cross_domain_notes": {
+                    "type": "array",
+                    "minItems": 1,
+                    "description": "Optional copied notes from curated knowledge cards that identify other professional domains this alignment should co-present with when targets overlap.",
+                    "items": {
+                      "type": "object",
+                      "required": ["domain", "note"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "domain": {
+                          "type": "string",
+                          "enum": ["positioning", "audience_insight", "hook_mechanic", "narrative_arc", "emotional_rhythm", "visual_rhetoric", "proof_logic", "product_demo_logic", "platform_format", "commercial_compliance", "cinematography", "color_theory", "editing_technique", "sound_design", "music_direction"]
+                        },
+                        "note": { "type": "string", "minLength": 1 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "trending_signals": { "type": "array", "items": { "type": "object" } },
+        "reference_ads_analyzed": { "type": "array", "items": { "type": "object" } },
+        "provenance_demotions": {
+          "type": "array",
+          "description": "Audit trail of research-grounded claims that lib.provenance_audit.audit_intelligence_provenance demoted to pattern-inferred at bible-director Step 0. Empty array means the auditor passed everything. Surfaced to the user at Round 2a as part of the FLAGGED section if non-empty.",
+          "items": {
+            "type": "object",
+            "required": ["path", "path_type", "current_confidence", "suggested_confidence", "reason"],
+            "properties": {
+              "path": { "type": "string" },
+              "path_type": { "type": "string", "enum": ["recommendation", "dimension_verdict"] },
+              "key": { "type": "string", "description": "Recommendation key (path_type=recommendation only)." },
+              "index": { "type": "integer", "minimum": 0, "description": "dimension_verdicts array index (path_type=dimension_verdict only)." },
+              "current_confidence": { "type": "string" },
+              "suggested_confidence": { "type": "string" },
+              "reason": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "rhythm_warnings": {
+          "type": "array",
+          "description": "Per-beat divergence warnings from lib.intensity_curve.check_editing_rhythm_consistency at bible-director Step 3. Non-empty when a beat's editing_rhythm sharply disagrees with its intensity (>= 2 density-rank tiers apart, or long shots at peak intensity). Both axes can fire on the same beat — multiple entries per beat_id are valid. Surfaced to the user at Round 2a as part of the FLAGGED section.",
+          "items": {
+            "type": "object",
+            "required": ["beat_id", "warning", "rhythm"],
+            "properties": {
+              "beat_id": { "type": "string", "minLength": 1 },
+              "warning": { "type": "string", "minLength": 1 },
+              "rhythm": {
+                "type": "object",
+                "description": "The editing_rhythm dict the warning was raised against. Fields match production_bible.visual.editing_rhythm[].",
+                "properties": {
+                  "cuts_density": { "type": "string" },
+                  "avg_shot_duration_seconds": { "type": "number" },
+                  "transition_style": { "type": "string" },
+                  "confidence": { "type": "string" }
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "rejected_approaches": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["approach", "reason"],
+            "properties": {
+              "approach": { "type": "string" },
+              "reason": { "type": "string" }
+            }
+          }
+        },
+        "classification_aggregate": {
+          "type": "object",
+          "description": "Aggregate narrative-pattern classification across hit_ads_analyzed[].classification entries, produced by lib.hit_ad_classification.aggregate_classifications at bible-director Step 0b. Recorded as audit trail and surfaced at Round 2a — does NOT auto-override narrative.arc_type. The user retains the final say; the aggregate is one signal among many.",
+          "required": ["arc_type", "hook_mechanic", "sample_size", "confidence"],
+          "properties": {
+            "arc_type": {
+              "type": "string",
+              "enum": ["problem-solution", "desire-fulfillment", "contrast", "journey", "social-proof", "demo-reveal"]
+            },
+            "arc_type_agreement": { "type": "number", "minimum": 0, "maximum": 1 },
+            "hook_mechanic": {
+              "type": "string",
+              "enum": ["question", "statement", "visual-contrast", "sound-interrupt", "stat"]
+            },
+            "hook_mechanic_agreement": { "type": "number", "minimum": 0, "maximum": 1 },
+            "sample_size": { "type": "integer", "minimum": 1 },
+            "confidence": {
+              "type": "string",
+              "enum": ["research-grounded", "pattern-inferred"]
+            },
+            "dissent": {
+              "type": "array",
+              "description": "Full classification of ads that disagreed with the majority on arc_type or hook_mechanic. Surfaced at Round 2a so the user sees 'these N ads went a different way and here's what they chose'.",
+              "items": {
+                "type": "object",
+                "required": ["arc_type", "hook_mechanic"],
+                "properties": {
+                  "arc_type": { "type": "string" },
+                  "hook_mechanic": { "type": "string" }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "truth_contract": {
+      "type": "object",
+      "description": "Source-backed truth and safety contract for ad-video generation. Scene plans derive hallucination_checks from these rules; asset review verifies generated keyframes against them before compose/publish.",
+      "required": [
+        "objective_facts",
+        "physical_constraints",
+        "product_geometry_rules",
+        "motion_coherence_rules",
+        "values_guardrails"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "objective_facts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/truth_contract_rule" },
+          "description": "Objective claims that must remain true in script, scenes, assets, and final edit."
+        },
+        "physical_constraints": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/truth_contract_rule" },
+          "description": "Physical plausibility constraints for people, products, environments, and interactions."
+        },
+        "product_geometry_rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/truth_contract_rule" },
+          "description": "Recognizable product/app/packaging geometry and brand-marking rules. For non-physical services, include UI/brand identity rules or an explicit not-applicable rule."
+        },
+        "motion_coherence_rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/truth_contract_rule" },
+          "description": "Continuity and motion rules checked across start/mid/end keyframes."
+        },
+        "values_guardrails": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/truth_contract_rule" },
+          "description": "Safety, values, legal, and brand-compliance guardrails."
+        }
+      }
+    },
+    "visual": {
+      "type": "object",
+      "required": ["style_mode"],
+      "properties": {
+        "style_mode": { "type": "string", "enum": ["animated", "cinematic"] },
+        "render_runtime": {
+          "type": "string",
+          "enum": ["remotion", "hyperframes", "ffmpeg"],
+          "description": "Optional audit copy only. The runtime is selected and locked at proposal stage in production_proposal.render_runtime after the user sees the runtime shortlist."
+        },
+        "color_direction": { "type": "string" },
+        "visual_motifs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["motif", "mandatory", "minimum_scene_count"],
+            "properties": {
+              "motif": { "type": "string" },
+              "mandatory": { "type": "boolean" },
+              "minimum_scene_count": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "key_visual_moments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["moment_id", "description", "maps_to_beat", "mandatory", "required_motion_primitives"],
+            "properties": {
+              "moment_id": { "type": "string" },
+              "description": { "type": "string" },
+              "maps_to_beat": { "type": "string" },
+              "mandatory": { "type": "boolean" },
+              "required_motion_primitives": {
+                "type": "array",
+                "description": "Scene motion primitive IDs required to fulfill this key visual moment. Scene-director maps these to motion_specs and scene_fidelity_check validates component support.",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        },
+        "editing_rhythm": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["maps_to_beat", "cuts_density", "avg_shot_duration_seconds", "transition_style", "confidence"],
+            "properties": {
+              "maps_to_beat": { "type": "string" },
+              "cuts_density": { "type": "string", "enum": ["rapid", "moderate", "slow", "held"] },
+              "avg_shot_duration_seconds": { "type": "number" },
+              "transition_style": { "type": "string", "enum": ["hard_cut", "dissolve", "whip", "match_cut"] },
+              "confidence": { "type": "string", "enum": ["research-grounded", "pattern-inferred", "default-heuristic"] }
+            }
+          }
+        }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "required": ["voice_character", "music_direction", "av_sync_notes"],
+      "properties": {
+        "voice_character": {
+          "type": "object",
+          "required": ["tone", "pacing", "persona"],
+          "additionalProperties": false,
+          "properties": {
+            "tone": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Narrator tone/register specific enough for proposal-director to choose an aligned voice."
+            },
+            "pacing": { "type": "string", "enum": ["measured", "energetic", "conversational"] },
+            "persona": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Narrator persona including any required perceived gender/age/register when relevant."
+            }
+          }
+        },
+        "music_direction": {
+          "type": "object",
+          "properties": {
+            "mood": { "type": "string" },
+            "tempo": { "type": "string", "enum": ["slow", "medium", "fast"] },
+            "genre_direction": { "type": "string" },
+            "arc": { "type": "string" }
+          }
+        },
+        "av_sync_notes": { "type": "string" }
+      }
+    },
+    "brand_constraints": {
+      "type": "object",
+      "required": ["brand_name_in_final_frame"],
+      "properties": {
+        "brand_name_in_final_frame": { "type": "boolean", "const": true },
+        "mandatory_elements": { "type": "array", "items": { "type": "string" } },
+        "prohibited_elements": { "type": "array", "items": { "type": "string" } },
+        "tone_guardrails": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "deliverables": {
+      "type": "object",
+      "required": ["primary"],
+      "properties": {
+        "primary": {
+          "type": "object",
+          "required": ["aspect_ratio", "duration_seconds"],
+          "properties": {
+            "aspect_ratio": { "type": "string", "enum": ["16:9", "9:16", "1:1"] },
+            "duration_seconds": { "type": "number" }
+          }
+        },
+        "derivatives": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["variant_id", "aspect_ratio", "duration_seconds"],
+            "properties": {
+              "variant_id": { "type": "string" },
+              "aspect_ratio": { "type": "string" },
+              "duration_seconds": { "type": "number" },
+              "adaptation_notes": { "type": "string" }
+            }
+          },
+          "default": []
+        }
+      }
+    },
+    "compliance_manifest": {
+      "type": "object",
+      "required": ["checkpoints"],
+      "properties": {
+        "checkpoints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "applies_to_stage", "description", "check_type", "evaluation_method", "criterion", "source_confidence", "failure_action"],
+            "properties": {
+              "id": { "type": "string" },
+              "applies_to_stage": { "type": "string", "enum": ["script", "scene_plan", "assets", "edit"] },
+              "description": { "type": "string" },
+              "check_type": { "type": "string", "enum": ["structural", "content", "timing", "presence"] },
+              "evaluation_method": { "type": "string", "enum": ["structural", "semantic"] },
+              "criterion": { "type": "string" },
+              "source_confidence": { "type": "string", "enum": ["research-grounded", "pattern-inferred", "default-heuristic"] },
+              "failure_action": { "type": "string", "enum": ["revise", "flag"] },
+              "structured": {
+                "type": "object",
+                "description": "v2 structured criterion. When present, compliance_check evaluates this directly and ignores the natural-language `criterion` field. Eliminates regex-parser silent failures. Discriminated by `kind`.",
+                "required": ["kind"],
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": ["kind", "beat_id", "target_seconds"],
+                    "properties": {
+                      "kind": { "type": "string", "const": "timing" },
+                      "beat_id": { "type": "string", "minLength": 1 },
+                      "target_seconds": { "type": "number", "minimum": 0.1 },
+                      "tolerance": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.10 }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": ["kind", "terms"],
+                    "properties": {
+                      "kind": { "type": "string", "const": "presence" },
+                      "terms": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": { "type": "string", "minLength": 1 }
+                      },
+                      "min_count": { "type": "integer", "minimum": 1, "default": 1 },
+                      "negated": { "type": "boolean", "default": false }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": ["kind", "beat_id"],
+                    "properties": {
+                      "kind": { "type": "string", "const": "beat_mapping" },
+                      "beat_id": { "type": "string", "minLength": 1 }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": ["kind", "beat_id", "cuts_density", "avg_shot_duration_seconds", "transition_style"],
+                    "properties": {
+                      "kind": { "type": "string", "const": "editing_rhythm" },
+                      "beat_id": { "type": "string", "minLength": 1 },
+                      "cuts_density": { "type": "string", "enum": ["rapid", "moderate", "slow", "held"] },
+                      "avg_shot_duration_seconds": { "type": "number", "minimum": 0.1 },
+                      "transition_style": { "type": "string", "enum": ["hard_cut", "dissolve", "whip", "match_cut"] },
+                      "tolerance": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.25 }
+                    },
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "truth_contract_rule": {
+      "type": "object",
+      "required": ["rule_id", "requirement", "prohibited_failure", "evidence_source", "source_confidence"],
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable id, e.g. TC-GEO-1."
+        },
+        "requirement": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What must remain true."
+        },
+        "prohibited_failure": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Concrete hallucination or safety failure that must not reach final render."
+        },
+        "evidence_source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Source backing this rule: user brief field, cited research, product_identity_reference path, brand guide, or explicit director validation."
+        },
+        "source_confidence": {
+          "type": "string",
+          "enum": ["source-backed", "research-grounded", "director-verified", "user-approved-waiver"],
+          "description": "How firmly the rule is grounded."
+        },
+        "applies_to": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Optional scene ids, beat ids, or artifact fields the rule targets."
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

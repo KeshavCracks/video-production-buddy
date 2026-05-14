@@ -1,4 +1,4 @@
-.PHONY: setup install install-dev install-gpu test test-contracts lint clean preflight demo demo-list hyperframes-doctor hyperframes-warm
+.PHONY: setup install install-dev install-gpu install-remotion test test-contracts genui-verify lint clean preflight preflight-full demo demo-list hyperframes-doctor hyperframes-warm
 
 # ---- One-command setup ----
 
@@ -7,7 +7,7 @@ setup:
 	pip install -r requirements.txt
 	@echo ""
 	@echo "==> Installing Remotion composer..."
-	cd remotion-composer && npm install
+	$(MAKE) install-remotion
 	@echo ""
 	@echo "==> Installing free offline TTS (Piper)..."
 	pip install piper-tts || echo "  [skip] piper-tts install failed — TTS will use cloud providers instead"
@@ -38,6 +38,20 @@ install-gpu:
 	pip install -r requirements-gpu.txt
 	pip install diffusers transformers accelerate
 
+install-remotion:
+	@if [ -f remotion-composer/pnpm-lock.yaml ]; then \
+		echo "Using pnpm-lock.yaml for Remotion dependencies..."; \
+		if command -v pnpm >/dev/null 2>&1; then \
+			cd remotion-composer && pnpm install --frozen-lockfile; \
+		elif command -v corepack >/dev/null 2>&1; then \
+			cd remotion-composer && corepack pnpm install --frozen-lockfile; \
+		else \
+			cd remotion-composer && npx --yes pnpm install --frozen-lockfile; \
+		fi; \
+	else \
+		cd remotion-composer && npm install; \
+	fi
+
 # ---- Testing ----
 
 test:
@@ -46,9 +60,31 @@ test:
 test-contracts:
 	python -m pytest tests/contracts/ -v
 
+genui-verify:
+	python -m pytest -q tests/contracts/test_genui_session_contract.py tests/contracts/test_genui_dynamic_interaction.py tests/contracts/test_genui_interaction_contract.py tests/contracts/test_genui_surface_contract.py
+	python -m pytest -q tests/contracts/test_genui_session_hardening.py
+	python -m pytest -q tests/contracts/test_genui_product_contract.py
+	python -m pytest -q tests/tools/test_genui_surface_browser.py
+	pnpm --dir genui-renderer test
+	pnpm --dir genui-renderer typecheck
+	@before=$$(mktemp); after=$$(mktemp); \
+		status=0; \
+		git diff -- lib/genui/static/renderer > $$before; \
+		pnpm --dir genui-renderer build; \
+		git diff -- lib/genui/static/renderer > $$after; \
+		if ! cmp -s $$before $$after; then \
+			echo "genui renderer static bundle is stale; rerun pnpm --dir genui-renderer build and include lib/genui/static/renderer"; \
+			git diff --exit-code -- lib/genui/static/renderer || status=$$?; \
+		fi; \
+		rm -f $$before $$after; \
+		exit $$status
+
 # ---- Utilities ----
 
 preflight:
+	python -c "from tools.tool_registry import registry; import json; registry.discover(); print(json.dumps(registry.provider_menu_summary(), indent=2))"
+
+preflight-full:
 	python -c "from tools.tool_registry import registry; import json; registry.discover(); print(json.dumps(registry.provider_menu(), indent=2))"
 
 hyperframes-doctor:
@@ -74,7 +110,7 @@ lint:
 	python -m py_compile tools/base_tool.py
 	python -m py_compile tools/tool_registry.py
 	python -m py_compile tools/cost_tracker.py
-	python -m py_compile tools/composition_validator.py
+	python -m py_compile tools/analysis/composition_validator.py
 
 clean:
 	python -c "import pathlib, shutil; [shutil.rmtree(p) for p in pathlib.Path('.').rglob('__pycache__')]; [p.unlink() for p in pathlib.Path('.').rglob('*.pyc')]"

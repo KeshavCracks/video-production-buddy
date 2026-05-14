@@ -48,7 +48,9 @@ stages:
     produces:
       - brief
       - decision_log
-    tools_available: []
+    tools_available:
+      - genui_interaction
+      - genui_session
     checkpoint_required: true
     human_approval_default: true
     review_focus:
@@ -68,6 +70,8 @@ stages:
     optional_tools:
       - transcriber
     tools_available:
+      - genui_interaction
+      - genui_session
       - transcriber
     checkpoint_required: true
     human_approval_default: true
@@ -87,7 +91,9 @@ stages:
       - brief
     produces:
       - scene_plan
-    tools_available: []
+    tools_available:
+      - genui_interaction
+      - genui_session
     checkpoint_required: true
     human_approval_default: true
     review_focus:
@@ -138,6 +144,7 @@ stages:
     required_artifacts_in:
       - scene_plan
       - asset_manifest
+      - brief
     optional_artifacts_in:
       - script
     produces:
@@ -158,6 +165,8 @@ stages:
     required_artifacts_in:
       - edit_decisions
       - asset_manifest
+      - brief
+      - decision_log
     optional_artifacts_in:
       - scene_plan
     produces:
@@ -194,7 +203,9 @@ stages:
       - script
     produces:
       - publish_log
-    tools_available: []
+    tools_available:
+      - genui_interaction
+      - genui_session
     checkpoint_required: true
     human_approval_default: true
     review_focus:

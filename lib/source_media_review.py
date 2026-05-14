@@ -17,6 +17,8 @@ import logging
 from pathlib import Path
 from typing import Any, Optional
 
+from schemas.artifacts import validate_artifact
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,6 +26,7 @@ logger = logging.getLogger(__name__)
 _VIDEO_EXTENSIONS = frozenset({".mp4", ".mov", ".webm", ".avi", ".mkv", ".m4v"})
 _AUDIO_EXTENSIONS = frozenset({".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a", ".opus"})
 _IMAGE_EXTENSIONS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".svg"})
+_VECTOR_IMAGE_EXTENSIONS = frozenset({".svg"})
 
 
 def detect_media_type(path: Path) -> Optional[str]:
@@ -36,6 +39,67 @@ def detect_media_type(path: Path) -> Optional[str]:
     if ext in _IMAGE_EXTENSIONS:
         return "image"
     return None
+
+
+def _has_video_stream_metadata(probe: dict[str, Any]) -> bool:
+    """Return True when probe data contains real video dimensions."""
+    resolution = probe.get("resolution")
+    if not isinstance(resolution, str) or "x" not in resolution:
+        return False
+    width, height = resolution.split("x", maxsplit=1)
+    return width.isdigit() and height.isdigit()
+
+
+def _safe_int(value: Any) -> int:
+    if value in (None, ""):
+        return 0
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _safe_float(value: Any) -> float:
+    if value in (None, ""):
+        return 0.0
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _canonical_video_probe(
+    fmt: dict[str, Any],
+    video_stream: dict[str, Any],
+    audio_stream: dict[str, Any] | None,
+) -> dict[str, Any]:
+    return {
+        "duration_seconds": _safe_float(fmt.get("duration")),
+        "resolution": (
+            f"{video_stream.get('width', '?')}x{video_stream.get('height', '?')}"
+        ),
+        "fps": _parse_fps(str(video_stream.get("r_frame_rate", "0/1"))),
+        "codec": video_stream.get("codec_name", "unknown"),
+        "audio_codec": audio_stream.get("codec_name", "") if audio_stream else "",
+        "sample_rate": _safe_int(audio_stream.get("sample_rate")) if audio_stream else 0,
+        "channels": _safe_int(audio_stream.get("channels")) if audio_stream else 0,
+        "file_size_bytes": _safe_int(fmt.get("size")),
+        "bitrate_kbps": round(_safe_int(fmt.get("bit_rate")) / 1000, 1),
+    }
+
+
+def _canonical_audio_probe(
+    fmt: dict[str, Any],
+    audio_stream: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "duration_seconds": _safe_float(fmt.get("duration")),
+        "audio_codec": audio_stream.get("codec_name", "unknown"),
+        "sample_rate": _safe_int(audio_stream.get("sample_rate")),
+        "channels": _safe_int(audio_stream.get("channels")),
+        "file_size_bytes": _safe_int(fmt.get("size")),
+        "bitrate_kbps": round(_safe_int(fmt.get("bit_rate")) / 1000, 1),
+    }
 
 
 def _probe_video(path: Path, tool_registry: Any) -> dict[str, Any]:
@@ -52,8 +116,10 @@ def _probe_video(path: Path, tool_registry: Any) -> dict[str, Any]:
     except Exception as e:
         logger.warning("audio_probe failed for %s: %s", path, e)
 
-    # If audio_probe didn't work, try ffprobe directly
-    if not result["technical_probe"]:
+    # audio_probe reports generic duration/audio fields. A video source still
+    # needs stream-level video metadata for truthful planning summaries.
+    needs_video_stream_probe = not _has_video_stream_metadata(result["technical_probe"])
+    if needs_video_stream_probe:
         try:
             import subprocess
             cmd = [
@@ -65,19 +131,24 @@ def _probe_video(path: Path, tool_registry: Any) -> dict[str, Any]:
                 probe_data = json.loads(proc.stdout)
                 fmt = probe_data.get("format", {})
                 streams = probe_data.get("streams", [])
-                video_stream = next((s for s in streams if s.get("codec_type") == "video"), {})
-                audio_stream = next((s for s in streams if s.get("codec_type") == "audio"), {})
-                result["technical_probe"] = {
-                    "duration_seconds": float(fmt.get("duration", 0)),
-                    "resolution": f"{video_stream.get('width', '?')}x{video_stream.get('height', '?')}",
-                    "fps": _parse_fps(video_stream.get("r_frame_rate", "0/1")),
-                    "codec": video_stream.get("codec_name", "unknown"),
-                    "audio_codec": audio_stream.get("codec_name", ""),
-                    "sample_rate": int(audio_stream.get("sample_rate", 0)) if audio_stream else 0,
-                    "channels": int(audio_stream.get("channels", 0)) if audio_stream else 0,
-                    "file_size_bytes": int(fmt.get("size", 0)),
-                    "bitrate_kbps": round(int(fmt.get("bit_rate", 0)) / 1000, 1),
-                }
+                video_stream = next((s for s in streams if s.get("codec_type") == "video"), None)
+                audio_stream = next((s for s in streams if s.get("codec_type") == "audio"), None)
+                if video_stream:
+                    result["technical_probe"] = _canonical_video_probe(
+                        fmt,
+                        video_stream,
+                        audio_stream,
+                    )
+                elif audio_stream:
+                    result["detected_media_type"] = "audio"
+                    result["technical_probe"] = _canonical_audio_probe(fmt, audio_stream)
+                    result["quality_risks"].append(
+                        "File has a video extension but no video stream; treat it as audio-only source media"
+                    )
+                else:
+                    result["quality_risks"].append(
+                        "Container has no detectable video or audio streams"
+                    )
         except Exception as e:
             logger.warning("ffprobe failed for %s: %s", path, e)
             result["quality_risks"].append(f"Could not probe file: {e}")
@@ -165,26 +236,42 @@ def _probe_image(path: Path) -> dict[str, Any]:
     """Probe an image file for basic metadata."""
     result: dict[str, Any] = {"technical_probe": {}, "quality_risks": []}
 
+    if path.suffix.lower() in _VECTOR_IMAGE_EXTENSIONS:
+        result["technical_probe"] = {
+            "file_size_bytes": path.stat().st_size,
+            "codec": path.suffix.lower().lstrip(".") or "unknown",
+        }
+        return result
+
     try:
         from PIL import Image
-        img = Image.open(path)
-        w, h = img.size
+        with Image.open(path) as img:
+            w, h = img.size
+            image_format = img.format or "unknown"
         result["technical_probe"] = {
             "resolution": f"{w}x{h}",
             "file_size_bytes": path.stat().st_size,
-            "codec": img.format or "unknown",
+            "codec": image_format,
         }
         if w < 640 or h < 480:
             result["quality_risks"].append(f"Low resolution ({w}x{h}) — may need upscaling")
     except ImportError:
-        # PIL not available — use file size as minimal probe
-        result["technical_probe"] = {
-            "file_size_bytes": path.stat().st_size,
-        }
+        result["quality_risks"].append(
+            "Could not probe raster image: Pillow is not installed"
+        )
     except Exception as e:
         result["quality_risks"].append(f"Could not probe image: {e}")
 
     return result
+
+
+def _has_review_evidence(entry: dict[str, Any]) -> bool:
+    """Return True when an entry has real inspection evidence."""
+    return bool(
+        entry.get("technical_probe")
+        or entry.get("representative_frames")
+        or entry.get("transcript_summary")
+    )
 
 
 def _transcribe_if_available(
@@ -240,15 +327,26 @@ def review_source_media(
     reviewed_files: list[dict[str, Any]] = []
     all_implications: list[str] = []
     summaries: list[str] = []
+    unreviewed_files: list[str] = []
 
     for file_path in files:
         media_type = detect_media_type(file_path)
         if media_type is None:
             logger.warning("Skipping unrecognized file type: %s", file_path)
+            unreviewed_files.append(file_path.name)
+            all_implications.append(
+                f"{file_path.name} is not a supported media type; "
+                "do not plan around it as reviewed source media."
+            )
             continue
 
         if not file_path.exists():
             logger.warning("File does not exist: %s", file_path)
+            unreviewed_files.append(file_path.name)
+            all_implications.append(
+                f"{file_path.name} was provided but does not exist; "
+                "do not plan around its contents."
+            )
             continue
 
         entry: dict[str, Any] = {
@@ -265,6 +363,11 @@ def review_source_media(
         else:
             probe_data = _probe_image(file_path)
 
+        detected_media_type = probe_data.get("detected_media_type")
+        if media_type == "video" and detected_media_type == "audio":
+            media_type = "audio"
+            entry["media_type"] = media_type
+
         entry["technical_probe"] = probe_data.get("technical_probe", {})
         entry["quality_risks"] = probe_data.get("quality_risks", [])
         entry["representative_frames"] = probe_data.get("representative_frames", [])
@@ -273,6 +376,14 @@ def review_source_media(
         transcript = _transcribe_if_available(file_path, media_type, tool_registry)
         if transcript:
             entry["transcript_summary"] = transcript
+
+        if not _has_review_evidence(entry):
+            unreviewed_files.append(file_path.name)
+            all_implications.append(
+                f"{file_path.name} could not be reviewed with available probes; "
+                "do not plan around its contents until a real probe succeeds."
+            )
+            continue
 
         # Build content summary
         probe = entry["technical_probe"]
@@ -301,10 +412,13 @@ def review_source_media(
         for risk in entry.get("quality_risks", []):
             all_implications.append(f"Quality risk in {file_path.name}: {risk}")
 
+    if unreviewed_files:
+        detail = ", ".join(dict.fromkeys(unreviewed_files))
+        raise RuntimeError(f"Source media could not be reviewed completely: {detail}")
+
     # Build overall summary
     if not reviewed_files:
-        summary = "No user-supplied media files could be reviewed."
-        all_implications.append("No source media available — production is fully generated.")
+        raise RuntimeError("Source media could not be reviewed: no supported files")
     else:
         summary = "; ".join(summaries)
 
@@ -323,12 +437,14 @@ def review_source_media(
     if not all_implications:
         all_implications.append("No specific constraints identified from source media.")
 
-    return {
+    review = {
         "version": "1.0",
         "files": reviewed_files,
         "summary": summary,
         "planning_implications": all_implications,
     }
+    validate_artifact("source_media_review", review)
+    return review
 
 
 # ---------------------------------------------------------------------------
@@ -388,8 +504,18 @@ def has_user_media(project_dir: Path) -> bool:
     """Check if a project directory contains user-supplied media files."""
     if not project_dir.exists():
         return False
-    for ext_set in (_VIDEO_EXTENSIONS, _AUDIO_EXTENSIONS, _IMAGE_EXTENSIONS):
-        for ext in ext_set:
-            if list(project_dir.glob(f"*{ext}")):
+    search_roots = [project_dir, project_dir / "reference_assets"]
+    media_exts = set().union(_VIDEO_EXTENSIONS, _AUDIO_EXTENSIONS, _IMAGE_EXTENSIONS)
+    for root in search_roots:
+        if not root.exists():
+            continue
+        for path in root.iterdir():
+            if path.is_file() and path.suffix.lower() in media_exts:
                 return True
+            if root.name == "reference_assets" and path.is_dir():
+                if any(
+                    child.is_file() and child.suffix.lower() in media_exts
+                    for child in path.rglob("*")
+                ):
+                    return True
     return False

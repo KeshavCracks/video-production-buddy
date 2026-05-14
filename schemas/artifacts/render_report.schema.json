@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "openmontage/artifacts/render_report",
+  "$id": "video-production-buddy/artifacts/render_report",
   "title": "Render Report",
   "description": "Output report produced by the Composer agent after rendering.",
   "type": "object",
@@ -21,11 +21,40 @@
           "fps": { "type": "number" },
           "duration_seconds": { "type": "number", "minimum": 0 },
           "file_size_bytes": { "type": "integer" },
+          "file_size_mb": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Convenience-units alias for file_size_bytes / 1e6. Optional."
+          },
+          "variant": {
+            "type": "string",
+            "description": "Aspect-ratio or duration variant id (e.g. '16:9', '9:16', '15s_short')."
+          },
+          "audio_channels": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Audio channel count (1=mono, 2=stereo)."
+          },
           "platform_target": { "type": "string" }
         },
         "additionalProperties": false
       },
       "minItems": 1
+    },
+    "renderer": {
+      "type": "string",
+      "description": "Composition runtime that produced this render (e.g. 'remotion', 'hyperframes', 'ffmpeg'). Free-form to allow new runtimes; render_grammar uses a stricter enum for the renderer-family classification."
+    },
+    "probe_results": {
+      "type": "object",
+      "description": "Post-render verification results, keyed by variant id. Each entry maps check names (duration_check, resolution_check, audio_check) to PASS|FAIL|WARN.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string",
+          "enum": ["PASS", "FAIL", "WARN"]
+        }
+      }
     },
     "render_time_seconds": { "type": "number", "minimum": 0 },
     "warnings": {

@@ -1,6 +1,6 @@
-# OpenMontage - Agent Guide
+# Video Production Buddy - Agent Guide
 
-Start here. This is the complete operating guide and agent contract for OpenMontage.
+Start here. This is the complete operating guide and agent contract for Video Production Buddy.
 
 For architecture, key files, and conventions see [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md).
 
@@ -24,7 +24,7 @@ When the user provides a **video URL or local video file as inspiration** — fo
 
 — do **not** treat this as a generic web-search or prompt-writing request.
 
-This is a first-class workflow in OpenMontage.
+This is a first-class workflow in Video Production Buddy.
 
 ### Required behavior
 
@@ -44,7 +44,7 @@ This is a first-class workflow in OpenMontage.
 - **Reference-driven request:** "make me something like this" -> use `video-reference-analyst.md`
 - **Source-footage request:** "edit this footage" / "cut this into clips" -> use `source_media_review` and the appropriate footage-led pipeline
 
-If a model misses this distinction, it will often fall back to plain search + guesswork. That is incorrect for OpenMontage.
+If a model misses this distinction, it will often fall back to plain search + guesswork. That is incorrect for Video Production Buddy.
 
 ## Rule Zero — All Production Goes Through a Pipeline
 
@@ -56,7 +56,7 @@ When the user asks to make, create, produce, or generate any video content — a
 2. **Read the pipeline manifest.** `pipeline_defs/<pipeline>.yaml` — know the stages, tools, and quality gates.
 3. **Run preflight.** Discover available tools via the registry. Present the capability menu.
 4. **Execute stage by stage.** For EACH stage, read the stage director skill (`skills/pipelines/<pipeline>/<stage>-director.md`) BEFORE doing any work in that stage.
-5. **Read Layer 3 skills before calling tools.** Before using any tool with an `agent_skills` field, read the referenced skill in `.agents/skills/`. These contain provider-specific prompting guidance, parameter optimization, and quality techniques that dramatically improve output.
+5. **Read Layer 3 skills before calling tools.** Before using any tool with an `agent_skills` field, read the referenced skill in `.agents/skills/`. These files are generated from `.agents/components.yaml` and `.agents/components.lock.json`; if they are missing after checkout, run `python -m lib.agent_components install --profile default --frozen`. They contain provider-specific prompting guidance, parameter optimization, and quality techniques that dramatically improve output.
 
 **Do NOT:**
 - Write ad-hoc Python scripts to call tools directly
@@ -67,9 +67,9 @@ When the user asks to make, create, produce, or generate any video content — a
 
 The intelligence is in the skills, not in improvised code. An agent that reads the director skills and Layer 3 knowledge will produce significantly better output than one that calls tools directly with generic prompts.
 
-## What OpenMontage Is
+## What Video Production Buddy Is
 
-OpenMontage is an instruction-driven video production system. The AI agent IS the intelligence — it reads instructions (pipeline manifests + stage director skills + meta skills) and drives the pipeline using tools.
+Video Production Buddy is an instruction-driven video production system. The AI agent IS the intelligence — it reads instructions (pipeline manifests + stage director skills + meta skills) and drives the pipeline using tools.
 
 ```
 Agent reads pipeline manifest (YAML) -> reads stage director skill (MD)
@@ -163,17 +163,125 @@ This applies especially to:
 - prompt-only substitutes for reference-driven generation,
 - still-image animatics in place of true motion.
 
+## GenUI Interaction Layer
+
+Video Production Buddy's standard browser interaction path is **GenUI**. It is a
+local, product-level interaction system built from an A2UI/CopilotKit renderer
+contract plus AG-UI event/session transport. GenUI records every CLI-vs-
+browser routing decision in `ui_interaction_journal`, uses stage-aware policies
+and fixed workspace contracts for known human gates, carries durable decision/resume
+metadata, persists cursor-addressable `events.jsonl` AG-UI event logs, exposes
+`/events`, `/session.json`, and response-only `/draft` autosave for status/replay, checks
+source artifact hashes for conflict-safe resume, and keeps the browser/server
+write boundary response-only. Existing `ui_session_config`/`ui_session_response`
+wire artifacts remain compatible, predecessor product sessions are treated as
+compatible session contracts, and the fixed React `json-render` component
+catalog remains available for compatibility surfaces. GenUI has four modes:
+
+- **Gate workspace** — the default for substantive human approval rounds. It
+  shows the active decision, media/comparison/revision blocks, approval
+  attestations, and traceability back to the artifacts the agent will later
+  update.
+- **Media review room** — the default for media, product-fidelity, sample,
+  asset, music, and publish review rounds. It supports media evidence,
+  timestamp/range/region annotations, issue IDs, and approval evidence.
+- **Project cockpit** — a read-only overview of pipeline stage status,
+  artifacts, decision history, budget/cost status, and media outputs. The
+  cockpit can help the user inspect project state, but it must not advance a
+  pipeline stage or mutate canonical artifacts.
+- **Background status** — a passive progress surface for long-running local
+  work where the browser should observe status but not make decisions.
+
+Video Production Buddy may use GenUI for any human interaction round where a visual,
+structured workspace is clearer than linear chat. The browser path is a
+framework-backed A2UI React renderer fed by a project-specific
+`view_spec.json`; GenUI sessions write `ui_session_response` after local
+submission and the agent records lifecycle state in `ui_interaction_journal`.
+GenUI is an interaction layer, not an orchestrator.
+It does not change pipeline stage order, stage director
+responsibilities, review policy, checkpoint rules, provider/runtime governance,
+or canonical artifact contracts.
+
+Before each substantive human interaction, decide whether linear chat is sufficient.
+Use `genui_interaction` when the round needs visual demonstration,
+media review, side-by-side comparison, multi-axis selection, many options,
+or structured revision capture. One-question clarifications and short yes/no
+approvals can stay in CLI.
+
+For sample video, generated AIGC clips, audio/music, product references,
+concept images, keyframes, and publish/final-review assets, the browser review
+room must show the assets inline. Interaction requests may cite safe project-
+relative media paths under `renders/`, `assets/`, `reference_assets/`,
+`media/`, or `outputs/`; `genui_interaction`/`genui_session` materialize them
+to `/media/...` refs before rendering. If a review round has no reviewable
+media after materialization, stop and report the missing assets instead of
+asking the user to manually open a project folder. Manual folder review is a
+fallback only when the local browser/GenUI path fails or the user explicitly
+declines it.
+
+When `genui_interaction` recommends GenUI, including director-required visual
+gates:
+
+1. Generate a project-specific `ui_session_config` with a
+   `visual_need_assessment`, defaults, recommendations, media refs, artifact
+   refs, trace refs, approval contracts, issue lifecycle, revision blocks, and
+   bindings to the artifact fields the agent will later update.
+2. Prefer `genui_interaction` for dynamic per-round routing; it delegates to
+   `genui_session` for session materialization, serving, status, replay, validation,
+   and summarization. Use `genui_session` directly only when the director
+   already provides a complete `ui_session_config`. Use `genui_surface` only
+   for explicit compatibility surface.
+3. If the user cannot use the browser or the GenUI tool is unavailable, use the
+   CLI fallback in the stage director skill or compactly mirror the same fields.
+4. Read and validate the submitted `ui_session_response` (or
+   `ui_surface_response` for explicit compatibility surface).
+5. Summarize the submitted choices to the user.
+6. Only after agent validation, write canonical artifacts such as
+   `enriched_brief`, `production_proposal`, `decision_log`, and checkpoints.
+
+The GenUI server must not write canonical artifacts directly. It writes only
+`ui_session_response` or fallback `ui_surface_response` under the project
+workspace so the agent can review it. `ui_interaction_journal` is agent-owned
+routing/session lifecycle state, not browser-owned state. The `view_spec.json` file is
+renderer-only state for A2UI/json-render, not a canonical pipeline artifact and
+not an executable artifact-binding instruction. This keeps human-friendly input
+separate from Video Production Buddy's auditable source of truth: schemas, canonical
+artifacts, decision logs, and checkpoints.
+
 ## Orchestrator
 
 The agent itself orchestrates the production state machine:
 
-`research -> proposal -> script -> scene_plan -> assets -> edit -> compose`
+Pipeline stage order is defined by the selected manifest, not by a global hardcoded
+sequence. Common generated-video pipelines follow a core pattern such as:
+
+`research -> proposal -> script -> scene_plan -> assets -> edit -> compose -> publish`
+
+The canonical top-level stage order is:
+
+`research -> proposal -> script -> scene_plan -> assets -> edit -> compose -> publish`
+
+Pipelines should use those names for top-level stages whenever the work fits the
+common model. Domain-specific governance belongs inside `sub_stages`, not in a
+new top-level vocabulary. For `ad-video`, the top-level manifest sequence is the
+standard order above, with checkpointable child gates:
+
+- `research.intake`
+- `research.brief_enrichment`
+- `research.intelligence`
+- `proposal.bible`
+- `proposal.idea`
+- `proposal.technical_proposal`
+
+These dotted gate ids are the resumable/checkpointable execution units. The
+parent stages keep the pipeline aligned with the shared model; the child gates
+preserve the original ad-video approvals, artifacts, and governance rules.
 
 The agent:
 
 1. Reads the pipeline manifest (`pipeline_defs/*.yaml`) to know the process
-2. Calls `checkpoint.get_next_stage()` to find where to resume
-3. Reads the stage's director skill (`skills/pipelines/<pipeline>/<stage>-director.md`) to know HOW
+2. Calls `checkpoint.get_next_stage(projects_dir, project_id, pipeline_type=<selected pipeline>)` to find where to resume
+3. Reads the stage's director skill (`skills/pipelines/<pipeline>/<stage>-director.md`) to know HOW. For dotted child gates, read the child gate's director skill from the manifest.
 4. Uses tools (`tools/`) for concrete capabilities
 5. Self-reviews using the reviewer meta skill (`skills/meta/reviewer.md`)
 6. Checkpoints via the checkpoint protocol (`skills/meta/checkpoint-protocol.md`)
@@ -191,13 +299,21 @@ Every production run creates a project workspace under `projects/`. This directo
 
 ```
 projects/<project-name>/
-├── artifacts/          # JSON artifacts from each stage (research_brief, script, scene_plan, etc.)
+├── USER_PROMPT.md      # Verbatim record of the user's original instruction (human-readable mirror)
+├── reference_assets/   # OPTIONAL — user-supplied brand reference inputs (gitignored)
+│   ├── product_*.{png,jpg}    # Product photography (used as image-to-video sources)
+│   ├── brand_logo.{png,svg}   # Brand wordmark / logotype
+│   └── style_*.{png,jpg}      # Mood / style reference images
+├── artifacts/
+│   ├── user_request.json   # Canonical user_request artifact (schemas/artifacts/user_request.schema.json)
+│   └── ...                  # JSON artifacts from each stage (research_brief, script, scene_plan, etc.)
 ├── assets/
 │   ├── images/         # Generated images (PNG)
 │   ├── video/          # Generated video clips (MP4)
 │   ├── audio/          # Narration segments + final mix (MP3/WAV)
 │   ├── music/          # Background music track (MP3)
-│   └── subtitles.srt   # Generated subtitles
+│   ├── keyframes/      # Per-scene PNG keyframes (extracted by frame_sampler for visual sanity check)
+│   └── subtitles.{srt,ass}  # Generated subtitles
 └── renders/
     └── final.mp4       # Final rendered video (the deliverable)
 ```
@@ -205,6 +321,48 @@ projects/<project-name>/
 **Naming convention**: Use kebab-case derived from the video title (e.g., `hidden-math-of-nature`, `how-music-rewires-brain`).
 
 Create the project directory at pipeline initialization, before any stage runs. All tools and agents should write outputs to these paths — never to the repo root or ad-hoc locations.
+
+### Reference Assets (physical-product brands)
+
+For brands selling physical products with recognizable geometry (smartphones, vehicles, cosmetics, apparel, hardware), the user should drop one or more product photos into `projects/<project-name>/reference_assets/` as `product_*.png` or `product_*.jpg`. The asset-director will use these as image-to-video sources via `wan2.7-i2v` / `wan2.6-i2v-flash` when the product is visible in a scene.
+
+**Why this matters:** text-to-video models (Wan, Kling, Seedance) cannot render specific product geometry from prose alone — they generate plausible-looking generic objects. Without a reference image, a "Find X9 Pro hero shot" prompt produces a generic premium black phone, not OPPO's specific device. For brand-paying advertisers, this is unacceptable risk; for personal projects, it's acceptable but should be flagged.
+
+The intake and brief-enrichment directors capture this need through
+`creative_requirements.product_fidelity_references` and
+`creative_requirements.truth_and_safety_constraints`. The proposal director then locks
+`production_proposal.product_reference_strategy`, and the asset director writes the
+canonical `product_identity_reference` artifact before any product-visible video
+generation. If the user provided product photos, the approved reference points at
+`reference_assets/product_*.png|jpg`. If no usable photo exists, generate 2-4 concept
+reference candidates and wait for explicit approval of one candidate, or stop for a
+user-approved `risk_accepted` waiver. Product-visible scenes must not proceed as
+text-only prompts unless that waiver is recorded.
+
+### Capture the User Request First (HARD RULE)
+
+The first action when initializing a project workspace — before research, before `intake_brief`, before any tool call that costs money — is to record the user's verbatim instruction inside the project. The transcript that lives in the harness (Claude Code session log, IDE chat history, etc.) is **not** part of this repo and is not portable; the canonical record of intent must travel with the project.
+
+Use the helper:
+
+```python
+from pathlib import Path
+from lib.user_request import record_user_request, Reference
+
+record_user_request(
+    Path("projects/<project-name>"),
+    prompt="<the user's first actionable instruction, verbatim — no paraphrasing, no translation>",
+    pipeline_hint="cinematic",          # optional, only if user explicitly named one
+    language="en",                       # optional BCP 47 tag
+    references=[                         # optional, anything the user pointed to
+        Reference(kind="url", value="https://...", role="reference_video"),
+    ],
+)
+```
+
+This writes both `artifacts/user_request.json` (schema-validated against `schemas/artifacts/user_request.schema.json`) and `USER_PROMPT.md` (human-readable mirror at the project root). The call is **idempotent** — re-running it is a no-op so re-entering intake never clobbers the original prompt. When the user materially refines the brief mid-intake (changed platform, added a reference, swapped tone), append a new turn with `lib.user_request.append_turn(...)`; never edit prior text.
+
+Every downstream artifact (`intake_brief`, `brief`, `research_brief`, …) is an *interpretation* of `user_request`. Keeping the verbatim source separate makes the pipeline auditable and lets a future agent re-run from original intent without fishing through chat logs.
 
 ## Music Library
 
@@ -230,8 +388,10 @@ If the folder has tracks, the proposal and asset stages should present them as o
 | `podcast-repurpose` | Podcast highlights and derivatives | beta |
 | `cinematic` | Trailer, teaser, and mood-led edits | production |
 | `animation` | Motion-graphics and animation-first videos | production |
+| `ad-video` | Ads and commercials with pre-production governance, product-fidelity checks, and sample approval | beta |
 | `character-animation` | Local rigged cartoon characters and reusable character acting | beta |
 | `hybrid` | Source footage plus support visuals | production |
+| `documentary-montage` | Retrieval-first thematic montage from real-world footage sources | beta |
 | `avatar-spokesperson` | Presenter-led avatar or lip-sync videos | production |
 | `localization-dub` | Subtitle, dub, and translated variants | beta |
 | `framework-smoke` | Test: minimal 2-stage smoke test | test |
@@ -364,7 +524,13 @@ print('HyperFrames note:', info.get('hyperframes_note'))
 | **Remotion** | React-based composition: still images → animated video, text cards, stat cards, charts, callouts, comparisons, transitions with spring physics, word-level caption burn, TalkingHead avatar | Node.js (`npx`) + `remotion-composer/` + `node_modules` |
 | **HyperFrames** | HTML/CSS/GSAP composition: kinetic typography, product promos, launch reels, website-to-video, registry-block-driven scenes, SVG character rigs | Node.js ≥ 22 + FFmpeg + `npx` (consumed via `npx hyperframes`) |
 
-`render_runtime` is **locked at proposal** (`proposal_packet.production_plan.render_runtime`) and **carried through edit_decisions unchanged**. `video_compose` routes based on this field; silent runtime swaps are forbidden. If the chosen runtime becomes unavailable at compose time, surface a structured blocker per "Escalate Blockers Explicitly" above. See `skills/core/hyperframes.md` for the Remotion-vs-HyperFrames decision matrix.
+`render_runtime` is **locked at proposal** (`production_proposal.render_runtime`
+for `ad-video`; the legacy proposal-packet runtime lock for older pipelines)
+and **carried through edit_decisions unchanged**.
+`video_compose` routes based on this field; silent runtime swaps are forbidden.
+If the chosen runtime becomes unavailable at compose time, surface a structured
+blocker per "Escalate Blockers Explicitly" above. See
+`skills/core/hyperframes.md` for the Remotion-vs-HyperFrames decision matrix.
 
 ### Critical Rule: Motion-Required Requests
 
@@ -404,7 +570,7 @@ Routing is automatic — `video_compose` reads `edit_decisions.render_runtime` a
 
 ## Capability Discovery
 
-OpenMontage uses two layers for capability choice:
+Video Production Buddy uses two layers for capability choice:
 
 - selector tools: capability-level routing such as `tts_selector` and `video_selector`
 - provider tools: concrete tools discovered via the registry that call a specific backend
@@ -522,22 +688,105 @@ Record the music decision in the proposal/brief artifact so the asset director k
 
 Each pipeline manifest's `tools_available` field declares what tools a stage can use. Use selectors for multi-provider capabilities — the selector handles routing to whatever is available. Read the pipeline manifest for the authoritative list per stage.
 
+## Ad Video Pipeline Contract
+
+Use `ad-video` for ad and commercial briefs where the output has to sell or
+position a product, service, brand, app, or campaign. This pipeline is not a
+simple topic-to-video flow. It has explicit pre-production governance before
+scripts or assets are generated.
+
+Manifest: `pipeline_defs/ad-video.yaml`
+
+Stage flow:
+
+Top-level:
+
+`research -> proposal -> script -> scene_plan -> assets -> edit -> compose -> publish`
+
+Checkpointable gates:
+
+`research.intake -> research.brief_enrichment -> research.intelligence -> proposal.bible -> proposal.idea -> proposal.technical_proposal -> script -> scene_plan -> assets -> edit -> compose -> publish`
+
+Key contract points:
+
+- `research.intake` asks only research-direction questions: product, platform,
+  demographic, emotional intent. Logistics such as subtitles, dubbing,
+- `research.brief_enrichment`, `research.intelligence`, and `proposal.bible`
+  create the strategic contract. `research.intelligence` must retrieve curated professional advertising knowledge through
+  `ad_knowledge_retriever` and write `intelligence_brief.professional_knowledge`
+  before live trend and hit-ad synthesis. This is the stable producer-doctrine
+  layer: positioning, hook mechanics, emotional rhythm, proof logic, visual
+  rhetoric, product-demo structure, platform format, and claim discipline.
+  `production_bible` owns the approved arc, beats, emotional targets, visual
+  motifs, audio direction, primary format, CTA, compliance checkpoints, and
+  rejected approaches. It also owns `truth_contract`: objective facts, physical
+  constraints, product geometry rules, motion-coherence rules, and values/safety
+  guardrails used to block hallucinated assets before final render.
+  It also owns `intelligence.knowledge_alignment`: selected professional
+  producer-knowledge applications that script and scene_plan must reference
+  explicitly with `knowledge_alignment:*` refs.
+  It also owns `intelligence.trend_alignment`: selected fresh, deduped,
+  brand-safe positive/neutral trend applications that script and scene_plan must
+  reference explicitly without imitating viral source content.
+- `proposal.idea` generates execution concepts inside the approved `production_bible`;
+  it must not reopen the arc, beats, hook mechanic, or mandatory motifs.
+- `proposal.technical_proposal` locks technical production parameters: derivative variants,
+  subtitles, dubbing, `style_mode`, `render_runtime`,
+  `product_reference_strategy`, budget, CTA verification, voice/audio contract,
+  and visual contract.
+- `scene_plan` must keep real-world ad content motion-first. Lifestyle,
+  environment, product-interaction, and b-roll scenes need real video clips.
+  Stills are only acceptable for text cards, packshots, and end cards. Every
+  scene must declare `product_visibility` and `product_reference_required`.
+  High-risk generated scenes must also declare `hallucination_checks[]` derived
+  from `production_bible.truth_contract`.
+- `assets` always runs a sample approval sub-stage before full generation.
+  The sample must include at least one product-visible scene when the product is
+  visible anywhere in the ad. After the sample is approved, the asset stage still
+  requires explicit `asset_review` and `music_review` approvals before compose.
+  A completed assets checkpoint must carry `production_proposal`,
+  `production_bible`, `script`, `scene_plan`, and `decision_log` alongside
+  `asset_manifest` and `product_identity_reference` so checkpoint validation can
+  rerun provider, product-identity, and hallucination gates before compose.
+- `assets` runs a Product Identity Reference sub-stage before the sample when
+  product-visible scenes exist. It must produce `product_identity_reference`,
+  use `reference_to_video` when supported, otherwise generate a scene keyframe
+  from the approved reference and animate it with image-to-video. Text-only
+  product-visible video is allowed only with a user-approved `risk_accepted`
+  waiver, and generated visual assets must record `product_identity_conditioning`.
+- Before sample approval and before full asset review, generated high-risk visual
+  assets must extract start/mid/end keyframes into `assets/keyframes/<scene_id>/`
+  and record `asset_manifest.assets[].hallucination_review` with per-check
+  PASS/WARN/FLAG/WAIVED verdicts. `hallucination_contract_check` FAIL blocks
+  compose/publish. FLAG blocker verdicts require regeneration or rerouting.
+  Waivers require an explicit user-approved `hallucination_review_waiver`
+  decision in `decision_log`.
+- Runtime and provider substitutions are governance events. If the selected
+  `render_runtime`, TTS provider, video provider, image provider, or music path
+  becomes unavailable, stop and ask before swapping. Record the decision.
+
 ## Stage Agents
 
 Each stage produces one canonical artifact that becomes the contract for the next stage. The stage director skill teaches the agent HOW to produce it.
 
 | Stage | Director Skill | Canonical output | Core quality bar |
 |------|---------------|------------------|------------------|
-| `idea` | `*-director.md` | `brief` | Clear hook, target platform, duration, tone, and user intent |
+| `research.intake` | `intake-director.md` | `intake_brief` | Minimum research-direction fields captured without over-asking |
+| `research.brief_enrichment` | `brief-enrichment-director.md` | `enriched_brief` | Explicit user-approved product/ad specification |
+| `research.intelligence` | `intelligence-director.md` | `intelligence_brief` | Cited category, audience, and rejected-approach insight |
+| `proposal.bible` | `bible-director.md` | `production_bible` | Approved strategic and execution contract |
+| `proposal.idea` | `idea-director.md` | `idea_options` | Clear hook, target platform, duration, tone, and user intent |
+| `proposal.technical_proposal` | `technical-proposal-director.md` | `production_proposal` + `decision_log` | User-approved technical plan, runtime, audio, visual, budget, and variants |
 | `script` | `*-director.md` | `script` | Structured sections, valid timing, coherent narration |
 | `scene_plan` | `*-director.md` | `scene_plan` | Ordered scenes, timings, asset requirements |
-| `assets` | `*-director.md` | `asset_manifest` | Provenance, paths, model/tool metadata, scene linkage |
+| `assets` | `*-director.md` | `product_identity_reference` + `asset_manifest` | Product identity approval, provenance, paths, model/tool metadata, scene linkage |
 | `edit` | `*-director.md` | `edit_decisions` | Concrete cuts, overlays, subtitle/music decisions |
 | `compose` | `*-director.md` | `render_report` | Output paths, encoding profile, verification notes |
+| `publish` | `*-director.md` | `publish_log` | Output matrix, metadata, and delivery notes |
 
 Stage contract rules:
 
-- A completed or awaiting-human checkpoint must include the stage's canonical artifact.
+- A completed or awaiting-human checkpoint must include the stage or child gate's canonical artifact.
 - Canonical artifacts must validate against the JSON schema in `schemas/artifacts/`.
 - Non-canonical outputs such as media files belong in stage-specific directories.
 - Tools should record seeds/model versions for reproducibility.
@@ -581,7 +830,7 @@ Primary files:
 
 Checkpoint rules:
 
-- Checkpoints live at `pipelines/<project_id>/checkpoint_<stage>.json`.
+- Checkpoints live at `projects/<project_id>/checkpoint_<stage>.json`.
 - `status` may be `completed`, `failed`, `awaiting_human`, or `in_progress`.
 - `completed` and `awaiting_human` checkpoints must include the canonical artifact.
 - Invalid checkpoints or invalid canonical artifacts are contract violations and should fail fast.
@@ -589,7 +838,10 @@ Checkpoint rules:
 Pipeline manifest rules:
 
 - Pipelines are declarative YAML manifests in `pipeline_defs/`.
-- Stages declare: `skill` (director skill path), `produces`, `tools_available`, `review_focus`, `success_criteria`, `human_approval_default`.
+- Stages declare: `skill` (director skill path), `produces`, `tools_available`, `review_focus`, `success_criteria`, `human_approval_default`, and `sub_stages` when a parent needs checkpointable child gates.
+- Child gates may declare their own `skill`, artifact dependencies, produced artifacts, tools, review focus, success criteria, checkpoint policy, and human approval policy.
+- Stage and sub-stage ids must be lowercase snake_case without dots; dotted ids are reserved for derived `<stage>.<sub_stage>` units.
+- New pipelines should use the canonical top-level order `research -> proposal -> script -> scene_plan -> assets -> edit -> compose -> publish` where applicable, and express specialized governance as sub-stages.
 - Adding a new pipeline requires a manifest + stage director skills.
 
 Tool rules:
@@ -602,20 +854,22 @@ Tool rules:
 
 | Playbook | Best For |
 |----------|----------|
+| `ad-brand` | Ads, commercials, product campaigns |
+| `anime-ghibli` | Warm anime illustration, nature-led storytelling |
 | `clean-professional` | Corporate, educational, SaaS |
 | `flat-motion-graphics` | Social media, TikTok, startups |
 | `minimalist-diagram` | Technical deep-dives, architecture |
 
 ## Layer Map
 
-OpenMontage has three instruction layers:
+Video Production Buddy has three instruction layers:
 
 1. `tools/`
    What exists, what is available, cost, runtime, fallback, related skills.
 2. `skills/`
-   How OpenMontage wants those tools used in pipelines.
+   How Video Production Buddy wants those tools used in pipelines.
 3. `.agents/skills/`
-   Raw vendor or technology knowledge.
+   Generated raw vendor or technology knowledge, materialized from `.agents/components.yaml` + `.agents/components.lock.json`.
 
 Reading order:
 
@@ -628,6 +882,15 @@ Reading order:
 **Exception: debugging, audits, and verifying the governance contract.** When a skill and a tool disagree, or when something behaves differently than the skill claims, reading the tool source is fair game — that's often the only way to catch a silent-availability bug or a stale doc string. An audit that refuses to look at the implementation will miss exactly the bugs that matter most. If you do read source to debug, consider whether the finding belongs in a skill update afterward so the next agent doesn't need to repeat the dive.
 
 **Layer 3 is not optional.** Every generation tool (video, image, TTS, music) has an `agent_skills` field listing its Layer 3 skills. These skills contain provider-specific prompt engineering, parameter tuning, and quality techniques. Read them before writing prompts. The difference between a generic prompt and a skill-informed prompt is the difference between "usable" and "cinematic."
+
+**Layer 3 dependency bootstrap.** The tracked source of truth is `.agents/components.yaml` and `.agents/components.lock.json`; `.agents/skills/` and `.claude/skills/` are generated compatibility targets. Run:
+
+```bash
+python -m lib.agent_components install --profile default --frozen
+python -m lib.agent_components verify --frozen --offline
+```
+
+Use `python -m lib.agent_components update <name> --to <branch|tag|sha>` or `python -m lib.agent_components use <name> --ref <branch|tag|sha>` when switching an upstream component version, then commit the manifest and lockfile changes.
 
 Example: Before calling `kling_video`, read its `agent_skills` → `ai-video-gen` → get Kling-specific prompt structure, camera direction syntax, and quality keywords that the model responds to best.
 

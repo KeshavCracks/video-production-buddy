@@ -45,7 +45,9 @@ stages:
     produces:
       - brief
       - decision_log
-    tools_available: []
+    tools_available:
+      - genui_interaction
+      - genui_session
     checkpoint_required: true
     human_approval_default: true
     review_focus:
@@ -68,6 +70,8 @@ stages:
       - transcriber      # speech-to-text
     optional_tools: []
     tools_available:
+      - genui_interaction
+      - genui_session
       - transcriber
     checkpoint_required: true
     human_approval_default: true
@@ -93,6 +97,8 @@ stages:
       - face_tracker     # face position analysis for reframing decisions
       - silence_cutter   # silence detection for jump cut planning
     tools_available:
+      - genui_interaction
+      - genui_session
       - frame_sampler
       - face_tracker
       - silence_cutter
@@ -138,6 +144,7 @@ stages:
     required_artifacts_in:
       - scene_plan
       - asset_manifest
+      - brief
     optional_artifacts_in:
       - script
     produces:
@@ -164,6 +171,8 @@ stages:
     required_artifacts_in:
       - edit_decisions
       - asset_manifest
+      - brief
+      - decision_log
     optional_artifacts_in:
       - scene_plan
     produces:
@@ -217,7 +226,9 @@ stages:
       - final_review
     produces:
       - publish_log
-    tools_available: []
+    tools_available:
+      - genui_interaction
+      - genui_session
     checkpoint_required: true
     human_approval_default: true
     review_focus:

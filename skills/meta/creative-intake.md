@@ -3,6 +3,32 @@
 Before the research stage, gather user intent through targeted questions.
 Do NOT start production on a vague brief.
 
+## Step 0 — Capture the Verbatim User Request
+
+Before asking any clarifying question, before producing the `intake_brief`,
+the agent **must** record the user's first actionable instruction inside
+the project workspace using `lib.user_request.record_user_request(...)`
+(see AGENT_GUIDE.md → "Capture the User Request First"). The chat
+transcript is not part of this repo — the verbatim record must live with
+the project so intake can be audited and re-run.
+
+```python
+from pathlib import Path
+from lib.user_request import record_user_request
+
+record_user_request(
+    Path("projects/<project-name>"),
+    prompt="<the user's first actionable instruction, exactly as written>",
+)
+```
+
+The call is idempotent. As intake continues and the user refines their
+ask (changed platform, added a reference, swapped tone), append each
+material turn with `lib.user_request.append_turn(project_dir, text,
+note="...")`. Do not edit prior text. The `intake_brief` produced later
+in this skill is an interpretation of `user_request`, never a substitute
+for it.
+
 ## Required Questions (ask conversationally, not as a survey)
 
 1. **Purpose**: What is this video FOR? (educate, sell, inspire, document, entertain)

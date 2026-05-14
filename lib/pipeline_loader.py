@@ -26,6 +26,88 @@ def _load_manifest_schema() -> dict:
         return json.load(f)
 
 
+def _sub_stage_is_checkpoint_unit(sub_stage: dict[str, Any]) -> bool:
+    """Whether a sub-stage is a resumable execution unit.
+
+    Existing sample/preview sub-stages are descriptive workflow steps. A child
+    gate becomes a checkpoint unit when it owns execution behavior: a skill,
+    artifacts, or an explicit checkpoint flag.
+    """
+    return bool(
+        sub_stage.get("skill")
+        or sub_stage.get("produces")
+        or sub_stage.get("required_artifacts_in")
+        or "checkpoint_required" in sub_stage
+    )
+
+
+def _iter_artifact_units(manifest: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    """Return manifest units that participate in artifact dependency ordering."""
+    units: list[tuple[str, dict[str, Any]]] = []
+    for stage in manifest.get("stages", []):
+        stage_name = stage.get("name")
+        if stage.get("required_artifacts_in") or stage.get("produces"):
+            units.append((stage_name, stage))
+        for sub_stage in stage.get("sub_stages", []):
+            if sub_stage.get("required_artifacts_in") or sub_stage.get("produces"):
+                units.append((f"{stage_name}.{sub_stage.get('name')}", sub_stage))
+    return units
+
+
+def _resolve_stage_unit(
+    manifest: dict[str, Any],
+    stage_name: str,
+) -> dict[str, Any] | None:
+    """Resolve a top-level stage or dotted child-gate id to its manifest block."""
+    if "." in stage_name:
+        parent_name, sub_stage_name = stage_name.split(".", 1)
+        for stage in manifest.get("stages", []):
+            if stage.get("name") != parent_name:
+                continue
+            for sub_stage in stage.get("sub_stages", []):
+                if sub_stage.get("name") == sub_stage_name:
+                    return sub_stage
+            return None
+    for stage in manifest.get("stages", []):
+        if stage.get("name") == stage_name:
+            return stage
+    return None
+
+
+def get_stage_definition(manifest: dict, stage_name: str) -> dict[str, Any] | None:
+    """Return the manifest block for a top-level stage or dotted child gate."""
+    return _resolve_stage_unit(manifest, stage_name)
+
+
+def _validate_manifest_semantics(manifest: dict[str, Any]) -> None:
+    """Validate cross-field manifest rules that JSON Schema cannot express."""
+    seen_stages: set[str] = set()
+    for stage in manifest.get("stages", []):
+        stage_name = stage.get("name")
+        if stage_name in seen_stages:
+            raise ValueError(f"Duplicate stage name in pipeline manifest: {stage_name!r}")
+        seen_stages.add(stage_name)
+        seen_sub_stages: set[str] = set()
+        for sub_stage in stage.get("sub_stages", []):
+            sub_stage_raw_name = sub_stage.get("name")
+            if sub_stage_raw_name in seen_sub_stages:
+                raise ValueError(
+                    f"Duplicate sub-stage name in pipeline manifest stage "
+                    f"{stage_name!r}: {sub_stage_raw_name!r}"
+                )
+            seen_sub_stages.add(sub_stage_raw_name)
+
+    produced_artifacts: set[str] = set()
+    for unit_name, unit in _iter_artifact_units(manifest):
+        for artifact_name in unit.get("required_artifacts_in", []):
+            if artifact_name not in produced_artifacts:
+                raise ValueError(
+                    f"Stage {unit_name!r} requires artifact {artifact_name!r} "
+                    "before any prior stage produces it"
+                )
+        produced_artifacts.update(unit.get("produces", []))
+
+
 def load_pipeline(name: str, defs_dir: Optional[Path] = None) -> dict[str, Any]:
     """Load and validate a pipeline manifest by name.
 
@@ -36,6 +118,16 @@ def load_pipeline(name: str, defs_dir: Optional[Path] = None) -> dict[str, Any]:
     Returns:
         Validated pipeline manifest dict.
     """
+    if (
+        not name
+        or name in {".", ".."}
+        or "/" in name
+        or "\\" in name
+        or Path(name).suffix
+    ):
+        raise ValueError(
+            "Pipeline name must be a manifest stem, not a path or filename"
+        )
     defs_dir = defs_dir or PIPELINE_DEFS_DIR
     path = defs_dir / f"{name}.yaml"
     if not path.exists():
@@ -46,6 +138,7 @@ def load_pipeline(name: str, defs_dir: Optional[Path] = None) -> dict[str, Any]:
 
     schema = _load_manifest_schema()
     jsonschema.validate(instance=manifest, schema=schema)
+    _validate_manifest_semantics(manifest)
 
     return manifest
 
@@ -129,33 +222,95 @@ def get_stage_order(
     return order
 
 
-def get_required_tools(manifest: dict) -> set[str]:
-    """Collect tools across stages, sub-stages, and reference-input analysis."""
-    tools: set[str] = set()
+def get_checkpoint_stage_order(
+    manifest: dict,
+    *,
+    context: Optional[dict[str, Any]] = None,
+) -> list[str]:
+    """Return ordered resumable units for checkpoints and resume.
+
+    Top-level stages remain the public pipeline shape. A top-level stage with
+    artifact-producing child gates is represented by those dotted child units
+    for precise checkpoint/resume behavior.
+    """
+    order: list[str] = []
     for stage in manifest["stages"]:
-        tools.update(stage.get("preferred_tools", []))
-        tools.update(stage.get("fallback_tools", []))
-        tools.update(stage.get("tools_available", []))
+        checkpoint_children = [
+            sub_stage
+            for sub_stage in get_stage_sub_stages(
+                manifest,
+                stage["name"],
+                context=context,
+                include_inactive=context is None,
+            )
+            if _sub_stage_is_checkpoint_unit(sub_stage)
+        ]
+        if checkpoint_children:
+            order.extend(
+                f"{stage['name']}.{sub_stage['name']}"
+                for sub_stage in checkpoint_children
+            )
+        else:
+            order.append(stage["name"])
+    return order
+
+
+def get_checkpoint_stage_units(
+    manifest: dict,
+    *,
+    context: Optional[dict[str, Any]] = None,
+) -> list[dict[str, Any]]:
+    """Return checkpoint units with parent/child metadata for UI surfaces."""
+    units: list[dict[str, Any]] = []
+    for unit_name in get_checkpoint_stage_order(manifest, context=context):
+        unit = _resolve_stage_unit(manifest, unit_name)
+        if unit is None:
+            continue
+        top_level_stage, separator, sub_stage = unit_name.partition(".")
+        units.append(
+            {
+                "name": unit_name,
+                "stage": top_level_stage,
+                **({"sub_stage": sub_stage} if separator else {}),
+                "definition": unit,
+            }
+        )
+    return units
+
+
+def get_required_tools(manifest: dict) -> set[str]:
+    """Collect manifest-declared tools for preflight and capability audits."""
+    tools: set[str] = set()
+    tool_fields = (
+        "required_tools",
+        "optional_tools",
+        "preferred_tools",
+        "fallback_tools",
+        "tools_available",
+    )
+    for stage in manifest["stages"]:
+        for field in tool_fields:
+            tools.update(stage.get(field, []))
         for sub_stage in stage.get("sub_stages", []):
-            tools.update(sub_stage.get("tools_available", []))
+            for field in tool_fields:
+                tools.update(sub_stage.get(field, []))
+    for production_mode in manifest.get("production_modes", []):
+        tools.update(production_mode.get("required_tools", []))
+        tools.update(production_mode.get("optional_tools", []))
     tools.update(get_reference_input_config(manifest).get("analysis_tools", []))
     return tools
 
 
 def get_stage_skill(manifest: dict, stage_name: str) -> Optional[str]:
     """Get the skill path for an instruction-driven stage."""
-    for stage in manifest["stages"]:
-        if stage["name"] == stage_name:
-            return stage.get("skill")
-    return None
+    unit = _resolve_stage_unit(manifest, stage_name)
+    return unit.get("skill") if unit else None
 
 
 def get_stage_review_focus(manifest: dict, stage_name: str) -> list[str]:
     """Get the review focus items for a stage."""
-    for stage in manifest["stages"]:
-        if stage["name"] == stage_name:
-            return stage.get("review_focus", [])
-    return []
+    unit = _resolve_stage_unit(manifest, stage_name)
+    return unit.get("review_focus", []) if unit else []
 
 
 # ---------------------------------------------------------------------------

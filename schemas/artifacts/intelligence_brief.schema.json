@@ -1,0 +1,348 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "video-production-buddy/artifacts/intelligence_brief",
+  "title": "Intelligence Brief",
+  "description": "Market research and hit-ad analysis produced by intelligence-director.",
+  "type": "object",
+  "required": ["professional_knowledge", "audience_psychographics", "platform_trends", "hit_ads_analyzed", "rejected_approaches", "recommendations"],
+  "properties": {
+    "professional_knowledge": {
+      "type": "object",
+      "description": "Curated professional advertising knowledge retrieved before live research. This is stable producer doctrine, not current trend research.",
+      "required": ["retrieval_backend", "cards_used", "application_recommendations", "contraindications", "gaps"],
+      "additionalProperties": false,
+      "properties": {
+        "retrieval_backend": {
+          "type": "string",
+          "enum": ["bm25", "embedding", "hybrid"],
+          "description": "Actual retrieval backend used by ad_knowledge_retriever. BM25 is the deterministic default."
+        },
+        "cards_used": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["card_id", "domain", "source_ref", "summary", "principles", "relevance_score", "why_relevant", "avoid_when", "failure_patterns", "execution_techniques"],
+            "additionalProperties": false,
+            "properties": {
+              "card_id": { "type": "string", "minLength": 1 },
+              "domain": {
+                "type": "string",
+                "enum": ["positioning", "audience_insight", "hook_mechanic", "narrative_arc", "emotional_rhythm", "visual_rhetoric", "proof_logic", "product_demo_logic", "platform_format", "commercial_compliance", "cinematography", "color_theory", "editing_technique", "sound_design", "music_direction"]
+              },
+              "source_ref": {
+                "type": "string",
+                "pattern": "^knowledge_alignment:[A-Za-z0-9._:-]+$"
+              },
+              "summary": { "type": "string", "minLength": 1 },
+              "principles": {
+                "type": "array",
+                "minItems": 1,
+                "description": "Curated producer principles from the source card. Bible-director may use these when writing knowledge_alignment usage notes.",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "relevance_score": { "type": "number", "minimum": 0, "maximum": 1 },
+              "why_relevant": { "type": "string", "minLength": 1 },
+              "avoid_when": {
+                "type": "array",
+                "minItems": 1,
+                "description": "Curated contraindications from the source card. Bible-director uses these to decide whether a card should be selected.",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "downstream_targets": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "failure_patterns": {
+                "type": "array",
+                "minItems": 1,
+                "description": "Common misuse modes to copy or adapt into do_not_overapply notes.",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "execution_techniques": {
+                "type": "array",
+                "minItems": 1,
+                "description": "Concrete production techniques bible-director can adapt into script_usage and scene_usage instructions.",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "cross_domain_notes": {
+                "type": "array",
+                "minItems": 1,
+                "description": "Optional curated card notes identifying adjacent professional domains to coordinate when bible-director builds knowledge_alignment.",
+                "items": {
+                  "type": "object",
+                  "required": ["domain", "note"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "domain": {
+                      "type": "string",
+                      "enum": ["positioning", "audience_insight", "hook_mechanic", "narrative_arc", "emotional_rhythm", "visual_rhetoric", "proof_logic", "product_demo_logic", "platform_format", "commercial_compliance", "cinematography", "color_theory", "editing_technique", "sound_design", "music_direction"]
+                    },
+                    "note": { "type": "string", "minLength": 1 }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "application_recommendations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["card_id", "target", "recommendation", "confidence"],
+            "additionalProperties": false,
+            "properties": {
+              "card_id": { "type": "string", "minLength": 1 },
+              "target": { "type": "string", "minLength": 1 },
+              "recommendation": { "type": "string", "minLength": 1 },
+              "confidence": { "type": "string", "const": "producer-doctrine" }
+            }
+          }
+        },
+        "contraindications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["card_id", "avoid_when", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "card_id": { "type": "string", "minLength": 1 },
+              "avoid_when": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "gaps": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "audience_psychographics": {
+      "type": "object",
+      "required": ["emotional_profile", "core_pain_point", "aspiration"],
+      "properties": {
+        "emotional_profile": { "type": "string", "minLength": 1 },
+        "core_pain_point": { "type": "string", "minLength": 1 },
+        "aspiration": { "type": "string", "minLength": 1 }
+      }
+    },
+    "platform_trends": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["signal", "source", "relevance"],
+        "properties": {
+          "trend_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stable id used when production_bible.intelligence.trend_alignment selects this trend."
+          },
+          "signal": { "type": "string" },
+          "source": { "type": "string" },
+          "relevance": { "type": "string" },
+          "sentiment": {
+            "type": "string",
+            "enum": ["positive", "neutral", "negative", "mixed", "unknown"],
+            "description": "Brand-facing sentiment of the engagement signal. New ad-video runs should set this so bible-director can avoid controversy-driven trends."
+          },
+          "trend_type": {
+            "type": "string",
+            "enum": ["engagement_signal", "visual_style", "audio_pattern", "editing_pacing", "hook_format", "platform_format_norm", "cultural_moment", "topic_signal"],
+            "description": "How this record should be interpreted. platform_format_norm marks a platform convention rather than a positive engagement trend."
+          },
+          "brand_safety": {
+            "type": "string",
+            "enum": ["safe", "caution", "unsafe", "unknown"],
+            "description": "Whether this trend can safely guide a brand ad. Only safe trends may be selected into production_bible.intelligence.trend_alignment."
+          },
+          "application_targets": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": ["hook", "build", "reveal", "cta_brand", "script", "scene_plan", "visual", "pacing", "audio", "format"]
+            },
+            "description": "Where this trend may safely influence the production."
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date",
+            "description": "ISO 8601 date (YYYY-MM-DD) when the trend was identified by intelligence-director's search. Consumed by lib.trend_recency.score_trend_recency to filter stale trends. Optional: undated trends are treated as current for backward compatibility."
+          },
+          "retrieved_at": {
+            "type": "string",
+            "format": "date",
+            "description": "ISO 8601 date when the search result was retrieved. Captured for audit; not required for recency scoring."
+          },
+          "decay_window_days": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Days during which this trend is considered 'current'. Past 2x this window the trend is fully stale and filtered out by lib.trend_recency.filter_stale_trends. Default: 180."
+          },
+          "is_evergreen": {
+            "type": "boolean",
+            "description": "When true, this trend is exempt from decay (e.g. 'narrative arcs centred on aspiration'). Recency score stays 1.0 regardless of age."
+          },
+          "engagement_proxy": {
+            "type": "object",
+            "description": "Optional engagement signals captured from the source (views/likes/shares). Free-form because providers vary widely.",
+            "properties": {
+              "views": { "type": "integer", "minimum": 0 },
+              "likes": { "type": "integer", "minimum": 0 },
+              "shares": { "type": "integer", "minimum": 0 },
+              "note": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "hit_ads_analyzed": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["title", "platform", "arc_type", "hook_mechanic", "what_works", "adopted"],
+        "properties": {
+          "title": { "type": "string" },
+          "platform": { "type": "string" },
+          "arc_type": { "type": "string" },
+          "hook_mechanic": { "type": "string" },
+          "what_works": { "type": "string" },
+          "adopted": { "type": "boolean" },
+          "adaptation": { "type": "string", "default": "" },
+          "url": {
+            "type": "string",
+            "description": "Public URL to the hit ad (YouTube / Shorts / TikTok / Instagram). When present, intelligence-director should invoke video_analyzer and capture pacing_measured."
+          },
+          "analyzed_at": {
+            "type": "string",
+            "format": "date",
+            "description": "ISO 8601 date when video_analyzer was run on this ad. Audit trail."
+          },
+          "pacing_measured": {
+            "type": "object",
+            "description": "Real measured pacing from video_analyzer (not article-text inference). Aggregated across hit ads by lib.hit_ad_pacing.aggregate_pacing_from_hit_ads to upgrade editing_rhythm from pattern-inferred to research-grounded.",
+            "required": ["cuts_per_minute", "avg_scene_duration_seconds", "total_scenes", "source"],
+            "properties": {
+              "cuts_per_minute": { "type": "number", "minimum": 0 },
+              "avg_scene_duration_seconds": { "type": "number", "minimum": 0 },
+              "total_scenes": { "type": "integer", "minimum": 0 },
+              "source": { "type": "string", "const": "video_analyzer" }
+            },
+            "additionalProperties": false
+          },
+          "classification": {
+            "type": "object",
+            "description": "Rule-based narrative-pattern classification produced by lib.hit_ad_classification.classify_hit_ad_from_video_brief from the VideoAnalysisBrief. Aggregated across hit ads by aggregate_classifications to upgrade arc_type/hook_mechanic confidence to research-grounded when sample size + agreement support it.",
+            "required": ["arc_type", "hook_mechanic", "source"],
+            "properties": {
+              "arc_type": {
+                "type": "string",
+                "enum": ["problem-solution", "desire-fulfillment", "contrast", "journey", "social-proof", "demo-reveal"],
+                "description": "Must match production_bible.narrative.arc_type enum exactly."
+              },
+              "hook_mechanic": {
+                "type": "string",
+                "enum": ["question", "statement", "visual-contrast", "sound-interrupt", "stat"],
+                "description": "Must match production_bible.narrative.hook_mechanic enum. The visual classifier never emits sound-interrupt; the schema permits it for completeness."
+              },
+              "what_works": { "type": "string" },
+              "source": { "type": "string", "const": "video_analyzer_classification" },
+              "signals": {
+                "type": "object",
+                "description": "Audit trail of the rule's evidence (energy_profile, visual_type_distribution, etc.). Free-form for forward-compat across rule versions."
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "rejected_approaches": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["approach", "reason"],
+        "properties": {
+          "approach": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "recommendations": {
+      "type": "object",
+      "required": ["arc_type", "pacing_model", "hook_mechanic", "hook_window_seconds", "overall_rationale"],
+      "properties": {
+        "arc_type": { "$ref": "#/$defs/recommendation_field" },
+        "pacing_model": { "$ref": "#/$defs/recommendation_field" },
+        "hook_mechanic": { "$ref": "#/$defs/recommendation_field" },
+        "hook_window_seconds": { "$ref": "#/$defs/recommendation_field" },
+        "editing_rhythm_by_beat": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["value", "confidence"],
+            "properties": {
+              "value": {
+                "type": "object",
+                "required": ["cuts_density", "avg_shot_duration_seconds", "transition_style"],
+                "properties": {
+                  "cuts_density": { "type": "string", "enum": ["rapid", "moderate", "slow", "held"] },
+                  "avg_shot_duration_seconds": { "type": "number", "minimum": 0.5 },
+                  "transition_style": { "type": "string", "enum": ["hard_cut", "dissolve", "whip", "match_cut"] }
+                }
+              },
+              "confidence": { "$ref": "#/$defs/confidence_tier" }
+            }
+          }
+        },
+        "overall_rationale": { "type": "string", "minLength": 1 }
+      }
+    },
+    "dimension_verdicts": {
+      "type": "array",
+      "description": "Verdict for each INFERRED or DELEGATED dimension from enriched_brief.hypothesis_flags. Produced by Step 5b of intelligence-director.",
+      "items": {
+        "type": "object",
+        "required": ["dimension", "confidence", "verdict"],
+        "additionalProperties": false,
+        "properties": {
+          "dimension": { "type": "string", "minLength": 1 },
+          "confidence": { "$ref": "#/$defs/confidence_tier" },
+          "verdict": {
+            "type": "string",
+            "enum": ["SUPPORTED", "CONTRADICTED", "INSUFFICIENT-DATA"]
+          },
+          "challenge_evidence": {
+            "type": "string",
+            "description": "Required when verdict=CONTRADICTED AND confidence=research-grounded. Named, verifiable evidence only."
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "confidence_tier": {
+      "type": "string",
+      "enum": ["research-grounded", "pattern-inferred", "default-heuristic"]
+    },
+    "recommendation_field": {
+      "type": "object",
+      "required": ["value", "confidence", "rationale"],
+      "properties": {
+        "value": {},
+        "confidence": { "$ref": "#/$defs/confidence_tier" },
+        "rationale": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": false
+}

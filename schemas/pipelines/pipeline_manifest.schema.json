@@ -1,9 +1,24 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "openmontage/pipelines/pipeline_manifest",
+  "$id": "video-production-buddy/pipelines/pipeline_manifest",
   "title": "Pipeline Manifest",
   "description": "Declarative pipeline definition specifying stages, artifacts, tools, and policies.",
   "type": "object",
+  "$defs": {
+    "stage_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Stable stage identifier. Dots are reserved for derived <stage>.<sub_stage> unit ids."
+    },
+    "artifact_list": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "tool_list": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
   "required": ["name", "version", "stages"],
   "properties": {
     "name": { "type": "string" },
@@ -11,7 +26,7 @@
     "description": { "type": "string" },
     "category": {
       "type": "string",
-      "enum": ["talking_head", "generated", "hybrid", "screen_recording", "animation", "cinematic", "custom"]
+      "enum": ["talking_head", "generated", "hybrid", "screen_recording", "animation", "cinematic", "documentary", "custom"]
     },
     "stability": {
       "type": "string",
@@ -44,7 +59,7 @@
         "type": "object",
         "required": ["name"],
         "properties": {
-          "name": { "type": "string" },
+          "name": { "$ref": "#/$defs/stage_name" },
           "agent": { "type": "string", "description": "Legacy: class name for Python-driven stages" },
           "skill": { "type": "string", "description": "Skill path for instruction-driven stages (e.g., pipelines/explainer/idea-director)" },
           "required_artifacts_in": {
@@ -98,18 +113,29 @@
           },
           "sub_stages": {
             "type": "array",
-            "description": "Optional sub-stages within a stage (e.g., sample preview for reference-driven productions)",
+            "description": "Optional child gates within a stage. Artifact-producing child gates may be checkpointed as <stage>.<sub_stage> units.",
             "items": {
               "type": "object",
               "required": ["name"],
               "properties": {
-                "name": { "type": "string" },
+                "name": { "$ref": "#/$defs/stage_name" },
+                "skill": { "type": "string" },
                 "description": { "type": "string" },
                 "condition": { "type": "string", "description": "When this sub-stage activates (e.g., video_analysis_brief_exists)" },
+                "required_artifacts_in": { "$ref": "#/$defs/artifact_list" },
+                "optional_artifacts_in": { "$ref": "#/$defs/artifact_list" },
+                "produces": { "$ref": "#/$defs/artifact_list" },
+                "required_tools": { "$ref": "#/$defs/tool_list" },
+                "optional_tools": { "$ref": "#/$defs/tool_list" },
+                "preferred_tools": { "$ref": "#/$defs/tool_list" },
+                "fallback_tools": { "$ref": "#/$defs/tool_list" },
                 "human_approval_default": { "type": "boolean", "default": true },
-                "tools_available": { "type": "array", "items": { "type": "string" } },
-                "review_focus": { "type": "array", "items": { "type": "string" } }
-              }
+                "checkpoint_required": { "type": "boolean", "default": true },
+                "tools_available": { "$ref": "#/$defs/tool_list" },
+                "review_focus": { "type": "array", "items": { "type": "string" } },
+                "success_criteria": { "type": "array", "items": { "type": "string" } }
+              },
+              "additionalProperties": false
             }
           }
         },
@@ -121,6 +147,36 @@
       "type": "string",
       "enum": ["guided", "manual_all", "auto_noncreative"],
       "default": "guided"
+    },
+    "production_modes": {
+      "type": "array",
+      "description": "Optional pipeline-specific production modes that a planning skill can choose between.",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "required_tools": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "optional_tools": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "scene_type": { "type": "string" },
+          "agent_skills": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "best_for": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      }
     },
     "reference_input": {
       "type": "object",

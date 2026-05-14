@@ -1,0 +1,69 @@
+{
+  "card_id": "demo.context-before-ui.001",
+  "version": "1.0",
+  "domain": "product_demo_logic",
+  "summary": "A product demo persuades better when it first shows the viewer's situation, then the product action, then the changed state.",
+  "principles": [
+    "Start each demo moment from a concrete user context — the viewer must recognize their own situation before seeing the product solution.",
+    "Show the product doing one decisive action that resolves the context problem — not a feature tour.",
+    "End the demo moment on the human or business outcome, not the interface — the viewer cares about the result, not the button press.",
+    "Context-problem-solution-recovery: the four-beat demo structure ensures the viewer feels the pain before seeing the relief.",
+    "The demo should feel like the viewer is operating the product, not watching someone else use it — first-person or over-shoulder framing.",
+    "If the product is software, show the output not the workflow — the destination matters more than the journey for persuasion.",
+    "Demo pacing should be slower than the surrounding ad — the viewer needs processing time to understand what they're seeing."
+  ],
+  "apply_when": [
+    "The product is software, an app, a camera feature, a device function, or a workflow tool.",
+    "The proof beat needs a demo but the audience is not already product-qualified.",
+    "The ad risks becoming a screen recording without emotion."
+  ],
+  "avoid_when": [
+    "The user requested a pure tutorial or product walkthrough.",
+    "The visual surface is legally restricted or cannot be shown accurately.",
+    "The product action is too complex to communicate in the selected duration."
+  ],
+  "downstream_targets": [
+    "script",
+    "scene_plan",
+    "visual",
+    "reveal"
+  ],
+  "keywords": [
+    "demo",
+    "product action",
+    "ui",
+    "app",
+    "workflow",
+    "camera feature",
+    "before after",
+    "outcome"
+  ],
+  "source_type": "video-production-buddy-curated",
+  "content_hash": "sha256:5b6ce143407b3f160b8afec751ec55655374f4c56f32866a10eaf76bb92dbbd9",
+  "failure_patterns": [
+    "Feature tour that shows every function: the viewer sees complexity instead of value and retention drops at the demo beat.",
+    "Demo without context: the product action is shown but the viewer doesn't understand why it matters — a solution without a problem.",
+    "Interface-only demo that ends on a screen: the viewer sees pixels, not outcomes, and the product feels hollow.",
+    "Demo that's too fast for the viewer to process: if the action happens in under 1 second, the viewer misses the key moment."
+  ],
+  "cross_domain_notes": [
+    {
+      "domain": "audience_insight",
+      "note": "The demo context must match the audience's actual workflow — showing a use case the audience doesn't have makes the demo irrelevant."
+    },
+    {
+      "domain": "proof_logic",
+      "note": "The demo is proof in action: proof logic determines what to prove, demo logic determines how to show the proof happening."
+    },
+    {
+      "domain": "cinematography",
+      "note": "Over-shoulder or POV camera angles during demo beats create the feeling that the viewer is using the product, not watching a commercial."
+    }
+  ],
+  "execution_techniques": [
+    "Open the demo beat on the user's frustrated face or messy workspace, then cut to the product action, then the clean result — context-action-outcome.",
+    "Show the final output (photo, document, completed task) full-screen for 1 second before cutting away — let the result speak.",
+    "Use slow motion or slight pause on the key product action moment so the viewer can register what just happened.",
+    "If the product is an app, show the real output appearing on a device the viewer recognizes, not a floating UI mockup."
+  ]
+}

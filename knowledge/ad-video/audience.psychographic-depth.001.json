@@ -1,0 +1,73 @@
+{
+  "card_id": "audience.psychographic-depth.001",
+  "version": "1.0",
+  "domain": "audience_insight",
+  "summary": "Effective advertising speaks to who the audience believes they are, not just what demographics they match. Psychographic depth transforms generic messaging into personal recognition.",
+  "principles": [
+    "Map viewer identity: who they believe they are (creative professional, busy parent, tech enthusiast) determines the language, imagery, and tone that resonates.",
+    "Pain-surface hierarchy: functional pain (the task is slow) sits below emotional pain (I feel incompetent) which sits below identity pain (I'm not who I want to be). Target the deepest accessible layer.",
+    "Language calibration: match the audience's self-image in vocabulary and sentence structure. Technical audiences trust precision; creative audiences trust fluency.",
+    "Resistance anticipation: identify the single objection that would kill conversion and address it before the CTA, not after.",
+    "Aspirational gap: the most powerful ads show the viewer a version of themselves they want to become, then position the product as the bridge.",
+    "Cultural fluency: reference the audience's shared context (platforms, trends, aesthetics) without pandering or stereotyping.",
+    "Emotional self-image: the ad should make the viewer feel like the kind of person who uses this product, not just understand what it does."
+  ],
+  "apply_when": [
+    "The brief identifies a target audience beyond basic demographics.",
+    "The product competes on emotional or identity positioning rather than pure specs.",
+    "The ad needs to overcome a known objection or skepticism pattern."
+  ],
+  "avoid_when": [
+    "The audience is genuinely everyone with no meaningful psychographic clustering.",
+    "Legal restrictions prevent targeting specific emotional states or conditions.",
+    "The brief explicitly requests a feature-first approach with no emotional layer."
+  ],
+  "downstream_targets": [
+    "idea",
+    "script",
+    "hook",
+    "build",
+    "cta_brand"
+  ],
+  "keywords": [
+    "audience",
+    "psychographic",
+    "identity",
+    "pain point",
+    "aspiration",
+    "objection",
+    "resistance",
+    "language",
+    "tone",
+    "self-image",
+    "cultural"
+  ],
+  "source_type": "video-production-buddy-curated",
+  "content_hash": "sha256:4bce421a50e5164661debdec93269d7975f4d66d3b651f60e63d826ffe3c5e7f",
+  "failure_patterns": [
+    "Speaking to demographics instead of identity: 'women 25-34' is not an insight, it's a media buy.",
+    "Pain point too shallow: addressing 'your phone is slow' when the real pain is 'I feel left behind by technology.'",
+    "Aspirational imagery that's too far from the viewer's reality: unattainable lifestyle makes the product feel like it's not for them.",
+    "Objection ignored: the viewer's brain raises the objection during the ad and finds no answer, killing conversion."
+  ],
+  "cross_domain_notes": [
+    {
+      "domain": "hook_mechanic",
+      "note": "The hook must speak to the audience's identity pain or aspiration, not the product feature — the viewer recognizes themselves before they evaluate the product."
+    },
+    {
+      "domain": "positioning",
+      "note": "The single promise must be the one the audience most wants to believe, not necessarily the strongest product claim."
+    },
+    {
+      "domain": "emotional_rhythm",
+      "note": "Emotional targets per beat should map to the audience's emotional journey: frustration → recognition → hope → confidence → action."
+    }
+  ],
+  "execution_techniques": [
+    "Write the hook from the viewer's perspective, not the brand's: 'Your photos don't match your vision' not 'Our camera has 200MP.'",
+    "Identify the top objection and address it in the build beat with a proof moment: 'But does it actually work? Yes, here's the evidence.'",
+    "Mirror the audience's vocabulary in narration: technical precision for engineers, emotional fluency for creatives, efficiency language for business buyers.",
+    "Show the aspirational self in the reveal beat: the viewer using the product in the context of who they want to become."
+  ]
+}

@@ -31,6 +31,8 @@ from tools.audio.openai_tts import OpenAITTS
 from tools.audio.piper_tts import PiperTTS
 from tools.audio.tts_selector import TTSSelector
 
+SHIPPED_PLAYBOOKS = sorted(p.stem for p in (PROJECT_ROOT / "styles").glob("*.yaml"))
+
 
 # ---- TTS Provider Tools ----
 
@@ -143,7 +145,7 @@ class TestCapabilityMetadata:
         catalog = reg.capability_catalog()
         assert "tts" in catalog
         providers = {item["provider"] for item in catalog["tts"] if item["provider"] != "selector"}
-        assert providers == {"elevenlabs", "google_tts", "openai", "piper"}
+        assert providers == {"bailian", "doubao", "elevenlabs", "google_tts", "openai", "piper"}
 
 
 # ---- Animated Explainer Pipeline ----
@@ -199,17 +201,15 @@ class TestAnimatedExplainerManifest:
 class TestStylePlaybooks:
     def test_all_listed(self):
         playbooks = list_playbooks()
-        assert "clean-professional" in playbooks
-        assert "flat-motion-graphics" in playbooks
-        assert "minimalist-diagram" in playbooks
+        assert set(SHIPPED_PLAYBOOKS).issubset(playbooks)
 
-    @pytest.mark.parametrize("name", ["clean-professional", "flat-motion-graphics", "minimalist-diagram"])
+    @pytest.mark.parametrize("name", SHIPPED_PLAYBOOKS)
     def test_loads_and_validates(self, name):
         pb = load_playbook(name)
         assert pb["identity"]["name"]
         assert pb["identity"]["category"]
 
-    @pytest.mark.parametrize("name", ["clean-professional", "flat-motion-graphics", "minimalist-diagram"])
+    @pytest.mark.parametrize("name", SHIPPED_PLAYBOOKS)
     def test_has_required_sections(self, name):
         pb = load_playbook(name)
         assert "visual_language" in pb
@@ -220,7 +220,7 @@ class TestStylePlaybooks:
         assert "quality_rules" in pb
         assert len(pb["quality_rules"]) >= 3
 
-    @pytest.mark.parametrize("name", ["clean-professional", "flat-motion-graphics", "minimalist-diagram"])
+    @pytest.mark.parametrize("name", SHIPPED_PLAYBOOKS)
     def test_color_palette_complete(self, name):
         pb = load_playbook(name)
         palette = pb["visual_language"]["color_palette"]
@@ -229,7 +229,7 @@ class TestStylePlaybooks:
         assert "background" in palette
         assert "text" in palette
 
-    @pytest.mark.parametrize("name", ["clean-professional", "flat-motion-graphics", "minimalist-diagram"])
+    @pytest.mark.parametrize("name", SHIPPED_PLAYBOOKS)
     def test_pacing_rules_present(self, name):
         pb = load_playbook(name)
         pacing = pb["motion"]["pacing_rules"]
@@ -250,6 +250,7 @@ class TestStylePlaybooks:
 
 class TestSkillsExist:
     SKILLS_DIR = PROJECT_ROOT / "skills"
+    AGENT_SKILLS_DIR = PROJECT_ROOT / ".agents" / "skills"
 
     @pytest.mark.parametrize("skill_path", [
         "pipelines/explainer/idea-director.md",
@@ -276,6 +277,22 @@ class TestSkillsExist:
         assert full_path.exists(), f"Missing meta skill: {skill_path}"
         content = full_path.read_text(encoding="utf-8")
         assert len(content) > 500, f"Skill too short to be useful: {skill_path}"
+
+    def test_wanx_image_layer3_skill_exists(self):
+        from lib.agent_components import load_manifest
+        from tools.graphics.wanx_image import WanxImage
+
+        assert "wanx-best-practices" in WanxImage.agent_skills
+        assert "flux-best-practices" not in WanxImage.agent_skills
+
+        manifest = load_manifest(PROJECT_ROOT / ".agents" / "components.yaml", repo_root=PROJECT_ROOT)
+        for skill_name in WanxImage.agent_skills:
+            component = manifest.components[skill_name]
+            full_path = manifest.agents_dir / component.name / "SKILL.md"
+            assert full_path.exists(), f"wanx_image references missing Layer 3 skill: {skill_name}"
+            content = full_path.read_text(encoding="utf-8")
+            assert "Wanxiang" in content or "Wanx" in content
+            assert "negative_prompt" in content
 
     @pytest.mark.parametrize("skill_path", [
         "pipelines/explainer/idea-director.md",
@@ -316,6 +333,10 @@ class TestRemotionScaffold:
 
     def test_root_composition_exists(self):
         assert (self.REMOTION_DIR / "src" / "Root.tsx").exists()
+
+    def test_root_prefers_runtime_playbook_theme_config(self):
+        root = (self.REMOTION_DIR / "src" / "Root.tsx").read_text(encoding="utf-8")
+        assert root.index("props.themeConfig") < root.index("const themeName")
 
     def test_explainer_component_exists(self):
         assert (self.REMOTION_DIR / "src" / "Explainer.tsx").exists()

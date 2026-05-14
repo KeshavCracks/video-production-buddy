@@ -80,7 +80,9 @@ stages:
     produces:
       - brief
       - decision_log
-    tools_available: []
+    tools_available:
+      - genui_interaction
+      - genui_session
     checkpoint_required: true
     human_approval_default: true
     review_focus:
@@ -105,8 +107,11 @@ stages:
       - scene_detect
       - audio_enhance
     tools_available:
+      - genui_interaction
+      - genui_session
       - transcriber
       - scene_detect
+      - audio_enhance
     checkpoint_required: true
     human_approval_default: true
     review_focus:
@@ -129,6 +134,8 @@ stages:
     optional_tools:
       - frame_sampler
     tools_available:
+      - genui_interaction
+      - genui_session
       - frame_sampler
     checkpoint_required: true
     human_approval_default: true
@@ -176,6 +183,7 @@ stages:
     required_artifacts_in:
       - scene_plan
       - asset_manifest
+      - brief
     optional_artifacts_in:
       - script
     produces:
@@ -196,6 +204,8 @@ stages:
     required_artifacts_in:
       - edit_decisions
       - asset_manifest
+      - brief
+      - decision_log
     optional_artifacts_in:
       - scene_plan
     produces:
@@ -219,7 +229,7 @@ stages:
       - Output video is playable and crisp at target resolution
       - UI text remains readable after crops and scaling
       - Audio is clear with no keyboard/click noise
-      - "render_runtime in edit_decisions matches proposal_packet — silent swap is a CRITICAL governance violation"
+      - "render_runtime in edit_decisions matches brief — silent swap is a CRITICAL governance violation"
       - "For synthetic UI/terminal demos, render_runtime='remotion' (TerminalScene) is preferred; render_runtime='hyperframes' is valid for custom HTML UIs — in that case, lint+validate must pass before render"
     success_criteria:
       - Schema-valid render_report artifact
@@ -234,7 +244,9 @@ stages:
       - brief
     produces:
       - publish_log
-    tools_available: []
+    tools_available:
+      - genui_interaction
+      - genui_session
     checkpoint_required: true
     human_approval_default: true
     review_focus:

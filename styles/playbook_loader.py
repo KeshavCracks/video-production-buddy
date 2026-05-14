@@ -10,6 +10,7 @@ from __future__ import annotations
 import colorsys
 import json
 import math
+import re
 from pathlib import Path
 from typing import Any, Optional
 
@@ -41,9 +42,12 @@ def load_playbook(name: str, styles_dir: Optional[Path] = None) -> dict[str, Any
         Validated playbook dict.
     """
     styles_dir = styles_dir or STYLES_DIR
-    path = styles_dir / f"{name}.yaml"
-    if not path.exists():
-        raise FileNotFoundError(f"Playbook not found: {path}")
+    paths = [styles_dir / f"{name}.yaml", styles_dir / "custom" / f"{name}.yaml"]
+    path = next((p for p in paths if p.exists()), None)
+    if path is None:
+        raise FileNotFoundError(
+            f"Playbook not found: {paths[0]} or {paths[1]}"
+        )
 
     with open(path) as f:
         playbook = yaml.safe_load(f)
@@ -61,11 +65,11 @@ def validate_playbook(playbook: dict) -> None:
 def list_playbooks(styles_dir: Optional[Path] = None) -> list[str]:
     """List all available playbook names."""
     styles_dir = styles_dir or STYLES_DIR
-    return [
-        p.stem
-        for p in styles_dir.glob("*.yaml")
-        if p.stem != "__pycache__"
-    ]
+    names = {p.stem for p in styles_dir.glob("*.yaml")}
+    custom_dir = styles_dir / "custom"
+    if custom_dir.exists():
+        names.update(p.stem for p in custom_dir.glob("*.yaml"))
+    return sorted(names)
 
 
 # ---------------------------------------------------------------------------
@@ -81,6 +85,91 @@ def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
     if len(h) == 8:
         h = h[:6]
     return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+
+_CSS_RGB_RE = re.compile(
+    r"^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})"
+    r"(?:\s*,\s*(0|1|0?\.\d+))?\s*\)$",
+    re.IGNORECASE,
+)
+
+
+def _is_hex_color(color: str) -> bool:
+    h = color.strip().lstrip("#")
+    return len(h) in {3, 6, 8} and all(c in "0123456789abcdefABCDEF" for c in h)
+
+
+def _parse_css_rgb(color: str) -> tuple[int, int, int, float] | None:
+    match = _CSS_RGB_RE.match(color.strip())
+    if not match:
+        return None
+    r, g, b = (max(0, min(255, int(match.group(i)))) for i in range(1, 4))
+    alpha = float(match.group(4)) if match.group(4) is not None else 1.0
+    return r, g, b, max(0.0, min(1.0, alpha))
+
+
+def _normalize_color_for_contrast(
+    color: str | None,
+    background_hex: str | None = None,
+) -> str | None:
+    """Return an opaque hex color usable for contrast math.
+
+    Playbooks allow CSS strings in overlays, including rgba(...). For contrast
+    checks, transparent colors are composited against the active background.
+    """
+    if not isinstance(color, str) or not color.strip():
+        return None
+
+    raw = color.strip()
+    if _is_hex_color(raw):
+        if _has_alpha(raw) and background_hex:
+            return _composite_alpha(raw, background_hex)
+        if _has_alpha(raw):
+            return f"#{raw.lstrip('#')[:6]}"
+        return raw
+
+    parsed = _parse_css_rgb(raw)
+    if parsed:
+        r, g, b, alpha = parsed
+        if alpha < 1.0 and background_hex:
+            bg_r, bg_g, bg_b = _hex_to_rgb(background_hex)
+            r = round(alpha * r + (1 - alpha) * bg_r)
+            g = round(alpha * g + (1 - alpha) * bg_g)
+            b = round(alpha * b + (1 - alpha) * bg_b)
+        return _rgb_to_hex(r, g, b)
+
+    return None
+
+
+def _unique_colors(colors: list[str]) -> list[str]:
+    """Preserve order while removing repeated color values."""
+    seen: set[str] = set()
+    unique: list[str] = []
+    for color in colors:
+        key = color.upper()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(color)
+    return unique
+
+
+def _dedupe_issues(issues: list[dict]) -> list[dict]:
+    """Preserve order while removing repeated validator issues."""
+    seen: set[tuple[Any, ...]] = set()
+    unique: list[dict] = []
+    for issue in issues:
+        key = (
+            issue.get("category"),
+            issue.get("severity"),
+            issue.get("pair"),
+            issue.get("message"),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(issue)
+    return unique
 
 
 def _has_alpha(hex_color: str) -> bool:
@@ -297,8 +386,10 @@ def validate_palette(playbook: dict) -> list[dict]:
     """
     issues: list[dict] = []
     palette = playbook.get("visual_language", {}).get("color_palette", {})
-    bg = palette.get("background", "#FFFFFF")
-    text = palette.get("text", "#000000")
+    bg_raw = palette.get("background", "#FFFFFF")
+    bg = _normalize_color_for_contrast(bg_raw) or "#FFFFFF"
+    text_raw = palette.get("text", "#000000")
+    text = _normalize_color_for_contrast(text_raw, bg) or "#000000"
     muted = palette.get("muted")
 
     # Check main text on background
@@ -320,21 +411,30 @@ def validate_palette(playbook: dict) -> list[dict]:
 
     # Check muted text on background
     if muted:
-        result = validate_contrast(muted, bg)
-        if not result["large_text"]["AA"]:
+        muted_normalized = _normalize_color_for_contrast(muted, bg)
+        if not muted_normalized:
             issues.append({
-                "pair": f"muted ({muted}) on background ({bg})",
-                "ratio": result["ratio"],
-                "severity": "error",
-                "message": f"Muted text fails AA even for large text (ratio {result['ratio']}:1)",
-            })
-        elif not result["normal_text"]["AA"]:
-            issues.append({
-                "pair": f"muted ({muted}) on background ({bg})",
-                "ratio": result["ratio"],
+                "pair": f"muted ({muted}) on background ({bg_raw})",
                 "severity": "warning",
-                "message": f"Muted text fails AA for normal text (ratio {result['ratio']}:1, OK for large)",
+                "message": f"Muted color {muted!r} is not parseable for contrast validation",
             })
+            muted_normalized = None
+        if muted_normalized:
+            result = validate_contrast(muted_normalized, bg)
+            if not result["large_text"]["AA"]:
+                issues.append({
+                    "pair": f"muted ({muted}) on background ({bg_raw})",
+                    "ratio": result["ratio"],
+                    "severity": "error",
+                    "message": f"Muted text fails AA even for large text (ratio {result['ratio']}:1)",
+                })
+            elif not result["normal_text"]["AA"]:
+                issues.append({
+                    "pair": f"muted ({muted}) on background ({bg_raw})",
+                    "ratio": result["ratio"],
+                    "severity": "warning",
+                    "message": f"Muted text fails AA for normal text (ratio {result['ratio']}:1, OK for large)",
+                })
 
     # Check overlay text/bg pairs
     overlays = playbook.get("overlays", {})
@@ -342,12 +442,21 @@ def validate_palette(playbook: dict) -> list[dict]:
         o_bg = overlay.get("bg")
         o_text = overlay.get("text")
         if o_bg and o_text:
-            # Composite alpha colors against page background
-            if _has_alpha(o_bg):
-                o_bg = _composite_alpha(o_bg, bg)
-            if _has_alpha(o_text):
-                o_text = _composite_alpha(o_text, bg)
-            result = validate_contrast(o_text, o_bg)
+            o_bg_normalized = _normalize_color_for_contrast(o_bg, bg)
+            o_text_normalized = _normalize_color_for_contrast(
+                o_text, o_bg_normalized or bg
+            )
+            if not o_bg_normalized or not o_text_normalized:
+                issues.append({
+                    "pair": f"overlay.{overlay_name}: text ({o_text}) on bg ({o_bg})",
+                    "severity": "warning",
+                    "message": (
+                        f"Overlay '{overlay_name}' has a color that is not "
+                        "parseable for contrast validation"
+                    ),
+                })
+                continue
+            result = validate_contrast(o_text_normalized, o_bg_normalized)
             if not result["normal_text"]["AA"]:
                 issues.append({
                     "pair": f"overlay.{overlay_name}: text ({o_text}) on bg ({o_bg})",
@@ -361,12 +470,22 @@ def validate_palette(playbook: dict) -> list[dict]:
 
     # Color-blind safety on primary + accent + chart_palette
     all_colors = []
-    all_colors.extend(palette.get("primary", []))
-    all_colors.extend(palette.get("accent", []))
+    for color in palette.get("primary", []):
+        normalized = _normalize_color_for_contrast(color)
+        if normalized:
+            all_colors.append(normalized)
+    for color in palette.get("accent", []):
+        normalized = _normalize_color_for_contrast(color)
+        if normalized:
+            all_colors.append(normalized)
     chart_palette = playbook.get("visual_language", {}).get(
         "color_palette", {}
     ).get("chart_palette") or playbook.get("chart_palette", [])
-    all_colors.extend(chart_palette)
+    for color in chart_palette:
+        normalized = _normalize_color_for_contrast(color)
+        if normalized:
+            all_colors.append(normalized)
+    all_colors = _unique_colors(all_colors)
 
     if len(all_colors) >= 2:
         cvd_result = check_color_blind_safety(all_colors)
@@ -377,7 +496,7 @@ def validate_palette(playbook: dict) -> list[dict]:
                 "message": cvd_issue["message"],
             })
 
-    return issues
+    return _dedupe_issues(issues)
 
 
 def generate_harmony(base_hex: str, harmony_type: str) -> list[str]:
@@ -784,18 +903,6 @@ def validate_accessibility(playbook: dict) -> dict:
     for hi in hierarchy_issues:
         issues.append({"category": "typography", **hi})
 
-    # --- Chart palette color-blind check ---
-    chart_palette = playbook.get("chart_palette", [])
-    if chart_palette and len(chart_palette) >= 2:
-        cvd_result = check_color_blind_safety(chart_palette)
-        if not cvd_result["safe"]:
-            for ci in cvd_result["issues"]:
-                issues.append({
-                    "category": "color_blind",
-                    "severity": "warning",
-                    "message": ci["message"],
-                })
-
     # --- Weight matrix checks ---
     weight_matrix = typography.get("weight_matrix", {})
     if weight_matrix:
@@ -816,6 +923,7 @@ def validate_accessibility(playbook: dict) -> dict:
                 prev_weight = w
 
     # --- Compute overall result ---
+    issues = _dedupe_issues(issues)
     error_count = sum(1 for i in issues if i.get("severity") == "error")
     warning_count = sum(1 for i in issues if i.get("severity") == "warning")
 

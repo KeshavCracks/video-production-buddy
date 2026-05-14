@@ -1,0 +1,564 @@
+name: Ad Video Pipeline
+version: '1.0'
+category: custom
+stability: beta
+description: Orchestrated ad/commercial video pipeline. Supports animated and cinematic render modes, derivative aspect-ratio
+  variants (9:16, 1:1, 15s short), mandatory sample approval, and required TTS plus proposal-conditioned subtitle generation.
+orchestration:
+  skill: pipelines/ad-video/executive-producer
+  budget_default_usd: 5.0
+  max_wall_time_minutes: 30
+  max_revisions_per_stage: 3
+  max_send_backs: 3
+compatible_playbooks:
+  - ad-brand
+  - flat-motion-graphics
+  - clean-professional
+required_skills:
+  - skills/pipelines/ad-video/intake-director.md
+  - skills/pipelines/ad-video/brief-enrichment-director.md
+  - skills/pipelines/ad-video/intelligence-director.md
+  - skills/pipelines/ad-video/bible-director.md
+  - skills/pipelines/ad-video/executive-producer.md
+  - skills/pipelines/ad-video/idea-director.md
+  - skills/pipelines/ad-video/proposal-director.md
+  - skills/pipelines/ad-video/script-director.md
+  - skills/pipelines/ad-video/scene-director.md
+  - skills/pipelines/ad-video/scene-director-animated.md
+  - skills/pipelines/ad-video/scene-director-cinematic.md
+  - skills/pipelines/ad-video/asset-director.md
+  - skills/pipelines/ad-video/asset-director-animated.md
+  - skills/pipelines/ad-video/asset-director-cinematic.md
+  - skills/pipelines/ad-video/edit-director.md
+  - skills/pipelines/ad-video/compose-director.md
+  - skills/pipelines/ad-video/publish-director.md
+  - skills/pipelines/ad-video/research-director.md
+  - skills/pipelines/ad-video/technical-proposal-director.md
+stages:
+  - name: research
+    skill: pipelines/ad-video/research-director
+    checkpoint_required: false
+    human_approval_default: false
+    sub_stages:
+      - name: intake
+        skill: pipelines/ad-video/intake-director
+        produces:
+          - intake_brief
+        tools_available: []
+        checkpoint_required: false
+        human_approval_default: false
+        review_focus:
+          - intake_completeness is honest (not "rich" when prompt was actually thin)
+          - round1_questions_asked contains only research-direction questions
+          - round1_questions_asked.length <= 3
+        success_criteria:
+          - Schema-valid intake_brief produced
+      - name: brief_enrichment
+        skill: pipelines/ad-video/brief-enrichment-director
+        required_artifacts_in:
+          - intake_brief
+        produces:
+          - enriched_brief
+        tools_available:
+          - genui_interaction
+          - genui_session
+        checkpoint_required: true
+        human_approval_default: true
+        review_focus:
+          - user_approved == true (G-0 requires explicit APPROVE reply — not implicit agreement)
+          - creative_requirements contains every required worksheet dimension before enriched brief approval
+          - creative_requirements.truth_and_safety_constraints captures objective facts, physical constraints, geometry, motion
+            coherence, and values/safety guardrails
+          - every creative_requirements.*.source is FROM BRIEF or DELEGATED
+          - No required worksheet dimension is INFERRED
+          - All 5 narrative arc beats populated with full visual + emotional + key_action detail
+          - hypothesis_flags non-empty — every INFERRED or DELEGATED dimension listed with specific basis
+          - No empty strings in product_brief or ad_specification
+          - prohibited_elements contains at least 3 category-specific rules
+        success_criteria:
+          - Schema-valid enriched_brief produced
+          - enriched_brief.product_brief.brand_name present for final-frame and publish metadata
+          - enriched_brief.user_approved == true
+      - name: intelligence
+        skill: pipelines/ad-video/intelligence-director
+        required_artifacts_in:
+          - intake_brief
+          - enriched_brief
+        produces:
+          - intelligence_brief
+        tools_available:
+          - ad_knowledge_retriever
+        checkpoint_required: false
+        human_approval_default: false
+        review_focus:
+          - professional_knowledge is present and produced by ad_knowledge_retriever before live research synthesis
+          - professional_knowledge.cards_used entries include knowledge_alignment source refs, relevance scores, and application
+            recommendations
+          - All recommendations carry a confidence tier
+          - platform_trends entries for new runs include sentiment, trend_type, brand_safety, and application_targets
+          - brand_safety distinguishes safe trend signals from caution/unsafe research context
+          - dimension_verdicts covers every INFERRED or DELEGATED enriched_brief.hypothesis_flags dimension and excludes FROM
+            BRIEF dimensions
+          - rejected_approaches is non-empty (empty = insufficient research)
+          - audience_psychographics are specific and research-cited, not generic
+          - At least 3 hit ads analyzed
+        success_criteria:
+          - Schema-valid intelligence_brief with professional_knowledge, recommendations, dimension_verdicts coverage, and
+            typed platform_trends metadata
+    review_focus:
+      - research.intake captures the user request as intake_brief
+      - research.brief_enrichment produces an explicitly approved enriched_brief
+      - research.intelligence produces cited intelligence_brief before proposal gates begin
+    success_criteria:
+      - intake_brief, enriched_brief, and intelligence_brief are schema-valid
+      - research.brief_enrichment approval gate is satisfied before intelligence completes
+  - name: proposal
+    skill: pipelines/ad-video/proposal-director
+    required_artifacts_in:
+      - intake_brief
+      - enriched_brief
+      - intelligence_brief
+    checkpoint_required: false
+    human_approval_default: false
+    sub_stages:
+      - name: bible
+        skill: pipelines/ad-video/bible-director
+        required_artifacts_in:
+          - intake_brief
+          - enriched_brief
+          - intelligence_brief
+        produces:
+          - production_bible
+        tools_available:
+          - genui_interaction
+          - genui_session
+        checkpoint_required: true
+        human_approval_default: true
+        review_focus:
+          - strategic_approved == true before advancing
+          - execution_approved == true before advancing
+          - compliance_manifest checkpoints are derived not hardcoded
+          - default-heuristic checkpoints use failure_action=flag only
+          - deliverables.primary aspect_ratio matches platform default
+          - rejected_approaches present in intelligence section
+          - production_bible.intelligence.trend_alignment selects only fresh, deduped, positive/neutral, brand_safety=safe
+            trends
+          - trend_alignment entries include script_usage.source_ref, scene_usage, target_beat, and do_not_imitate notes
+          - production_bible.intelligence.knowledge_alignment selects applicable professional producer knowledge refs from
+            intelligence_brief.professional_knowledge
+          - knowledge_alignment entries include script_usage.source_ref, scene_usage, target_beat, and do_not_overapply notes
+          - cta is non-null (must be set before execution_approved=true)
+          - truth_contract contains objective_facts, physical_constraints, product_geometry_rules, motion_coherence_rules,
+            and values_guardrails
+        success_criteria:
+          - Schema-valid production_bible with both approval flags true
+          - production_bible.intelligence.trend_alignment is present, even if no safe trend is selected
+          - production_bible.intelligence.knowledge_alignment is present, even if no card is selected
+          - production_bible.truth_contract is populated with source-backed requirements
+      - name: idea
+        skill: pipelines/ad-video/idea-director
+        required_artifacts_in:
+          - intake_brief
+          - intelligence_brief
+          - production_bible
+        produces:
+          - idea_options
+        checkpoint_required: true
+        human_approval_default: true
+        tools_available:
+          - genui_interaction
+          - genui_session
+        review_focus:
+          - All concepts satisfy every beat in production_bible.narrative.emotional_beat_sequence
+          - All concepts respect production_bible.intelligence.knowledge_alignment producer-knowledge constraints
+          - All mandatory visual_motifs appear in each concept's beat mapping
+          - No rejected_approaches used
+          - Concepts differ in scenario/character/metaphor but NOT in arc_type/beats/hook_mechanic
+        success_criteria:
+          - Schema-valid idea_options with selected_concept_id set by user
+          - Every concept includes hook_execution, visual_metaphor, beat_mapping, why_this_works, and knowledge_alignment_refs
+      - name: technical_proposal
+        skill: pipelines/ad-video/technical-proposal-director
+        required_artifacts_in:
+          - idea_options
+          - production_bible
+        produces:
+          - production_proposal
+          - decision_log
+        tools_available:
+          - genui_interaction
+          - genui_session
+        checkpoint_required: true
+        human_approval_default: true
+        review_focus:
+          - style_mode locked (confirmed or changed from bible candidate)
+          - 'render_runtime selected and logged (HARD RULE: options_considered includes Remotion and HyperFrames; mark unavailable
+            options rejected_because rather than omitting them)'
+          - product_reference_strategy locked and logged as product_identity_reference_selection
+          - audio_contract locks voice_model, voice_gender, voice_persona, voice_performance, and voice_sample_approved
+          - Qwen/DashScope voice instructions use qwen3-tts-instruct-flash, not qwen3-tts-flash; OpenAI voice instructions
+            use gpt-4o-mini-tts
+          - Physical/product-visible ads use provided reference, generated concept reference, or explicit risk_accepted waiver
+          - Derivatives explicitly opted in or out (9:16, 1:1, 15s short)
+          - Subtitles and dubbing preferences explicitly confirmed
+          - CTA confirmed non-null
+          - Budget confirmed and itemized by stage
+        success_criteria:
+          - Schema-valid production_proposal artifact produced
+          - style_mode locked in production_proposal.style_mode
+          - render_runtime locked in production_proposal.render_runtime
+          - decision_log render_runtime_selection records Remotion and HyperFrames in options_considered
+          - product_reference_strategy locked in production_proposal.product_reference_strategy
+          - derivatives locked in production_proposal.derivatives_added
+          - production_proposal.subtitles.user_confirmed == true
+          - voice_model and voice_performance locked in production_proposal.audio_contract
+          - production_proposal.audio_contract.voice_sample_approved == true
+    review_focus:
+      - proposal.bible locks the approved strategic and execution contract
+      - proposal.idea records the selected execution concept inside the approved bible constraints
+      - proposal.technical_proposal locks technical production choices and decision_log entries
+    success_criteria:
+      - production_bible, idea_options, production_proposal, and decision_log are schema-valid
+      - all proposal child gates requiring approval are completed before script begins
+  - name: script
+    skill: pipelines/ad-video/script-director
+    required_artifacts_in:
+      - production_proposal
+      - production_bible
+      - idea_options
+    produces:
+      - script
+    optional_tools:
+      - compliance_check
+    tools_available:
+      - genui_interaction
+      - genui_session
+      - compliance_check
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - 'Four beats present: hook, build, reveal, cta_brand'
+      - Word count within ±10% of target_duration_seconds × production_proposal.audio_contract.target_speed_wps
+      - Sections include source_ref/source_refs values from production_bible.intelligence.knowledge_alignment when selected
+        knowledge script_usage requires them
+      - hook/build sections include source_ref or source_refs values from production_bible.intelligence.trend_alignment when
+        selected trend script_usage requires them
+      - Mode annotations present on lines where animated/cinematic treatment differs
+      - speaker_directions and voice_performance present on every section
+      - CTA section ends with brand name — non-negotiable
+      - User has READ and APPROVED the full narration text before TTS generation begins
+    success_criteria:
+      - script artifact produced with sections array
+      - total_words within ±10% of target_duration_seconds × production_proposal.audio_contract.target_speed_wps
+      - every script section has delivery instructions compatible with production_proposal.audio_contract.voice_performance
+      - check_script_trend_alignment passes when production_bible.intelligence.trend_alignment has selected entries
+      - check_script_knowledge_alignment passes when production_bible.intelligence.knowledge_alignment has selected entries
+      - script.user_approved == true (user explicitly approved the narration text)
+  - name: scene_plan
+    skill: pipelines/ad-video/scene-director
+    required_artifacts_in:
+      - script
+      - production_proposal
+      - production_bible
+      - idea_options
+    produces:
+      - scene_plan
+    optional_tools:
+      - compliance_check
+    tools_available:
+      - genui_interaction
+      - genui_session
+      - compliance_check
+    checkpoint_required: true
+    human_approval_default: true
+    review_focus:
+      - User has approved the scene plan before any asset generation begins
+      - 'All broll and generated scenes have motion_required: true — stills only permitted for text_card and packshot scene
+        types'
+      - product_visibility and product_reference_required present on every scene
+      - Product-visible generated scenes set product_reference_required=true
+      - High-risk generated scenes include hallucination_checks derived from production_bible.truth_contract
+      - Visual/pacing trend_alignment entries have at least one scene with trend_alignment_refs and trend_alignment_notes
+      - Visual/pacing/format/color/sound/music/editing knowledge_alignment entries have at least one scene with knowledge_alignment_refs
+        and knowledge_alignment_notes
+      - Total scene duration covers script duration (±0.5s)
+      - crop_regions present on every scene with entries for every opted-in derivative variant
+      - core field present on every scene
+      - No more than 3 consecutive scenes of same type
+      - motion_required field present on scenes requiring actual video
+    success_criteria:
+      - scene_plan artifact produced
+      - scene_plan.user_approved == true
+      - sum(scene.duration) within ±0.5s of total script duration
+      - Product-visible scenes declare product_visibility != none and product_reference_required=true
+      - check_scene_plan_trend_alignment passes for selected visual or pacing trends
+      - check_scene_plan_knowledge_alignment passes for selected visual, pacing, format, color, sound, music, or editing knowledge
+      - Generated high-risk scenes declare hallucination_checks with check_id, category, requirement, prohibited_failure,
+        severity, and evidence_source
+      - 'If derivative_variants non-empty: all scenes have crop_regions entries for every selected variant'
+  - name: assets
+    skill: pipelines/ad-video/asset-director
+    required_artifacts_in:
+      - scene_plan
+      - script
+      - production_proposal
+      - production_bible
+    produces:
+      - product_identity_reference
+      - asset_manifest
+    checkpoint_required: false
+    required_tools:
+      - ad_video_planning_chain_check
+      - provider_consistency_check
+      - product_identity_consistency_check
+      - hallucination_contract_check
+      - sample_product_visibility_check
+      - cosyvoice_tts
+      - wanx_image
+      - wan_video_api
+      - minimax_music
+      - audio_mixer
+    optional_tools:
+      - openai_tts
+      - pexels_video
+      - pixabay_video
+      - frame_sampler
+    tools_available:
+      - ad_video_planning_chain_check
+      - provider_consistency_check
+      - product_identity_consistency_check
+      - hallucination_contract_check
+      - sample_product_visibility_check
+      - cosyvoice_tts
+      - openai_tts
+      - wanx_image
+      - wan_video_api
+      - minimax_music
+      - audio_mixer
+      - pexels_video
+      - pixabay_video
+      - frame_sampler
+    sub_stages:
+      - name: product_reference
+        description: Resolve Product Identity Reference before sample generation. Use an existing user product image, generate
+          2-4 concept reference candidates for approval, record an external URL reference, or stop for an explicit risk_accepted
+          waiver. No product-visible video clip may be generated before product_identity_reference is approved or waived.
+        human_approval_default: true
+        review_focus:
+          - ad_video_planning_chain_check passes before any asset generation
+          - product_identity_reference artifact exists and validates
+          - selected reference image path or risk_accepted waiver is user-approved
+          - product_identity_reference_selection decision is logged
+          - no text-only generation for product-visible scenes unless risk_accepted is user-approved
+        tools_available:
+          - genui_interaction
+          - genui_session
+      - name: sample
+        description: Generate 10–15s preview clip from first 2–3 scenes. Always runs. Present the sample as inline GenUI media
+          via genui_interaction/genui_session; manual file-path review is fallback only when the local browser path fails.
+        human_approval_default: true
+        tools_available:
+          - genui_interaction
+          - genui_session
+        review_focus:
+          - sample_product_visibility_check passes or warns for selected sample scene ids before assembly
+          - hallucination_contract_check passes or warns with generated_scene_ids for selected sample scene ids before sample
+            approval
+          - Sample clip is visible in the inline GenUI media review room
+          - Approval requested only after ui_session_response confirms review evidence
+          - sample_clip file exists and is playable
+          - sample_approved == true in EP_STATE after user decision
+      - name: full_generation
+        description: Generate all remaining assets after sample approval.
+        human_approval_default: false
+        review_focus:
+          - TTS audio file generated for every script section
+          - Narration uses the locked production_proposal.audio_contract.voice_model and passes section delivery instructions
+            to TTS
+          - When production_proposal.subtitles.mode != "off", ASS subtitle file generated with explicit PlayResX/PlayResY
+          - All scene assets match scene_plan required_assets
+          - Style consistency across all generated images
+          - asset_manifest complete with all required files
+          - Generated high-risk visual assets record hallucination_review with start/mid/end keyframe paths and per-check
+            verdicts
+          - hallucination_contract_check returns PASS or documented WARN before asset review
+          - narration_durations populated in EP_STATE
+          - When production_proposal.subtitles.mode != "off", ASS subtitle_file present in asset_manifest
+      - name: asset_review
+        description: Present all generated stills, keyframes, and video clips to the user in an inline GenUI media review
+          room before compose. Manual folder/file review is fallback only when GenUI is unavailable or declined.
+        human_approval_default: true
+        review_focus:
+          - All generated image, video, sample, product-reference, and keyframe assets are visible as inline GenUI media
+          - ui_session_response records review evidence for hero scenes and motion-required clips
+          - asset_review_approved == true
+        tools_available:
+          - genui_interaction
+          - genui_session
+      - name: music_review
+        description: Present the generated music track as inline GenUI audio before mixing. Do NOT proceed to compose until
+          ui_session_response shows the user listened and approved.
+        human_approval_default: true
+        tools_available:
+          - genui_interaction
+          - genui_session
+        review_focus:
+          - Music track file path communicated
+          - User has listened to the full track
+          - Music arc confirmed matches brief direction specified in production_plan.music_source.mood_direction
+          - music_review_approved == true
+    review_focus:
+      - product_reference sub-stage completed before sample generation
+      - provider_consistency_check passes before compose to catch missing or unauditable narration, silent TTS/image/video/music
+        provider substitutions, missing music_alignment evidence for library_locked/search_align, and approved-budget overages
+      - Sample sub-stage includes at least one product-visible scene (not chronological-only if product appears late)
+      - product_identity_consistency_check returns PASS or documented WARN before asset review
+      - hallucination_contract_check returns PASS or documented WARN with generated_scene_ids before sample approval and without
+        generated_scene_ids before asset review
+      - blocker FLAG hallucination verdicts regenerate or reroute before compose
+      - hallucination-review waivers have user-approved decision_log entries with category hallucination_review_waiver
+      - no text-only generation for product-visible scenes unless risk_accepted is user-approved
+      - sample_approved == true before full generation proceeds
+      - asset_review_approved == true before compose begins
+      - music_review_approved == true before compose begins
+      - TTS files present for all sections
+      - Narration model/instructions match production_proposal.audio_contract
+      - Budget not exceeded
+      - Completed assets checkpoint includes production_proposal, production_bible, script, scene_plan, and decision_log so
+        checkpoint validation can rerun provider_consistency_check, product_identity_consistency_check, and hallucination_contract_check
+        before compose
+    success_criteria:
+      - product_identity_reference artifact produced
+      - asset_manifest artifact produced
+      - Product-visible generated assets record product_identity_conditioning metadata
+      - Generated high-risk visual assets record hallucination_review metadata
+      - No blocker hallucination_review FLAG reaches compose
+      - sample_approved == true
+      - asset_review_approved == true
+      - music_review_approved == true
+      - When production_proposal.subtitles.mode != "off", ASS subtitle file present in asset_manifest
+  - name: edit
+    skill: pipelines/ad-video/edit-director
+    required_artifacts_in:
+      - scene_plan
+      - asset_manifest
+      - production_bible
+      - production_proposal
+    produces:
+      - edit_decisions
+    optional_tools:
+      - compliance_check
+    tools_available:
+      - compliance_check
+    checkpoint_required: false
+    review_focus:
+      - Timeline covers 0 to total_duration with no gaps
+      - Every cut source, narration/music/SFX/overlay asset_id, and enabled subtitle source resolves through asset_manifest
+      - render_runtime and music_strategy match production_proposal unless an approved decision_log substitution selects the
+        edit value
+      - Music ducking set to -18 dB during all narration segments
+      - Subtitle burn setting matches production_proposal.subtitles.mode
+      - Derivative edit specs present and renderable when production_proposal.derivatives_added is non-empty (aspect variants
+        need crop_regions; duration variants need a <=15s scene selection)
+    success_criteria:
+      - edit_decisions artifact produced
+      - edit_decisions.render_runtime == production_proposal.render_runtime unless an approved render_runtime_selection decision
+        selects the edit runtime
+      - edit_decisions.music_strategy == production_proposal.music_strategy unless an approved music_strategy_selection decision
+        selects the edit strategy
+      - cut sources, audio/overlay asset IDs, and enabled subtitle sources resolve to asset_manifest entries
+      - audio.target_db == -18 for all narration windows
+      - edit_decisions.subtitles.enabled is false for production_proposal.subtitles.mode == "off" and true for "burnt-in"
+      - opted-in derivative variants have executable edit specs, not placeholder keys
+  - name: compose
+    skill: pipelines/ad-video/compose-director
+    required_artifacts_in:
+      - edit_decisions
+      - asset_manifest
+      - production_proposal
+      - production_bible
+      - script
+      - scene_plan
+      - decision_log
+    produces:
+      - render_report
+      - final_review
+    checkpoint_required: false
+    required_tools:
+      - ad_video_planning_chain_check
+      - provider_consistency_check
+      - runtime_consistency_check
+      - scene_fidelity_check
+      - hallucination_contract_check
+      - video_compose
+      - audio_mixer
+    tools_available:
+      - ad_video_planning_chain_check
+      - provider_consistency_check
+      - runtime_consistency_check
+      - scene_fidelity_check
+      - hallucination_contract_check
+      - video_compose
+      - audio_mixer
+    review_focus:
+      - ad_video_planning_chain_check passes with production_bible, script, and scene_plan before render
+      - provider_consistency_check passes with production_proposal, asset_manifest, script, and decision_log before render,
+        including narration coverage, visual provider locks, strict music_alignment evidence, and approved budget
+      - runtime_consistency_check passes before video_compose, confirming render_runtime and music_strategy still match production_proposal
+        unless user-approved changes are logged
+      - scene_fidelity_check passes before video_compose
+      - Primary render complete at declared aspect_ratio_primary (16:9 or 9:16)
+      - asset_manifest has no blocker hallucination_review FLAG before render
+      - hallucination_contract_check previously passed or warned with documented user-approved waiver
+      - crop_regions verified present before each derivative render
+      - Each derivative is a separate output file
+      - render_report output resolution matches each aspect-ratio variant label; 15s/15s_short outputs are <=15s
+      - Duration within ±5% of target
+      - 'Audio channels: stereo'
+      - final_review.status == pass after inspecting actual rendered outputs
+      - final_review.output_path and probe/runtime evidence match render_report.outputs
+      - final_review subtitle evidence matches production_proposal and music presence evidence matches the approved music_strategy
+      - final_review.reviewed_outputs covers every render_report.outputs file when derivative outputs exist
+    success_criteria:
+      - render_report artifact produced
+      - final_review artifact produced with status pass
+      - final_review subtitle evidence matches production_proposal and music evidence matches the approved music_strategy
+      - ad_video_planning_chain_check passed before video_compose
+      - provider_consistency_check confirmed narration coverage and visual provider locks before video_compose
+      - provider_consistency_check confirmed library_locked/search_align music_alignment evidence before video_compose when
+        strict music sync is selected
+      - provider_consistency_check confirmed total asset spend is within approved budget or backed by a user-approved budget_tradeoff
+      - render_report.outputs contains primary file at declared aspect_ratio_primary
+      - render_report.outputs contains one entry per opted-in derivative
+      - render_report.outputs variant, resolution, and duration fields are semantically consistent
+      - completed compose checkpoint includes production_proposal and production_bible for output coverage validation
+  - name: publish
+    skill: pipelines/ad-video/publish-director
+    required_artifacts_in:
+      - render_report
+      - production_proposal
+      - script
+      - production_bible
+      - scene_plan
+      - asset_manifest
+      - decision_log
+      - final_review
+    produces:
+      - publish_log
+    required_tools:
+      - hallucination_contract_check
+    tools_available:
+      - hallucination_contract_check
+    checkpoint_required: false
+    review_focus:
+      - output_file_matrix present with all rendered files
+      - final_review.status == pass before publish_log is produced
+      - hallucination_contract_check passes or warns before publish_log is produced
+      - no blocker hallucination_review FLAG or unapproved waiver is present in the published asset_manifest
+      - 'Metadata complete: title, description, tags, platform targets'
+      - Thumbnail concept written
+    success_criteria:
+      - publish_log artifact produced
+      - output_file_matrix non-empty
+      - completed publish checkpoint includes render_report, final_review, production_proposal, and production_bible for output_file_matrix
+        and render coverage validation

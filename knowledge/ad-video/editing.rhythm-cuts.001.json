@@ -1,0 +1,77 @@
+{
+  "card_id": "editing.rhythm-cuts.001",
+  "version": "1.0",
+  "domain": "editing_technique",
+  "summary": "The rhythm of cuts is the heartbeat of the ad. Cut length, transition type, and cut-to-beat alignment shape attention density and emotional momentum far more than any single shot.",
+  "principles": [
+    "Cut length equals attention density: shorter cuts create urgency and excitement, longer cuts create absorption and trust.",
+    "Match cuts create visual continuity across disparate subjects — the viewer's eye tracks the shared shape, color, or motion across the cut.",
+    "L-cuts let audio lead the visual transition so the viewer anticipates the next image; J-cuts let the visual arrive before its audio context for surprise and dynamism.",
+    "Hard cuts at peak intensity convey confidence and energy; dissolves and fades at transitions convey passage of time or emotional shift.",
+    "The rhythm of cuts should mirror the emotional intensity curve, not fight it — rapid cuts during a calm beat feel anxious, long holds during a peak feel sluggish.",
+    "Every cut should have a reason: motivated by motion, dialogue, sound, or emotional shift. Unmotivated cuts feel arbitrary.",
+    "The final cut before the CTA should be the cleanest and most decisive in the entire ad — it sets up the conversion moment."
+  ],
+  "apply_when": [
+    "The ad has multiple scenes or shots requiring assembly.",
+    "The brief specifies pacing energy, mood shifts, or montage treatment.",
+    "The emotional curve has distinct intensity levels that editing rhythm should reflect."
+  ],
+  "avoid_when": [
+    "The ad is a single continuous shot or animation with no cuts.",
+    "Platform constraints (short format) limit the number of viable cuts.",
+    "The product requires uninterrupted viewing time to demonstrate its action."
+  ],
+  "downstream_targets": [
+    "scene_plan",
+    "visual",
+    "pacing",
+    "editing",
+    "hook",
+    "build",
+    "reveal",
+    "cta_brand"
+  ],
+  "keywords": [
+    "editing",
+    "cut",
+    "rhythm",
+    "match cut",
+    "L-cut",
+    "J-cut",
+    "hard cut",
+    "dissolve",
+    "transition",
+    "montage",
+    "pace",
+    "attention density"
+  ],
+  "source_type": "video-production-buddy-curated",
+  "content_hash": "sha256:e8364857f9108112207b186ea2dcbd5ad5972e5e7160f6264f86766a31b346d4",
+  "failure_patterns": [
+    "Cut rhythm at odds with the emotional curve: rapid cuts in a calm section or long holds at the climax.",
+    "Every cut is a hard cut with no variation — the ad feels like a slideshow rather than a flowing piece.",
+    "Match cuts that are too clever: the viewer notices the technique instead of the product message.",
+    "Cutting on the wrong frame: the motion or expression at the cut point is mid-action, creating visual stutter."
+  ],
+  "cross_domain_notes": [
+    {
+      "domain": "emotional_rhythm",
+      "note": "Cut density should directly track intensity: held shots at low intensity, rapid cuts at peak. They are the visual expression of the same curve."
+    },
+    {
+      "domain": "cinematography",
+      "note": "Camera movement enables or blocks cut types: a tracking shot enables match-cut continuation, a locked shot enables clean hard cuts."
+    },
+    {
+      "domain": "sound_design",
+      "note": "Audio transitions should lead or lag visual cuts by 2-3 frames to create the L-cut/J-cut effect that professional editing relies on."
+    }
+  ],
+  "execution_techniques": [
+    "Cut on motion when transitioning between beats — the viewer's eye follows the movement and doesn't register the cut.",
+    "Use L-cuts to let narration flow across scene boundaries so the voice carries the viewer through the visual change.",
+    "Hold the product hero shot 0.5 seconds longer than feels comfortable — it reads as confidence and gives the viewer time to absorb.",
+    "Build a cut rhythm pattern in the first 3 seconds (e.g., 1s-1s-1s) then break it at the reveal for maximum impact."
+  ]
+}

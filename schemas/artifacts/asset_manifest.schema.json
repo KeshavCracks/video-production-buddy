@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "openmontage/artifacts/asset_manifest",
+  "$id": "video-production-buddy/artifacts/asset_manifest",
   "title": "Asset Manifest",
   "description": "Inventory of generated/sourced assets produced by the Asset Generator.",
   "type": "object",
@@ -33,13 +33,354 @@
           "generation_summary": { "type": "string", "description": "Brief summary of how the asset was generated or sourced" },
           "provider": { "type": "string", "description": "Provider name (e.g. pixabay, google_imagen)" },
           "license": { "type": "string", "description": "License type (e.g. Pixabay License, CC0)" },
-          "original_url": { "type": "string", "description": "Source URL if downloaded from a stock service" }
+          "original_url": { "type": "string", "description": "Source URL if downloaded from a stock service" },
+          "music_alignment": {
+            "type": "object",
+            "description": "Required by provider_consistency_check for ad-video music assets when production_proposal.music_strategy is library_locked or search_align. Records the chosen source-track peak/drop and how it was aligned to the planned tension peak.",
+            "required": [
+              "strategy",
+              "target_peak_seconds",
+              "selected_peak_seconds",
+              "aligned_peak_seconds",
+              "drift_seconds",
+              "evidence"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "strategy": {
+                "type": "string",
+                "enum": ["library_locked", "search_align"]
+              },
+              "target_peak_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Target peak/drop timestamp in the ad timeline, usually production_bible.narrative.tension_peak_at_seconds."
+              },
+              "selected_peak_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Source-track peak/drop timestamp selected before trimming or padding."
+              },
+              "aligned_peak_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Timestamp where the selected source peak/drop lands in the final music bed after trim/pad alignment."
+              },
+              "drift_seconds": {
+                "type": "number",
+                "description": "aligned_peak_seconds - target_peak_seconds. Strict music strategies must stay within +/-0.5 seconds."
+              },
+              "timing_sidecar_path": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Validated music_library/<track>.timing.json sidecar used for library_locked selection."
+              },
+              "beat_detection_report": {
+                "type": "object",
+                "description": "Inline report from lib.beat_detector.analyze() or equivalent stock-track beat/drop analysis.",
+                "additionalProperties": true
+              },
+              "beat_detection_report_path": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Path to the saved beat/drop analysis report for search_align."
+              },
+              "evidence": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Short human-readable summary of how alignment was verified."
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "strategy": { "const": "library_locked" }
+                  },
+                  "required": ["strategy"]
+                },
+                "then": {
+                  "required": ["timing_sidecar_path"]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "strategy": { "const": "search_align" }
+                  },
+                  "required": ["strategy"]
+                },
+                "then": {
+                  "anyOf": [
+                    { "required": ["beat_detection_report"] },
+                    { "required": ["beat_detection_report_path"] }
+                  ]
+                }
+              }
+            ]
+          },
+          "product_identity_conditioning": {
+            "type": "object",
+            "description": "Required for generated image/video assets linked to product-visible scenes. Records how the product identity reference conditioned generation and what the visual sanity check found.",
+            "required": [
+              "conditioning_mode",
+              "generation_tool",
+              "generation_model",
+              "fidelity_verdict"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "approved_reference_id": {
+                "type": "string",
+                "description": "product_identity_reference.reference_id used for conditioning. Omit only for text_only_waived."
+              },
+              "approved_reference_path": {
+                "type": "string",
+                "description": "Approved reference image path copied from product_identity_reference.selected_reference_image_path. Omit only for text_only_waived."
+              },
+              "conditioning_mode": {
+                "type": "string",
+                "enum": [
+                  "reference_to_video",
+                  "scene_keyframe_to_video",
+                  "text_only_waived"
+                ]
+              },
+              "generation_tool": {
+                "type": "string"
+              },
+              "generation_model": {
+                "type": "string"
+              },
+              "fidelity_verdict": {
+                "type": "string",
+                "enum": ["PASS", "WARN", "FLAG", "NOT_CHECKED"]
+              },
+              "fidelity_notes": {
+                "type": "string"
+              },
+              "keyframe_path": {
+                "type": "string",
+                "description": "Extracted keyframe used for identity sanity check."
+              },
+              "waiver_decision_id": {
+                "type": "string",
+                "description": "decision_log decision id when conditioning_mode=text_only_waived."
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "conditioning_mode": {
+                      "enum": ["reference_to_video", "scene_keyframe_to_video"]
+                    }
+                  },
+                  "required": ["conditioning_mode"]
+                },
+                "then": {
+                  "required": ["approved_reference_id", "approved_reference_path"]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "conditioning_mode": { "const": "text_only_waived" }
+                  },
+                  "required": ["conditioning_mode"]
+                },
+                "then": {
+                  "required": ["waiver_decision_id"]
+                }
+              }
+            ]
+          },
+          "hallucination_review": {
+            "type": "object",
+            "description": "Agent/human keyframe review against scene_plan.scenes[].hallucination_checks. Required by hallucination_contract_check for generated visual assets in high-risk ad-video scenes.",
+            "required": [
+              "status",
+              "keyframe_paths",
+              "check_verdicts",
+              "reviewer"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["PASS", "WARN", "FLAG", "WAIVED", "NOT_REVIEWED"]
+              },
+              "keyframe_paths": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 },
+                "description": "Extracted keyframes used for review. Video clips should include start/mid/end frames under assets/keyframes/<scene_id>/."
+              },
+              "check_verdicts": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": ["check_id", "category", "status", "notes"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "check_id": { "type": "string", "minLength": 1 },
+                    "category": {
+                      "type": "string",
+                      "enum": [
+                        "objective_fact",
+                        "physical_plausibility",
+                        "product_geometry",
+                        "motion_coherence",
+                        "values_safety"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["PASS", "WARN", "FLAG", "WAIVED"]
+                    },
+                    "severity": {
+                      "type": "string",
+                      "enum": ["blocker", "warning"],
+                      "description": "Copied from the scene hallucination check when available."
+                    },
+                    "notes": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              },
+              "reviewer": {
+                "type": "object",
+                "required": ["type", "reviewed_at", "method"],
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["agent", "human"]
+                  },
+                  "reviewer_id": { "type": "string" },
+                  "reviewed_at": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "ISO-like timestamp recorded by the reviewing agent or human gate."
+                  },
+                  "method": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Example: start_mid_end_keyframe_review."
+                  }
+                }
+              },
+              "regeneration_action": {
+                "type": "object",
+                "required": ["action", "reason"],
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": ["none", "regenerate", "reroute", "human_waiver"]
+                  },
+                  "reason": { "type": "string", "minLength": 1 },
+                  "decision_id": {
+                    "type": "string",
+                    "description": "decision_log.decisions[].decision_id when action=human_waiver."
+                  }
+                }
+              },
+              "waiver_decision_id": {
+                "type": "string",
+                "description": "decision_log.decisions[].decision_id for an explicit user-approved hallucination-review waiver."
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": { "const": "WAIVED" }
+                  },
+                  "required": ["status"]
+                },
+                "then": {
+                  "required": ["waiver_decision_id"]
+                }
+              }
+            ]
+          }
         },
         "additionalProperties": false
       }
     },
     "total_cost_usd": { "type": "number", "minimum": 0 },
-    "metadata": { "type": "object" }
+    "metadata": { "type": "object" },
+    "style_mode": {
+      "type": "string",
+      "enum": ["animated", "cinematic"],
+      "description": "Render mode locked at proposal. Carried into asset_manifest so downstream stages can branch on it without re-reading production_proposal."
+    },
+    "pipeline": {
+      "type": "string",
+      "description": "Pipeline that produced this asset_manifest (e.g. 'ad-video'). Optional informational field."
+    },
+    "project_id": {
+      "type": "string",
+      "description": "Project workspace id under projects/. Optional informational field."
+    },
+    "narration_files": {
+      "type": "array",
+      "description": "Per-section TTS file inventory (ad-video). Each entry: section_id (matches script.sections[].id), file (path), duration_seconds.",
+      "items": {
+        "type": "object",
+        "required": ["section_id", "file"],
+        "additionalProperties": false,
+        "properties": {
+          "section_id": { "type": "string" },
+          "file": { "type": "string" },
+          "duration_seconds": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "subtitle_file": {
+      "type": "string",
+      "description": "Path to the generated subtitle file. Conventionally .ass for ad-video (libass needs PlayRes header for predictable sizing)."
+    },
+    "music_file": {
+      "type": "string",
+      "description": "Path to the generated/selected music track."
+    },
+    "narration_durations": {
+      "type": "object",
+      "description": "Map of section_id → seconds. Mirrors the section-level data in narration_files for quick lookup.",
+      "additionalProperties": { "type": "number", "minimum": 0 }
+    },
+    "visual_assets": {
+      "type": "array",
+      "description": "Optional ad-video supplement to assets[] for richer visual-asset metadata. Free-form items.",
+      "items": { "type": "object" }
+    },
+    "sample_clip": {
+      "type": "string",
+      "description": "Path to the 10–15s sample preview clip generated before full asset generation begins."
+    },
+    "total_narration_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Sum of narration_files[].duration_seconds. Should ≈ script.total_duration_seconds within ±5%."
+    },
+    "costs": {
+      "type": "array",
+      "description": "Per-tool cost log accumulated during asset generation. Sum equals total_cost_usd.",
+      "items": {
+        "type": "object",
+        "required": ["tool", "cost_usd"],
+        "additionalProperties": false,
+        "properties": {
+          "tool": { "type": "string" },
+          "cost_usd": { "type": "number", "minimum": 0 }
+        }
+      }
+    }
   },
   "additionalProperties": false
 }

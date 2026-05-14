@@ -1,13 +1,36 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "openmontage/artifacts/scene_plan",
+  "$id": "video-production-buddy/artifacts/scene_plan",
   "title": "Scene Plan",
   "description": "Ordered scene list produced by the Scene Planner agent.",
   "type": "object",
   "required": ["version", "scenes"],
   "properties": {
     "version": { "type": "string", "const": "1.0" },
+    "user_approved": {
+      "type": "boolean",
+      "description": "Ad-video scene-plan approval flag. Must be true before asset generation begins."
+    },
     "style_playbook": { "type": "string", "description": "Name of the active style playbook" },
+    "style_mode": {
+      "type": "string",
+      "enum": ["animated", "cinematic"],
+      "description": "Render mode locked at proposal. Carried into scene_plan so scene/asset directors can branch on it without re-reading production_proposal."
+    },
+    "total_duration_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Total scene-plan duration; should match the sum of scenes[].end_seconds and equal script.total_duration within ±0.5s."
+    },
+    "derivative_variants": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["9:16", "1:1", "15s", "15s_short"]
+      },
+      "uniqueItems": true,
+      "description": "Variant ids (e.g. '9:16', '1:1', '15s_short') the user opted into at proposal. Aspect-ratio variants require per-scene crop_regions; duration-only variants are handled by core-scene filtering. Mirrors production_proposal.derivatives_added."
+    },
     "scenes": {
       "type": "array",
       "items": {
@@ -20,6 +43,14 @@
             "enum": ["talking_head", "broll", "animation", "character_scene", "diagram", "text_card", "transition", "generated", "screen_recording"]
           },
           "description": { "type": "string" },
+          "emotional_target": {
+            "type": "string",
+            "description": "The intended emotional register for this scene, copied from the matching beat in production_bible.narrative.emotional_beat_sequence"
+          },
+          "visual_constraint": {
+            "type": "string",
+            "description": "Mandatory visual treatment for this scene, copied from the matching beat in production_bible.narrative.emotional_beat_sequence"
+          },
           "start_seconds": { "type": "number", "minimum": 0 },
           "end_seconds": { "type": "number", "minimum": 0 },
           "script_section_id": { "type": "string" },
@@ -94,6 +125,224 @@
             "items": { "type": "string" },
             "description": "Visual texture descriptors: grain, clean, anamorphic, gritty, ethereal, etc."
           },
+          "scene_type": {
+            "type": "string",
+            "description": "Optional fine-grained subtype used by ad-video animated/cinematic supplements (e.g. anime_scene, stat_card, text_card, callout). Free-form because the supplements add new types over time. Coexists with the coarse top-level `type` enum, which remains required."
+          },
+          "text": {
+            "type": "string",
+            "description": "Registry prop for text_card / hero_title scenes."
+          },
+          "brandName": {
+            "type": "string",
+            "description": "Registry prop for brand_card scenes."
+          },
+          "tagline": {
+            "type": "string",
+            "description": "Registry prop for brand_card scenes."
+          },
+          "ctaText": {
+            "type": "string",
+            "description": "Registry prop for brand_card scenes."
+          },
+          "productImage": {
+            "type": "string",
+            "description": "Approved product reference image for product-visible Remotion scenes such as creator_workflow_scene and brand_card."
+          },
+          "hardwareTreatment": {
+            "type": "string",
+            "enum": ["synthetic_laptop"],
+            "description": "Explicit opt-in for synthetic hardware treatment. Omit unless the user approved a generic laptop packshot; productImage always takes precedence."
+          },
+          "backgroundImage": {
+            "type": "string",
+            "description": "Screenshot/image backdrop used by screenshot_scene or other Remotion-native scene types."
+          },
+          "screenshotSize": {
+            "$ref": "#/$defs/screenshot_size",
+            "description": "Natural pixel size of backgroundImage for screenshot_scene overlay coordinate mapping."
+          },
+          "cursorStartAt": {
+            "$ref": "#/$defs/screenshot_point",
+            "description": "Starting cursor position for screenshot_scene as normalized [x, y]."
+          },
+          "screenshotSteps": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "#/$defs/screenshot_step" },
+            "description": "Scripted overlay/cursor actions for screenshot_scene."
+          },
+          "leftLabel": {
+            "type": "string",
+            "description": "Registry prop for line_connection_scene / comparison scenes."
+          },
+          "rightLabel": {
+            "type": "string",
+            "description": "Registry prop for line_connection_scene / comparison scenes."
+          },
+          "leftSubLabel": {
+            "type": "string",
+            "description": "Registry prop for line_connection_scene scenes."
+          },
+          "rightSubLabel": {
+            "type": "string",
+            "description": "Registry prop for line_connection_scene scenes."
+          },
+          "targetValue": {
+            "type": "number",
+            "description": "Registry prop for stat_roll_scene scenes."
+          },
+          "unitLabel": {
+            "type": "string",
+            "description": "Registry prop for stat_roll_scene scenes."
+          },
+          "subtitle": {
+            "type": "string",
+            "description": "Registry prop for stat_card / stat_roll_scene scenes."
+          },
+          "fulfills_kvm": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": [],
+            "description": "Key visual moment IDs from production_bible.visual.key_visual_moments fulfilled by this scene. Empty array means this scene fulfills no mandatory KVM."
+          },
+          "motion_specs": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": [],
+            "description": "Motion primitive IDs required for this scene. For animated ad-video scenes, every value must be supported by the selected remotion-composer scene_type_registry entry."
+          },
+          "style_layers": {
+            "type": "array",
+            "items": { "type": "object" },
+            "description": "Optional atmosphere/style layers for animated ad-video scenes. Layer object shapes are defined by remotion-composer/scene_type_registry.json#style_layers."
+          },
+          "duration_seconds": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Convenience field; equals end_seconds - start_seconds. Optional — start_seconds and end_seconds remain the canonical timing fields."
+          },
+          "beat": {
+            "type": "string",
+            "description": "Optional ad-video beat label (e.g. 'hook', 'build', 'reveal', 'cta'). Maps the scene to its production_bible.narrative.emotional_beat_sequence position."
+          },
+          "trend_alignment_refs": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^trend_alignment:[A-Za-z0-9._:-]+$"
+            },
+            "description": "Selected production_bible.intelligence.trend_alignment refs applied by this scene."
+          },
+          "trend_alignment_notes": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Visual or pacing instruction showing how the selected trend is adapted without copying source content."
+          },
+          "knowledge_alignment_refs": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^knowledge_alignment:[A-Za-z0-9._:-]+$"
+            },
+            "description": "Selected production_bible.intelligence.knowledge_alignment refs applied by this scene."
+          },
+          "knowledge_alignment_notes": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Professional producer-knowledge instruction showing how the selected doctrine shapes this scene."
+          },
+          "core": {
+            "type": "boolean",
+            "default": false,
+            "description": "True if this scene must appear in the 15s_short derivative cut. When derivative_variants includes '15s', sum of core-true scene durations must be ≤ 15s."
+          },
+          "motion_required": {
+            "type": "boolean",
+            "default": false,
+            "description": "True when the scene needs actual motion video (not a still). Enforces the motion-required hard rule for animated/cinematic ad-video runs."
+          },
+          "product_visibility": {
+            "type": "string",
+            "enum": ["none", "background", "partial", "hero", "detail", "packshot"],
+            "description": "How visibly the advertised product appears in this scene. Product-visible generated scenes must not rely on text-only identity prompting."
+          },
+          "product_reference_required": {
+            "type": "boolean",
+            "description": "True when the scene must be conditioned on an approved product_identity_reference or an explicit risk_accepted waiver before video generation."
+          },
+          "hallucination_checks": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Explicit truth-contract checks the asset director must review against generated keyframes before sample approval and asset review.",
+            "items": {
+              "type": "object",
+              "required": [
+                "check_id",
+                "category",
+                "requirement",
+                "prohibited_failure",
+                "severity",
+                "evidence_source"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "check_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Stable check id, e.g. HC-GEO-1."
+                },
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "objective_fact",
+                    "physical_plausibility",
+                    "product_geometry",
+                    "motion_coherence",
+                    "values_safety"
+                  ]
+                },
+                "requirement": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "prohibited_failure": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "severity": {
+                  "type": "string",
+                  "enum": ["blocker", "warning"]
+                },
+                "evidence_source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Where the requirement comes from, usually production_bible.truth_contract.<section>[n] or product_identity_reference."
+                }
+              }
+            }
+          },
+          "crop_regions": {
+            "type": "object",
+            "minProperties": 1,
+            "description": "Per-aspect-ratio crop rectangles for derivative renders. Keys are aspect-ratio strings (e.g. '9:16', '1:1'); values are {x, y, w, h} pixel rectangles into the primary frame.",
+            "propertyNames": {
+              "enum": ["9:16", "1:1"]
+            },
+            "additionalProperties": {
+              "type": "object",
+              "required": ["x", "y", "w", "h"],
+              "additionalProperties": false,
+              "properties": {
+                "x": { "type": "integer", "minimum": 0 },
+                "y": { "type": "integer", "minimum": 0 },
+                "w": { "type": "integer", "minimum": 1 },
+                "h": { "type": "integer", "minimum": 1 }
+              }
+            }
+          },
           "required_assets": {
             "type": "array",
             "items": {
@@ -107,11 +356,207 @@
             }
           }
         },
-        "additionalProperties": false
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "product_visibility": {
+                  "enum": ["background", "partial", "hero", "detail", "packshot"]
+                }
+              },
+              "required": ["product_visibility"]
+            },
+            "then": {
+              "required": ["product_reference_required"],
+              "properties": {
+                "product_reference_required": { "const": true }
+              }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "scene_type": { "const": "screenshot_scene" }
+            },
+            "required": ["scene_type"]
+          },
+          "then": {
+            "required": ["backgroundImage", "screenshotSteps"]
+          }
+        }
+      ],
+      "additionalProperties": false
       },
       "minItems": 1
     },
     "metadata": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["style_mode"],
+        "properties": {
+          "style_mode": { "enum": ["animated", "cinematic"] }
+        }
+      },
+      "then": {
+        "properties": {
+          "scenes": {
+            "items": {
+              "required": [
+                "core",
+                "motion_required",
+                "product_visibility",
+                "product_reference_required"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["derivative_variants"],
+        "properties": {
+          "derivative_variants": { "contains": { "const": "9:16" } }
+        }
+      },
+      "then": {
+        "properties": {
+          "scenes": {
+            "items": {
+              "required": ["crop_regions"],
+              "properties": {
+                "crop_regions": {
+                  "required": ["9:16"]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["derivative_variants"],
+        "properties": {
+          "derivative_variants": { "contains": { "const": "1:1" } }
+        }
+      },
+      "then": {
+        "properties": {
+          "scenes": {
+            "items": {
+              "required": ["crop_regions"],
+              "properties": {
+                "crop_regions": {
+                  "required": ["1:1"]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "screenshot_point": {
+      "type": "array",
+      "prefixItems": [
+        { "type": "number", "minimum": 0, "maximum": 1 },
+        { "type": "number", "minimum": 0, "maximum": 1 }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "screenshot_region": {
+      "type": "object",
+      "required": ["x", "y", "w", "h"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number", "minimum": 0, "maximum": 1 },
+        "y": { "type": "number", "minimum": 0, "maximum": 1 },
+        "w": { "type": "number", "minimum": 0, "maximum": 1 },
+        "h": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "screenshot_size": {
+      "type": "object",
+      "required": ["width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "width": { "type": "number", "exclusiveMinimum": 0 },
+        "height": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "screenshot_step": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "cursor_move" } } },
+          "then": { "required": ["to"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "click_pulse" } } },
+          "then": { "required": ["at"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "type_into" } } },
+          "then": { "required": ["region", "text"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "bubble_append" } } },
+          "then": { "required": ["region", "text"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "typing_dots" } } },
+          "then": { "required": ["at"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "highlight_box" } } },
+          "then": { "required": ["region"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "callout_balloon" } } },
+          "then": { "required": ["anchor", "text"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "pause" } } },
+          "then": { "required": ["seconds"] }
+        }
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "cursor_move",
+            "click_pulse",
+            "type_into",
+            "bubble_append",
+            "typing_dots",
+            "highlight_box",
+            "callout_balloon",
+            "pause"
+          ]
+        },
+        "to": { "$ref": "#/$defs/screenshot_point" },
+        "at": { "$ref": "#/$defs/screenshot_point" },
+        "anchor": { "$ref": "#/$defs/screenshot_point" },
+        "region": { "$ref": "#/$defs/screenshot_region" },
+        "text": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "assistant"] },
+        "position": { "type": "string", "enum": ["top", "bottom", "left", "right"] },
+        "durationSeconds": { "type": "number", "minimum": 0 },
+        "seconds": { "type": "number", "minimum": 0 },
+        "typeSpeed": { "type": "number", "exclusiveMinimum": 0 },
+        "fontSize": { "type": "number", "exclusiveMinimum": 0 },
+        "color": { "type": "string" },
+        "stream": { "type": "boolean" },
+        "pulses": { "type": "integer", "minimum": 0 }
+      }
+    }
   },
   "additionalProperties": false
 }

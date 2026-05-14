@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "openmontage/artifacts/script",
+  "$id": "video-production-buddy/artifacts/script",
   "title": "Production Script",
   "description": "Timestamped script produced by the Script Writer agent.",
   "type": "object",
@@ -9,6 +9,34 @@
     "version": { "type": "string", "const": "1.0" },
     "title": { "type": "string" },
     "total_duration_seconds": { "type": "number", "minimum": 1 },
+    "style_mode": {
+      "type": "string",
+      "enum": ["animated", "cinematic"],
+      "description": "Render mode locked at proposal. Carried into script so script-director can branch on tone/pacing without re-reading production_proposal."
+    },
+    "target_duration_seconds": {
+      "type": "number",
+      "minimum": 1,
+      "description": "Aspirational duration target from the proposal. total_duration_seconds is the actual sum-of-sections; the two should agree within ±10%."
+    },
+    "target_words": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Word budget = round(target_duration_seconds * words_per_second). Optional convenience field."
+    },
+    "total_words": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Actual total word count across all sections — sum of sections[].word_count."
+    },
+    "cta": {
+      "type": "string",
+      "description": "Final call-to-action line (e.g. 'Start free at flowcut.io'). Optional — duplicates content from the cta_brand section but surfaced at root for downstream stages."
+    },
+    "brand_name": {
+      "type": "string",
+      "description": "Brand name as it appears in the cta_brand section. Optional — surfaced at root for asset-director / publish-director consumption."
+    },
     "sections": {
       "type": "array",
       "items": {
@@ -20,7 +48,64 @@
           "text": { "type": "string" },
           "start_seconds": { "type": "number", "minimum": 0 },
           "end_seconds": { "type": "number", "minimum": 0 },
+          "beat": {
+            "type": "string",
+            "description": "Optional ad-video beat label (e.g. 'hook', 'build', 'reveal', 'cta_brand'). Maps the section to its production_bible.narrative.emotional_beat_sequence position."
+          },
+          "word_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Word count of section.text. Sum across sections should equal script.total_words."
+          },
+          "duration_estimate_seconds": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Estimated section duration before TTS generation; should ≈ end_seconds - start_seconds. start_seconds + end_seconds remain canonical."
+          },
+          "mode_annotations": {
+            "type": "object",
+            "description": "Per-mode visual treatment cues for ad-video. Scene-director consumes these when expanding sections into scenes.",
+            "additionalProperties": false,
+            "properties": {
+              "animated": { "type": "string", "description": "What the animated treatment shows during this section." },
+              "cinematic": { "type": "string", "description": "What the cinematic treatment shows during this section." }
+            }
+          },
           "speaker_directions": { "type": "string" },
+          "voice_performance": {
+            "type": "object",
+            "description": "Structured per-section delivery controls for ad-video TTS. Mirrors production_proposal.audio_contract.voice_performance while adapting emotion, intonation, rhythm, and pauses to this beat.",
+            "required": ["emotion", "intonation", "rhythm", "pace", "pause_after_seconds"],
+            "additionalProperties": false,
+            "properties": {
+              "emotion": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Specific emotion for this section, e.g. intrigue, relief, confidence."
+              },
+              "intonation": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Section-specific pitch movement, emphasis, and resolve."
+              },
+              "rhythm": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Section-specific phrase rhythm, breath placement, and anti-monotony notes."
+              },
+              "pace": {
+                "type": "string",
+                "enum": ["measured", "conversational", "energetic", "urgent", "slow"],
+                "description": "Human-readable pace label; tts_directive.speed_mult remains the numeric control."
+              },
+              "pause_after_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 2,
+                "description": "Desired silence/breath room after this section before the next narration beat."
+              }
+            }
+          },
           "enhancement_cues": {
             "type": "array",
             "items": {
@@ -46,12 +131,38 @@
           },
           "source_ref": {
             "type": "string",
-            "description": "Reference to the research_brief data point or URL that supports this claim. Every factual claim should be traceable."
+            "description": "Reference to the research_brief data point, URL, production_bible.intelligence.trend_alignment source_ref, or production_bible.intelligence.knowledge_alignment source_ref that supports this claim or creative application. Every factual claim and selected trend/knowledge use should be traceable."
+          },
+          "source_refs": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Multiple references supporting this section. Use when one hook/build section carries several production_bible.intelligence.trend_alignment or knowledge_alignment source_ref values."
+          },
+          "tts_directive": {
+            "type": "object",
+            "description": "Path A: per-section TTS pacing derived from the bible's beat intensity by lib.intensity_curve.derive_tts_directive. asset-director maps speed_mult to the active provider's speed/rate parameter (cosyvoice 'speed', etc.). Optional; absence = baseline 1.0 speed (legacy behavior).",
+            "required": ["speed_mult"],
+            "properties": {
+              "speed_mult": {
+                "type": "number",
+                "minimum": 0.5,
+                "maximum": 2.0,
+                "description": "Multiplier on the provider's nominal speech rate. Bounded to the cosyvoice safe range; most providers accept this."
+              }
+            },
+            "additionalProperties": false
           }
         },
         "additionalProperties": false
       },
       "minItems": 1
+    },
+    "user_approved": {
+      "type": "boolean",
+      "default": false,
+      "description": "True only after user has explicitly approved the narration text. Ad-video manifest success_criteria requires this before TTS generation begins."
     },
     "metadata": { "type": "object" }
   },

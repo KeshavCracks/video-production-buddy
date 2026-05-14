@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "openmontage/artifacts/decision_log",
+  "$id": "video-production-buddy/artifacts/decision_log",
   "title": "Decision Log",
   "description": "Audit trail of every meaningful choice made during production. Prevents hidden system behavior, enables reviewer inspection, and guards against context drift.",
   "type": "object",
@@ -34,12 +34,16 @@
               "budget_tradeoff",
               "downgrade_approval",
               "music_source",
+              "music_strategy_selection",
               "motion_commitment",
+              "product_identity_reference_selection",
               "concept_selection",
               "voice_selection",
               "capability_extension",
               "playbook_override",
-              "visual_accuracy_check"
+              "visual_accuracy_check",
+              "hallucination_review_waiver",
+              "trend_knowledge_conflict_resolution"
             ],
             "description": "What class of decision this is"
           },

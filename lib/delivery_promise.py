@@ -212,13 +212,16 @@ def classify_from_brief(
         "cinematic": PromiseType.MOTION_LED,
         "animated-explainer": PromiseType.DATA_EXPLAINER,
         "animation": PromiseType.MOTION_LED,
-        "talking-head": PromiseType.AVATAR_PRESENTER,
+        "talking-head": PromiseType.SOURCE_LED,
         "avatar-spokesperson": PromiseType.AVATAR_PRESENTER,
         "screen-demo": PromiseType.SCREEN_DEMO,
         "hybrid": PromiseType.HYBRID,
         "localization-dub": PromiseType.LOCALIZATION,
         "podcast-repurpose": PromiseType.SOURCE_LED,
         "clip-factory": PromiseType.SOURCE_LED,
+        "ad-video": PromiseType.MOTION_LED,
+        "character-animation": PromiseType.MOTION_LED,
+        "documentary-montage": PromiseType.SOURCE_LED,
     }
 
     promise_type = pipeline_defaults.get(pipeline_type, PromiseType.HYBRID)
@@ -231,7 +234,13 @@ def classify_from_brief(
         PromiseType.MOTION_LED, PromiseType.AVATAR_PRESENTER,
     ))
 
-    source_required = user_intent.get("has_footage", False)
+    if "has_footage" in user_intent:
+        source_required = bool(user_intent["has_footage"])
+    else:
+        source_required = promise_type in (
+            PromiseType.SOURCE_LED,
+            PromiseType.LOCALIZATION,
+        )
     if source_required and promise_type not in (PromiseType.SOURCE_LED, PromiseType.LOCALIZATION):
         promise_type = PromiseType.SOURCE_LED
 

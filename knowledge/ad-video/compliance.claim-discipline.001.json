@@ -1,0 +1,68 @@
+{
+  "card_id": "compliance.claim-discipline.001",
+  "version": "1.0",
+  "domain": "commercial_compliance",
+  "summary": "Commercial craft includes claim discipline: every strong promise must be either sourced, visually demonstrated, or softened.",
+  "principles": [
+    "Separate objective claims (measurable, verifiable) from emotional impressions (subjective, experiential) and treat them differently.",
+    "Block superlatives ('best,' 'fastest,' 'number one'), quantified results ('2x faster'), and competitor comparisons unless the brief supplies substantiation.",
+    "Convert unsupported certainty into experiential language ('feels faster') or remove it entirely.",
+    "Every visual that implies a product capability must be achievable in real use — generated visuals that exaggerate performance are compliance violations.",
+    "Testimonial and social-proof claims require disclosure of typical results; unrepresentative outcomes are deceptive.",
+    "Fine print is not a cure for misleading main content — if the main claim is deceptive, a disclaimer doesn't fix it.",
+    "Generated visuals carry special compliance risk because they can show capabilities the product doesn't have — hallucination checks on every product-visible scene."
+  ],
+  "apply_when": [
+    "The ad contains performance, health, beauty, productivity, safety, finance, or comparative claims.",
+    "The user provided selling points but not substantiation.",
+    "Generated visuals could imply more than the product can prove."
+  ],
+  "avoid_when": [
+    "The script uses only subjective mood and brand identity language.",
+    "The campaign already has approved legal copy for each claim.",
+    "The brief explicitly marks a claim as fictional or parody."
+  ],
+  "downstream_targets": [
+    "script",
+    "scene_plan",
+    "cta_brand"
+  ],
+  "keywords": [
+    "compliance",
+    "claim",
+    "legal",
+    "substantiation",
+    "superlative",
+    "competitor",
+    "safety",
+    "truth"
+  ],
+  "source_type": "video-production-buddy-curated",
+  "content_hash": "sha256:d40fb2469c280ba353b0909e5b1869dfaee221350afb9dd39ec4747a71d52f43",
+  "failure_patterns": [
+    "Superlative that can't be substantiated: 'the best camera on any phone' when no independent test supports the claim.",
+    "Generated visual that implies a capability: AI-generated footage showing a product feature that doesn't exist in the real product.",
+    "Before/after that exaggerates results: the visual contrast implies a transformation the product can't deliver for most users.",
+    "Testimonial without disclosure: showing exceptional results without noting 'results may vary' or 'sponsored content.'"
+  ],
+  "cross_domain_notes": [
+    {
+      "domain": "hook_mechanic",
+      "note": "The hook's visual contrast must not exaggerate beyond what the product can actually deliver — a compliance violation in the first second is fatal."
+    },
+    {
+      "domain": "proof_logic",
+      "note": "Proof must be proportional to evidence: if the evidence is weak, the claim must be softened, not the proof made more dramatic."
+    },
+    {
+      "domain": "visual_rhetoric",
+      "note": "Product hero continuity must not drift into product misrepresentation — consistency is about accuracy, not idealization."
+    }
+  ],
+  "execution_techniques": [
+    "Create a claim inventory at the script stage: list every claim, tag it as objective or subjective, and verify each objective claim has evidence.",
+    "Run hallucination checks on every product-visible generated clip: compare against the reference image and flag any capability the clip implies.",
+    "Use experiential language framing for unsupported claims: 'Designed to feel faster' instead of '2x faster.'",
+    "Include a compliance checkpoint in the production bible that lists every claim and its substantiation status before any asset generation."
+  ]
+}
