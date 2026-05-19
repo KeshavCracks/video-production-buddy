@@ -189,3 +189,18 @@ def test_reviewer_has_critical_finding_for_single_option_runtime():
         "Reviewer skill doesn't flag single-option render_runtime_selection "
         "as CRITICAL — the conversation contract has no teeth."
     )
+
+
+def test_user_facing_hyperframes_docs_use_public_npx_command():
+    """User-facing HyperFrames docs must point at the runtime command OpenMontage uses."""
+    docs = [
+        ROOT / "PROMPT_GALLERY.md",
+        SKILLS_DIR / "meta" / "onboarding.md",
+    ]
+    for path in docs:
+        body = path.read_text(encoding="utf-8")
+        assert "npx @hyperframes/cli" not in body, (
+            f"{path.relative_to(ROOT)} still recommends the monorepo-internal "
+            "HyperFrames package name; use `npx hyperframes` instead."
+        )
+        assert "npx hyperframes" in body

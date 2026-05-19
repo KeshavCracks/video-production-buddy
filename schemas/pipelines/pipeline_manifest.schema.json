@@ -11,7 +11,7 @@
     "description": { "type": "string" },
     "category": {
       "type": "string",
-      "enum": ["talking_head", "generated", "hybrid", "screen_recording", "animation", "cinematic", "custom"]
+      "enum": ["talking_head", "generated", "hybrid", "screen_recording", "animation", "cinematic", "documentary", "custom"]
     },
     "stability": {
       "type": "string",
@@ -121,6 +121,36 @@
       "type": "string",
       "enum": ["guided", "manual_all", "auto_noncreative"],
       "default": "guided"
+    },
+    "production_modes": {
+      "type": "array",
+      "description": "Optional pipeline-specific production modes that a planning skill can choose between.",
+      "items": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "required_tools": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "optional_tools": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "scene_type": { "type": "string" },
+          "agent_skills": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "best_for": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "additionalProperties": false
+      }
     },
     "reference_input": {
       "type": "object",

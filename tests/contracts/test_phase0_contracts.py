@@ -506,6 +506,19 @@ class TestCheckpoint:
 # ---- Pipeline manifests ----
 
 class TestPipelineManifests:
+    def test_all_pipeline_manifests_load_through_loader(self):
+        failures = {}
+        for name in list_pipelines():
+            try:
+                load_pipeline(name)
+            except Exception as exc:  # pragma: no cover - failure path is the assertion payload
+                failures[name] = f"{type(exc).__name__}: {exc}"
+
+        assert not failures, (
+            "Every manifest in pipeline_defs/ must validate through "
+            f"lib.pipeline_loader.load_pipeline(); failures: {failures}"
+        )
+
     def test_framework_smoke_manifest_loads(self):
         manifest = load_pipeline("framework-smoke")
         assert manifest["name"] == "framework-smoke"

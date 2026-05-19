@@ -53,7 +53,7 @@ entries in the provider menu. Report each one's availability separately:
   Best for React-based scene components (text cards, stat cards, charts),
   word-level captions, and the `TalkingHead` avatar composition.
 - **HyperFrames** requires Node.js ≥ 22 + `npx` + FFmpeg. Consumed via
-  `npx @hyperframes/cli` (no monorepo checkout required). Best for
+  `npx hyperframes` (no monorepo checkout required). Best for
   HTML/CSS/GSAP motion graphics — kinetic typography, product promos,
   launch reels, website-to-video workflows, registry blocks.
 
