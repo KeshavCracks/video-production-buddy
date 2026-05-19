@@ -28,7 +28,8 @@
         "language_voiceover",
         "mandatory_marketing",
         "cta",
-        "product_fidelity_references"
+        "product_fidelity_references",
+        "truth_and_safety_constraints"
       ],
       "additionalProperties": false,
       "properties": {
@@ -41,7 +42,8 @@
         "language_voiceover": { "$ref": "#/definitions/creative_requirement_dimension" },
         "mandatory_marketing": { "$ref": "#/definitions/creative_requirement_dimension" },
         "cta": { "$ref": "#/definitions/creative_requirement_dimension" },
-        "product_fidelity_references": { "$ref": "#/definitions/creative_requirement_dimension" }
+        "product_fidelity_references": { "$ref": "#/definitions/creative_requirement_dimension" },
+        "truth_and_safety_constraints": { "$ref": "#/definitions/creative_requirement_dimension" }
       }
     },
     "product_brief": {

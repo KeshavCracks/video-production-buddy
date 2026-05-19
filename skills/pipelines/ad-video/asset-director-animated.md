@@ -43,6 +43,10 @@ Output: `assets/scene_{id}_bg.png`, 1920×1080
 
 For `motion_loop` and `product_demo` scenes:
 
+Read `scene.hallucination_checks[]` before prompting any generated visual. Product/app
+UI demos are high-risk even in motion-graphics mode because generated frames can invent
+screens, logos, or impossible interactions.
+
 If `scene.product_reference_required == true`, load the approved
 `product_identity_reference` first. Preserve product identity with provider
 `reference_to_video` when supported, otherwise generate a reference-constrained scene
@@ -50,6 +54,10 @@ keyframe and animate it with image-to-video. Do not use text-only product-demo p
 unless `product_identity_reference.source_type == "risk_accepted"` and the waiver is
 user-approved. Record the result in
 `asset_manifest.assets[].product_identity_conditioning`.
+
+After generation, record `asset_manifest.assets[].hallucination_review` from
+start/mid/end keyframe review. Any blocker `FLAG` requires regeneration or rerouting
+before the asset can be shown as approved.
 
 Provider: Wan 2.7 (Bailian/DashScope) — primary
 Fallback: Kling

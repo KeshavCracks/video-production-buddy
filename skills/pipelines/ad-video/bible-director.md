@@ -148,6 +148,32 @@ preference being contradicted.
 
 ### Step 3 — Build visual contract
 
+- Build `production_bible.truth_contract` before scene planning. Start from
+  `enriched_brief.creative_requirements.truth_and_safety_constraints`, then add
+  source-backed facts from the user-approved brief, product fidelity requirements,
+  brand constraints, and intelligence findings. This is the explicit truth contract
+  downstream stages use to prevent objective-fact, physical-plausibility,
+  product-geometry, motion-coherence, and values/safety hallucinations.
+- Required `truth_contract` sections:
+  - `objective_facts`: product/model/brand facts, claims, CTA, platform, and any
+    facts that must not be invented or renamed.
+  - `physical_constraints`: real-world plausibility limits for people, products,
+    packaging, app UI, environments, and interactions.
+  - `product_geometry_rules`: visible product/app/packaging geometry, screen sides,
+    camera/marking/logo placement, forbidden mutations, and reference-image anchors.
+    For non-physical services, include UI/brand identity rules or an explicit
+    not-applicable rule.
+  - `motion_coherence_rules`: continuity rules checked across start/mid/end keyframes,
+    including camera path, hand-object interactions, UI state continuity, and
+    impossible teleport/deformation failures.
+  - `values_guardrails`: legal, brand, safety, cultural, and claim boundaries from the
+    brief and brand constraints.
+- Every rule must include `rule_id`, `requirement`, `prohibited_failure`,
+  `evidence_source`, and `source_confidence`. Use `source-backed` whenever the
+  rule comes from the user, a provided reference asset, brand guide, product identity
+  reference, or cited intelligence. Use `director-verified` only for physical
+  plausibility rules that are common-sense but still explicit.
+
 - `visual_motifs`: from `hit_ads_analyzed`. `mandatory=true` only for motifs in ≥3 ads
   AND not in `rejected_approaches`
 - `editing_rhythm`: map from `recommendations.editing_rhythm_by_beat`; carry
@@ -302,6 +328,10 @@ Generate at minimum:
 - CP-S{n} (timing, structural) + CP-S{n}a (content, semantic) per beat
 - CP-V{n} (presence, structural) per mandatory visual_motif
 - CP-V{n} (structural, structural) per mandatory key_visual_moment
+- HC-* source rules are NOT compliance_manifest checkpoints. They live in
+  `truth_contract` and are expanded by scene-director into
+  `scene_plan.scenes[].hallucination_checks[]`, then verified by the
+  asset-director keyframe review.
 - CP-E{n} (timing, structural) per editing_rhythm entry
 - CP-B1 (presence, structural) — brand name in final scene
 - CP-B3 (presence, structural) — prohibited elements (negated check)

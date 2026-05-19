@@ -162,6 +162,57 @@
             "type": "boolean",
             "description": "True when the scene must be conditioned on an approved product_identity_reference or an explicit risk_accepted waiver before video generation."
           },
+          "hallucination_checks": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Explicit truth-contract checks the asset director must review against generated keyframes before sample approval and asset review.",
+            "items": {
+              "type": "object",
+              "required": [
+                "check_id",
+                "category",
+                "requirement",
+                "prohibited_failure",
+                "severity",
+                "evidence_source"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "check_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Stable check id, e.g. HC-GEO-1."
+                },
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "objective_fact",
+                    "physical_plausibility",
+                    "product_geometry",
+                    "motion_coherence",
+                    "values_safety"
+                  ]
+                },
+                "requirement": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "prohibited_failure": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "severity": {
+                  "type": "string",
+                  "enum": ["blocker", "warning"]
+                },
+                "evidence_source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Where the requirement comes from, usually production_bible.truth_contract.<section>[n] or product_identity_reference."
+                }
+              }
+            }
+          },
           "crop_regions": {
             "type": "object",
             "minProperties": 1,

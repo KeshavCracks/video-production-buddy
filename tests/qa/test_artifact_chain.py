@@ -197,6 +197,53 @@ PRODUCTION_BIBLE_VALID = {
             {"approach": "generic tagline", "reason": "No differentiation"},
         ],
     },
+    "truth_contract": {
+        "objective_facts": [
+            {
+                "rule_id": "TC-FACT-1",
+                "requirement": "Advertised product is Acme Productivity App.",
+                "prohibited_failure": "Rename the product or imply a different app.",
+                "evidence_source": "enriched_brief.product_brief.product_name",
+                "source_confidence": "source-backed",
+            }
+        ],
+        "physical_constraints": [
+            {
+                "rule_id": "TC-PHYS-1",
+                "requirement": "People, phones, laptops, and desks remain physically plausible.",
+                "prohibited_failure": "Warped hands, impossible device geometry, or floating props without context.",
+                "evidence_source": "director physical plausibility review",
+                "source_confidence": "director-verified",
+            }
+        ],
+        "product_geometry_rules": [
+            {
+                "rule_id": "TC-GEO-1",
+                "requirement": "Preserve Acme app UI identity, Acme logo, and CTA domain.",
+                "prohibited_failure": "Invented app name, unrelated UI, missing Acme logo, or wrong domain.",
+                "evidence_source": "brand_constraints.mandatory_elements",
+                "source_confidence": "source-backed",
+            }
+        ],
+        "motion_coherence_rules": [
+            {
+                "rule_id": "TC-MOTION-1",
+                "requirement": "Notification, UI, and workspace motion remains continuous across keyframes.",
+                "prohibited_failure": "Teleporting UI panels, discontinuous hand pose, or impossible perspective jump.",
+                "evidence_source": "production_bible.visual.key_visual_moments",
+                "source_confidence": "director-verified",
+            }
+        ],
+        "values_guardrails": [
+            {
+                "rule_id": "TC-VALUES-1",
+                "requirement": "No unsupported productivity, medical, safety, or competitor claims.",
+                "prohibited_failure": "Unapproved quantified claim or competitor disparagement.",
+                "evidence_source": "brand_constraints.prohibited_elements",
+                "source_confidence": "source-backed",
+            }
+        ],
+    },
     "visual": {
         "style_mode": "animated",
         "render_runtime": "remotion",

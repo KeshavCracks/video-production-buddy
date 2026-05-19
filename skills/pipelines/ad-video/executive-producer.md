@@ -164,6 +164,10 @@ CHECK: Script user approval gate
 ```
 CHECK: Duration coverage
 - sum(scene.duration_seconds) within ±0.5s of sum(script.sections[].duration_estimate_seconds)
+CHECK: Hallucination checks
+- Every high-risk generated scene has hallucination_checks[] derived from production_bible.truth_contract
+- Product-visible scenes include product_geometry blocker checks
+- Generated lifestyle/environment scenes include objective_fact, physical_plausibility, motion_coherence, and values_safety checks where applicable
 CHECK: Derivative readiness — CRITICAL
 - If derivative_variants non-empty:
     Every scene must have crop_regions with entries for each opted-in variant
@@ -180,6 +184,9 @@ CHECK: Sample gate — two-message protocol enforced
 - product_identity_reference exists before sample generation
 - If any scene has product_reference_required=true, product_identity_consistency_check must PASS or WARN before asset review
 - If product_identity_consistency_check FAILs: REVISE assets before sample/full generation continues
+- hallucination_contract_check must PASS or WARN before sample approval, asset_review, compose, and publish
+- If hallucination_contract_check FAILs: REVISE assets; blocker FLAG verdicts require regeneration or rerouting
+- Any hallucination-review waiver must have a user-approved decision_log entry with category hallucination_review_waiver
 - Was the sample path announced in message 1 WITHOUT a content description?
 - Was the approval request sent in a SEPARATE message 2?
 - sample_approved must be true before full generation proceeds
@@ -273,8 +280,8 @@ Actual: {what was produced}
 | G1 | idea | Brief completeness, style_mode_candidate, ref role annotations | Revise idea |
 | G2 | proposal | User approval, style_mode locked, product reference strategy locked, derivatives locked | Wait for user |
 | G3 | script | Word count ±10%, four beats, brand name in CTA | Revise script |
-| G4 | scene_plan | Duration coverage, crop_regions if derivatives, core tagging | Revise scene_plan |
-| G5 | assets | product_identity_reference approved/waived, sample_approved, asset_review_approved, music_review_approved, TTS required, budget | Send-back or revise |
+| G4 | scene_plan | Duration coverage, crop_regions if derivatives, core tagging, hallucination_checks for high-risk scenes | Revise scene_plan |
+| G5 | assets | product_identity_reference approved/waived, hallucination_contract_check PASS/WARN, sample_approved, asset_review_approved, music_review_approved, TTS required, budget | Send-back or revise |
 | G6 | edit | Timeline complete, ducking -18 dB, subtitle opt-in captured (not required true) | Revise edit |
 | G7 | compose | Duration ±5%, one file per derivative | Revise compose |
 | G8 | publish | output_file_matrix non-empty, metadata complete | Revise publish |
@@ -305,7 +312,8 @@ CHECK: Brief enrichment approval — HARD STOP if not satisfied
   VERIFY: all 6 sections populated (no empty strings);
           creative_requirements contains product_model, core_selling_points,
           platform_duration, target_audience, tone_style, visual_approach,
-          language_voiceover, mandatory_marketing, cta, and product_fidelity_references;
+          language_voiceover, mandatory_marketing, cta, product_fidelity_references,
+          and truth_and_safety_constraints;
           every creative_requirements.*.source is FROM BRIEF or DELEGATED;
           no required worksheet dimension is INFERRED;
           narrative_arc has exactly 5 beats;
@@ -324,6 +332,9 @@ CHECK: Bible approval — HARD STOP if any condition fails
   IF production_bible.identity.cta is null:
     STOP. "CTA missing — bible-director must collect CTA at Round 2b before advancing."
     (This catches a bible-director bug — cta should never be null when execution_approved=true.)
+  VERIFY: production_bible.truth_contract contains objective_facts, physical_constraints,
+          product_geometry_rules, motion_coherence_rules, and values_guardrails with
+          non-empty source-backed requirements.
   ONLY THEN: advance to idea-director.
 ```
 

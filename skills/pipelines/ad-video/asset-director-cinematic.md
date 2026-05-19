@@ -20,9 +20,9 @@ color grade: {aligned to playbook primary palette}
 
 Output: `assets/scene_{id}_img.jpg`, 1920×1080, JPEG quality 95
 
-### Reference-Aware Branching (run BEFORE picking a video tool)
+### Reference-Aware + Truth-Contract Branching (run BEFORE picking a video tool)
 
-**Brand-fidelity rule:** Wan 2.6 / 2.7 t2v cannot reliably render specific product geometry (lens count, button placement, brand-mark colors) from prose alone. For ANY scene where the advertised product or brand-mandatory element is visible, branch:
+**Brand-fidelity rule:** Wan 2.6 / 2.7 t2v cannot reliably render specific product geometry (lens count, button placement, brand-mark colors) from prose alone. For ANY high-risk scene, read `scene.hallucination_checks[]` before prompting. For ANY scene where the advertised product or brand-mandatory element is visible, branch:
 
 ```python
 scene_shows_product = scene.get("product_reference_required") is True
@@ -50,12 +50,17 @@ elif scene_shows_product and product_ref["source_type"] == "risk_accepted":
     operation = "text_to_video"
 else:
     # No product in frame — text-to-video is fine for environmental / lifestyle-only scenes.
+    # It still requires scene.hallucination_checks[] and post-generation
+    # hallucination_review when the scene is type="generated".
     operation = "text_to_video"
 ```
 
 After each product-visible generated asset, record
 `asset_manifest.assets[].product_identity_conditioning` with the approved reference id/path,
 conditioning mode, generation tool/model, and fidelity verdict from the visual sanity check.
+Also record `asset_manifest.assets[].hallucination_review` after start/mid/end keyframe
+review against `scene.hallucination_checks[]`. A blocker `FLAG` must regenerate or reroute;
+do not present it as a finished asset.
 
 **Rationale:** without an approved Product Identity Reference, the agent is gambling that Wan happens to generate a phone shape similar to the actual product. For brand-paying advertisers, this is unacceptable risk. The `reference_assets/` convention remains the preferred source when the user has real product photography, but the approved `product_identity_reference` artifact is the contract downstream stages inspect.
 

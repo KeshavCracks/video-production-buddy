@@ -4,7 +4,7 @@
   "title": "Production Bible",
   "description": "Machine-readable contract between pre-production and production. Downstream stages validate against compliance_manifest.",
   "type": "object",
-  "required": ["version", "pipeline", "project_id", "approval", "identity", "narrative", "intelligence", "visual", "audio", "brand_constraints", "deliverables", "compliance_manifest"],
+  "required": ["version", "pipeline", "project_id", "approval", "identity", "narrative", "intelligence", "truth_contract", "visual", "audio", "brand_constraints", "deliverables", "compliance_manifest"],
   "properties": {
     "version": { "type": "string", "const": "1.0" },
     "pipeline": { "type": "string", "const": "ad-video" },
@@ -191,6 +191,50 @@
       },
       "additionalProperties": false
     },
+    "truth_contract": {
+      "type": "object",
+      "description": "Source-backed truth and safety contract for ad-video generation. Scene plans derive hallucination_checks from these rules; asset review verifies generated keyframes against them before compose/publish.",
+      "required": [
+        "objective_facts",
+        "physical_constraints",
+        "product_geometry_rules",
+        "motion_coherence_rules",
+        "values_guardrails"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "objective_facts": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/truth_contract_rule" },
+          "description": "Objective claims that must remain true in script, scenes, assets, and final edit."
+        },
+        "physical_constraints": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/truth_contract_rule" },
+          "description": "Physical plausibility constraints for people, products, environments, and interactions."
+        },
+        "product_geometry_rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/truth_contract_rule" },
+          "description": "Recognizable product/app/packaging geometry and brand-marking rules. For non-physical services, include UI/brand identity rules or an explicit not-applicable rule."
+        },
+        "motion_coherence_rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/truth_contract_rule" },
+          "description": "Continuity and motion rules checked across start/mid/end keyframes."
+        },
+        "values_guardrails": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/truth_contract_rule" },
+          "description": "Safety, values, legal, and brand-compliance guardrails."
+        }
+      }
+    },
     "visual": {
       "type": "object",
       "required": ["style_mode"],
@@ -372,6 +416,45 @@
               }
             }
           }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "truth_contract_rule": {
+      "type": "object",
+      "required": ["rule_id", "requirement", "prohibited_failure", "evidence_source", "source_confidence"],
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable id, e.g. TC-GEO-1."
+        },
+        "requirement": {
+          "type": "string",
+          "minLength": 1,
+          "description": "What must remain true."
+        },
+        "prohibited_failure": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Concrete hallucination or safety failure that must not reach final render."
+        },
+        "evidence_source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Source backing this rule: user brief field, cited research, product_identity_reference path, brand guide, or explicit director validation."
+        },
+        "source_confidence": {
+          "type": "string",
+          "enum": ["source-backed", "research-grounded", "director-verified", "user-approved-waiver"],
+          "description": "How firmly the rule is grounded."
+        },
+        "applies_to": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Optional scene ids, beat ids, or artifact fields the rule targets."
         }
       }
     }

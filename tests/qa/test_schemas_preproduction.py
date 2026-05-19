@@ -195,6 +195,14 @@ def _minimal_creative_requirements() -> dict:
             "basis": "User supplied CTA copy.",
         },
         "product_fidelity_references": delegated(),
+        "truth_and_safety_constraints": {
+            "value": (
+                "Preserve product facts, packaging geometry, physically plausible use, "
+                "and avoid unsupported medical or safety claims."
+            ),
+            "source": "FROM BRIEF",
+            "basis": "User supplied product-fidelity and prohibited-claim requirements.",
+        },
     }
 
 
@@ -653,6 +661,53 @@ MINIMAL_BIBLE = {
         "rejected_approaches": [
             {"approach": "Celebrity endorsement", "reason": "Budget out of scope"}
         ]
+    },
+    "truth_contract": {
+        "objective_facts": [
+            {
+                "rule_id": "TC-FACT-1",
+                "requirement": "Advertised product is Acme App.",
+                "prohibited_failure": "Rename or imply a different app.",
+                "evidence_source": "enriched_brief.product_brief.product_name",
+                "source_confidence": "source-backed",
+            }
+        ],
+        "physical_constraints": [
+            {
+                "rule_id": "TC-PHYS-1",
+                "requirement": "Phone and hand interactions remain physically plausible.",
+                "prohibited_failure": "Impossible hand pose, floating UI without context, or warped device.",
+                "evidence_source": "director physical plausibility review",
+                "source_confidence": "director-verified",
+            }
+        ],
+        "product_geometry_rules": [
+            {
+                "rule_id": "TC-GEO-1",
+                "requirement": "Preserve Acme app UI identity and brand mark placement.",
+                "prohibited_failure": "Invented app name, unrelated UI, or missing Acme mark.",
+                "evidence_source": "brand_constraints.mandatory_elements",
+                "source_confidence": "source-backed",
+            }
+        ],
+        "motion_coherence_rules": [
+            {
+                "rule_id": "TC-MOTION-1",
+                "requirement": "UI and gesture motion remain continuous across keyframes.",
+                "prohibited_failure": "Teleporting UI, discontinuous gesture, or impossible perspective jump.",
+                "evidence_source": "production_bible.visual.key_visual_moments",
+                "source_confidence": "director-verified",
+            }
+        ],
+        "values_guardrails": [
+            {
+                "rule_id": "TC-VALUES-1",
+                "requirement": "No unsupported productivity, safety, or competitor claims.",
+                "prohibited_failure": "Unapproved quantified claim or competitor disparagement.",
+                "evidence_source": "brand_constraints.prohibited_elements",
+                "source_confidence": "source-backed",
+            }
+        ],
     },
     "visual": {
         "style_mode": "animated",

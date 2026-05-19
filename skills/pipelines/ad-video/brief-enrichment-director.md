@@ -106,6 +106,9 @@ Required `creative_requirements` dimensions:
 - `product_fidelity_references` — product photos/app screenshots/brand assets by path,
   public reference URLs, `generate concept reference`, explicit `risk waiver`, or
   `not applicable`.
+- `truth_and_safety_constraints` — objective product facts, physical plausibility limits,
+  geometry/marking rules, motion-continuity risks, values/safety/legal guardrails, and
+  the source for each where available.
 
 For physical products or any product-visible ad, this worksheet line is the first
 user-facing Product Identity Reference choice. A concept reference is not a diagram; it
@@ -131,8 +134,9 @@ line you want me to choose as creative director.
 8. Mandatory marketing: [prefill or recommendation]
 9. CTA: [prefill or recommendation]
 10. Product fidelity references: [provided path/URL, generate concept reference, risk waiver, or not applicable]
+11. Truth and safety constraints: [source-backed facts, physical limits, geometry rules, values/legal guardrails, or recommend]
 
-Reply with edits, or say APPROVE WORKSHEET. You can also say "RECOMMEND FOR ME: 5, 6, 10".
+Reply with edits, or say APPROVE WORKSHEET. You can also say "RECOMMEND FOR ME: 5, 6, 10, 11".
 ```
 
 When parsing the response:
@@ -339,7 +343,7 @@ After APPROVE received:
 1. Assemble the `enriched_brief` JSON matching `schemas/artifacts/enriched_brief.schema.json`
 2. Validate:
    - All required fields present and non-empty
-   - `creative_requirements` has all 10 required dimensions
+   - `creative_requirements` has all 11 required dimensions
    - Every `creative_requirements.*.source` is `FROM BRIEF` or `DELEGATED`
    - No required worksheet dimension is `INFERRED`
    - `narrative_arc` has exactly 5 items
@@ -359,7 +363,7 @@ After APPROVE received:
 | Music Direction | Full arc paragraph with 4 phases AND "-18 dB under narration" explicit |
 | Key lines | 3 complete sentences — not placeholders, not half-lines |
 | Prohibited Elements | At least 3 rules specific to this product category |
-| Creative Requirements Worksheet | All 10 required dimensions present; each is FROM BRIEF or DELEGATED |
+| Creative Requirements Worksheet | All 11 required dimensions present; each is FROM BRIEF or DELEGATED |
 | Hypothesis Flags | Every inferred or delegated dimension listed; basis is specific, not "creative judgment" |
 
 ## Common Pitfalls

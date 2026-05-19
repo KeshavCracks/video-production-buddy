@@ -109,6 +109,119 @@
                 }
               }
             ]
+          },
+          "hallucination_review": {
+            "type": "object",
+            "description": "Agent/human keyframe review against scene_plan.scenes[].hallucination_checks. Required by hallucination_contract_check for generated visual assets in high-risk ad-video scenes.",
+            "required": [
+              "status",
+              "keyframe_paths",
+              "check_verdicts",
+              "reviewer"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["PASS", "WARN", "FLAG", "WAIVED", "NOT_REVIEWED"]
+              },
+              "keyframe_paths": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "string", "minLength": 1 },
+                "description": "Extracted keyframes used for review. Video clips should include start/mid/end frames under assets/keyframes/<scene_id>/."
+              },
+              "check_verdicts": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "required": ["check_id", "category", "status", "notes"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "check_id": { "type": "string", "minLength": 1 },
+                    "category": {
+                      "type": "string",
+                      "enum": [
+                        "objective_fact",
+                        "physical_plausibility",
+                        "product_geometry",
+                        "motion_coherence",
+                        "values_safety"
+                      ]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["PASS", "WARN", "FLAG", "WAIVED"]
+                    },
+                    "severity": {
+                      "type": "string",
+                      "enum": ["blocker", "warning"],
+                      "description": "Copied from the scene hallucination check when available."
+                    },
+                    "notes": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              },
+              "reviewer": {
+                "type": "object",
+                "required": ["type", "reviewed_at", "method"],
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": ["agent", "human"]
+                  },
+                  "reviewer_id": { "type": "string" },
+                  "reviewed_at": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "ISO-like timestamp recorded by the reviewing agent or human gate."
+                  },
+                  "method": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Example: start_mid_end_keyframe_review."
+                  }
+                }
+              },
+              "regeneration_action": {
+                "type": "object",
+                "required": ["action", "reason"],
+                "additionalProperties": false,
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": ["none", "regenerate", "reroute", "human_waiver"]
+                  },
+                  "reason": { "type": "string", "minLength": 1 },
+                  "decision_id": {
+                    "type": "string",
+                    "description": "decision_log.decisions[].decision_id when action=human_waiver."
+                  }
+                }
+              },
+              "waiver_decision_id": {
+                "type": "string",
+                "description": "decision_log.decisions[].decision_id for an explicit user-approved hallucination-review waiver."
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "status": { "const": "WAIVED" }
+                  },
+                  "required": ["status"]
+                },
+                "then": {
+                  "required": ["waiver_decision_id"]
+                }
+              }
+            ]
           }
         },
         "additionalProperties": false

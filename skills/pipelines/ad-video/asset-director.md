@@ -197,9 +197,13 @@ generated assets:
   then animate it with image-to-video and record `scene_keyframe_to_video`.
 - Use `text_only_waived` only when the approved strategy is `risk_accepted`.
 
-Before sample approval and again before asset review, run
-`product_identity_consistency_check` against `product_identity_reference`, `scene_plan`,
-and `asset_manifest`. A FAIL blocks progress. A WARN must be shown during asset review.
+Before sample approval and again before asset review, run:
+- `product_identity_consistency_check` against `product_identity_reference`, `scene_plan`,
+  and `asset_manifest`
+- `hallucination_contract_check` against `production_bible`, `scene_plan`,
+  `asset_manifest`, and `decision_log`
+
+A FAIL blocks progress. A WARN must be shown during asset review.
 
 ## Sample Sub-Stage (Always Runs)
 
@@ -396,20 +400,33 @@ Empty intensity_curve → empty arc → falls back to the legacy mood-only
 prompt. Empty av_sync_notes → no suffix appended. No behavior change for
 legacy briefs without these fields.
 
-### Step 4.5: Agent Visual Sanity Check (REQUIRED before asset review)
+### Step 4.5: Agent Hallucination Review (REQUIRED before sample approval and asset review)
 
-**Purpose:** catch obvious tool failures (no product visible, wrong aspect ratio, severe artifacts, fingerprints of compositing) BEFORE bothering the user with asset_review. The user's review should be about creative judgment ("does the Hasselblad color sing?"), not about catching gross failures the agent should have flagged.
+**Purpose:** catch objective-fact, physical-plausibility, product-geometry, motion-coherence,
+and values/safety failures BEFORE they reach sample approval, asset_review, compose, or
+publish. The user's review should be about creative judgment ("does the Hasselblad color
+sing?"), not about catching known blocker hallucinations the agent should have flagged.
 
 **Workflow:**
 
-1. For each video clip in `asset_manifest.assets[]`, extract 3 keyframes (start / middle / end) using the existing `frame_sampler` tool:
+1. For each generated video clip in `asset_manifest.assets[]` linked to a scene with
+   `hallucination_checks[]`, extract 3 keyframes (start / middle / end) using the
+   existing `frame_sampler` tool before sample approval and again before full asset review:
 
    ```python
    from tools.analysis.frame_sampler import FrameSampler
    from pathlib import Path
 
    sampler = FrameSampler()
-   for asset in [a for a in asset_manifest["assets"] if a["type"] == "video"]:
+   high_risk_scene_ids = {
+       s["id"]
+       for s in scene_plan["scenes"]
+       if s.get("hallucination_checks")
+   }
+   for asset in [
+       a for a in asset_manifest["assets"]
+       if a["type"] == "video" and a.get("scene_id") in high_risk_scene_ids
+   ]:
        scene_id = asset["scene_id"]
        duration = asset.get("duration_seconds", 5)
        output_dir = Path(f"assets/keyframes/{scene_id}")
@@ -426,31 +443,77 @@ legacy briefs without these fields.
            continue
    ```
 
-2. Read each keyframe PNG and check:
+2. Read each keyframe PNG and evaluate every
+   `scene_plan.scenes[].hallucination_checks[]` entry for that scene:
 
    | Check | What it catches |
    |---|---|
-   | Brand-mandatory element visible? | Wan generated a generic phone instead of the OPPO/Hasselblad reference; the orange dot is missing; the device isn't in frame at all |
+   | Objective facts | Wrong product/model, invented claim, wrong CTA, wrong app/service name |
+   | Physical plausibility | Six-finger hands, impossible bend/deformation, unsupported floating objects |
+   | Product geometry | Wan generated a generic phone instead of the OPPO/Hasselblad reference; the orange dot is missing; the device isn't in frame at all |
+   | Motion coherence | Product teleports between start/mid/end keyframes; hand pose or UI state jumps impossibly |
+   | Values/safety | Unsafe use depiction, unapproved competitor/medical/superiority claim |
    | Aspect ratio correct? | Tool defaulted to landscape when 9:16 was required (the wan2.6-t2v + resolution-preset trap) |
-   | Severe artifacts? | Hand has 6 fingers; product is impossibly distorted; obvious AI-generation tells |
    | Real-light continuity intact? | Greenscreen seam visible; floating-product compositing fingerprint |
    | Color science on-brief? | Hasselblad-Natural-Color was specified but the output is over-saturated or blown out |
 
-3. For each scene, record a one-line verdict in `asset_manifest.metadata.visual_sanity[]`:
+3. For each generated visual asset, record `asset_manifest.assets[].hallucination_review`:
 
    ```json
-   "visual_sanity": [
-     {"scene_id": "scene-1", "verdict": "PASS", "notes": "Orange dot visible at t=2.0s; 9:16 confirmed; no artifacts"},
-     {"scene_id": "scene-3", "verdict": "FLAG", "notes": "Lagos market scene generated without device in frame — must regen with explicit prompt"},
-     {"scene_id": "scene-7", "verdict": "WARN", "notes": "Hero ring rotation looks plausibly OPPO but lens deck has 4 lenses, not the spec'd 3"}
-   ]
+   {
+     "status": "PASS",
+     "keyframe_paths": [
+       "assets/keyframes/scene-1/start.png",
+       "assets/keyframes/scene-1/mid.png",
+       "assets/keyframes/scene-1/end.png"
+     ],
+     "check_verdicts": [
+       {
+         "check_id": "HC-GEO-1",
+         "category": "product_geometry",
+         "status": "PASS",
+         "severity": "blocker",
+         "notes": "Camera island and brand mark match the approved reference in all three frames."
+       }
+     ],
+     "reviewer": {
+       "type": "agent",
+       "reviewed_at": "2026-05-19T09:00:00Z",
+       "method": "start_mid_end_keyframe_review"
+     }
+   }
    ```
 
-4. **If any FLAG verdicts:** regenerate those scenes (or surface to user with the keyframes attached) BEFORE presenting Step 5 asset_review. WARN verdicts can pass through to user — they're judgment calls.
+4. Run `hallucination_contract_check`:
 
-5. **Skip rule:** if frame_sampler is unavailable (ffmpeg missing) OR the agent's runtime cannot read PNGs (no multimodal capability), skip this step and surface the limitation in `asset_manifest.metadata.visual_sanity_skipped` with the reason. Asset_review remains the human safety net.
+   ```python
+   from tools.validation.hallucination_contract_check import check_hallucination_contract
 
-**Why this matters:** Wan 2.6 t2v has no reliable mechanism to render specific brand product geometry from prose alone — it generates plausible-looking generic objects. Without this sanity check, agents present the user with clips where the device may not match the brand at all, wasting the user's review time and forcing late-stage regeneration. This step is cheap (FFmpeg keyframe extraction is free) and catches the most expensive class of failure.
+   verdict = check_hallucination_contract(
+       production_bible,
+       scene_plan,
+       asset_manifest,
+       decision_log,
+   )
+   ```
+
+   - `FAIL` blocks sample approval, asset_review, compose, and publish.
+   - `FLAG` on any blocker check requires regeneration or rerouting, not silent acceptance.
+   - `WARN` can pass through to human asset review with the keyframe paths and notes.
+   - `WAIVED` requires an explicit user-approved `decision_log` entry with category
+     `hallucination_review_waiver`; otherwise it fails validation.
+
+5. **Skip rule:** if frame_sampler is unavailable (ffmpeg missing) OR the agent's runtime
+   cannot read PNGs (no multimodal capability), stop and surface the limitation. Do not
+   mark generated high-risk assets as PASS. Either reroute to stock/programmatic assets,
+   ask the user for a waiver, or record `hallucination_review.status="WAIVED"` with a
+   user-approved `hallucination_review_waiver` decision.
+
+**Why this matters:** Wan 2.6 t2v has no reliable mechanism to render specific brand
+product geometry from prose alone — it generates plausible-looking generic objects.
+Prompt improvements help, but they are not sufficient mitigation. The pipeline must
+prevent bad prompts through `truth_contract`, route high-risk visuals away from raw
+text-to-video when possible, and block compose/publish until keyframe review is recorded.
 
 ### Step 5: Asset Review Gate (REQUIRED before compose)
 

@@ -11,6 +11,7 @@ import pytest
 import yaml
 
 from schemas.artifacts import validate_artifact
+from tools.validation.hallucination_contract_check import check_hallucination_contract
 from tools.validation.product_identity_consistency_check import (
     check_product_identity_consistency,
 )
@@ -206,6 +207,344 @@ def test_asset_manifest_schema_accepts_product_identity_conditioning_metadata() 
         validate_artifact("asset_manifest", bad)
 
 
+def test_enriched_brief_schema_requires_truth_and_safety_constraints_dimension() -> None:
+    """G-0 must capture explicit truth/safety constraints before enrichment."""
+    from tests.qa.test_schemas_preproduction import _minimal_enriched_brief
+
+    brief = _minimal_enriched_brief()
+    validate_artifact("enriched_brief", brief)
+
+    bad = deepcopy(brief)
+    del bad["creative_requirements"]["truth_and_safety_constraints"]
+    with pytest.raises(Exception):
+        validate_artifact("enriched_brief", bad)
+
+    bad = deepcopy(brief)
+    bad["creative_requirements"]["truth_and_safety_constraints"]["source"] = "INFERRED"
+    with pytest.raises(Exception):
+        validate_artifact("enriched_brief", bad)
+
+
+def test_production_bible_schema_requires_truth_contract() -> None:
+    """The bible must carry the broader truth contract used by scene/assets gates."""
+    from tests.qa.test_artifact_chain import PRODUCTION_BIBLE_VALID
+
+    bible = deepcopy(PRODUCTION_BIBLE_VALID)
+    validate_artifact("production_bible", bible)
+
+    bad = deepcopy(bible)
+    del bad["truth_contract"]
+    with pytest.raises(Exception):
+        validate_artifact("production_bible", bad)
+
+    bad = deepcopy(bible)
+    bad["truth_contract"]["product_geometry_rules"] = []
+    with pytest.raises(Exception):
+        validate_artifact("production_bible", bad)
+
+
+def _hallucination_check(check_id: str = "HC-PRODUCT-GEOMETRY") -> dict:
+    return {
+        "check_id": check_id,
+        "category": "product_geometry",
+        "requirement": "Phone camera island remains circular with three visible lenses and OPPO wordmark.",
+        "prohibited_failure": "Generic rectangular camera bar, wrong lens count, or missing OPPO mark.",
+        "severity": "blocker",
+        "evidence_source": "truth_contract.product_geometry_rules[0]",
+    }
+
+
+def _truth_contract() -> dict:
+    return {
+        "objective_facts": [
+            {
+                "rule_id": "TC-FACT-1",
+                "requirement": "Advertised product name is OPPO Find X9 Pro.",
+                "prohibited_failure": "Renaming or implying a different model.",
+                "evidence_source": "enriched_brief.product_brief.product_name",
+                "source_confidence": "source-backed",
+            }
+        ],
+        "physical_constraints": [
+            {
+                "rule_id": "TC-PHYS-1",
+                "requirement": "The phone remains rigid; it does not bend, melt, split, or float without support.",
+                "prohibited_failure": "Impossible deformation or unsupported levitation.",
+                "evidence_source": "physical-product plausibility",
+                "source_confidence": "director-verified",
+            }
+        ],
+        "product_geometry_rules": [
+            {
+                "rule_id": "TC-GEO-1",
+                "requirement": "Preserve circular rear camera island, visible lens layout, and brand mark placement.",
+                "prohibited_failure": "Generic phone silhouette, changed camera layout, or invented markings.",
+                "evidence_source": "product_identity_reference.required_visual_features",
+                "source_confidence": "source-backed",
+            }
+        ],
+        "motion_coherence_rules": [
+            {
+                "rule_id": "TC-MOTION-1",
+                "requirement": "Camera motion and object motion remain continuous across start/mid/end keyframes.",
+                "prohibited_failure": "Teleporting product, discontinuous hand pose, or impossible perspective jump.",
+                "evidence_source": "scene_plan.motion_specs",
+                "source_confidence": "director-verified",
+            }
+        ],
+        "values_guardrails": [
+            {
+                "rule_id": "TC-VALUES-1",
+                "requirement": "Do not imply medical, safety, or competitor claims absent from the approved brief.",
+                "prohibited_failure": "Unapproved superiority claim or unsafe product-use depiction.",
+                "evidence_source": "enriched_brief.brand_guideline.prohibited_elements",
+                "source_confidence": "source-backed",
+            }
+        ],
+    }
+
+
+def _bible_with_truth_contract() -> dict:
+    return {"truth_contract": _truth_contract()}
+
+
+def _scene_plan_for_hallucination(
+    *,
+    include_checks: bool = True,
+    text_card: bool = False,
+) -> dict:
+    scene = {
+        "id": "scene-1",
+        "type": "text_card" if text_card else "generated",
+        "description": "Hero shot of OPPO Find X9 Pro camera island.",
+        "start_seconds": 0,
+        "end_seconds": 5,
+        "core": True,
+        "motion_required": not text_card,
+        "product_visibility": "none" if text_card else "hero",
+        "product_reference_required": not text_card,
+    }
+    if include_checks:
+        scene["hallucination_checks"] = [_hallucination_check()]
+    return {"version": "1.0", "style_mode": "cinematic", "scenes": [scene]}
+
+
+def _asset_manifest_for_hallucination(
+    *,
+    include_review: bool = True,
+    review_status: str = "PASS",
+    check_status: str = "PASS",
+    waiver_decision_id: str | None = None,
+) -> dict:
+    asset = {
+        "id": "scene-1-video",
+        "type": "video",
+        "path": "assets/video/scene-1.mp4",
+        "source_tool": "wan_video_api",
+        "scene_id": "scene-1",
+        "model": "wan2.7-i2v",
+    }
+    if include_review:
+        review = {
+            "status": review_status,
+            "keyframe_paths": [
+                "assets/keyframes/scene-1/start.png",
+                "assets/keyframes/scene-1/mid.png",
+                "assets/keyframes/scene-1/end.png",
+            ],
+            "check_verdicts": [
+                {
+                    "check_id": "HC-PRODUCT-GEOMETRY",
+                    "category": "product_geometry",
+                    "status": check_status,
+                    "severity": "blocker",
+                    "notes": "Reviewed start/mid/end keyframes against the approved product reference.",
+                }
+            ],
+            "reviewer": {
+                "type": "agent",
+                "reviewed_at": "2026-05-19T09:00:00Z",
+                "method": "start_mid_end_keyframe_review",
+            },
+        }
+        if waiver_decision_id:
+            review["waiver_decision_id"] = waiver_decision_id
+        asset["hallucination_review"] = review
+    return {"version": "1.0", "assets": [asset]}
+
+
+def _approved_hallucination_waiver_log() -> dict:
+    return {
+        "version": "1.0",
+        "project_id": "hallucination-waiver-regression",
+        "decisions": [
+            {
+                "decision_id": "d-waive-001",
+                "stage": "assets",
+                "category": "hallucination_review_waiver",
+                "subject": "Waive warned product-geometry review for scene-1",
+                "options_considered": [
+                    {
+                        "option_id": "regenerate",
+                        "label": "Regenerate",
+                        "score": 0.7,
+                        "reason": "Would reduce geometry ambiguity at extra cost.",
+                    },
+                    {
+                        "option_id": "waive",
+                        "label": "Waive",
+                        "score": 0.6,
+                        "reason": "User accepted the visible keyframe risk for this sample.",
+                    },
+                ],
+                "selected": "waive",
+                "reason": "User explicitly approved the waiver after seeing keyframes.",
+                "user_visible": True,
+                "user_approved": True,
+            }
+        ],
+    }
+
+
+def test_scene_plan_schema_accepts_hallucination_checks() -> None:
+    """Scene plans must carry explicit checks for generated high-risk visuals."""
+    scene_plan = _scene_plan_for_hallucination()
+    validate_artifact("scene_plan", scene_plan)
+
+    bad = deepcopy(scene_plan)
+    del bad["scenes"][0]["hallucination_checks"][0]["prohibited_failure"]
+    with pytest.raises(Exception):
+        validate_artifact("scene_plan", bad)
+
+
+def test_asset_manifest_schema_accepts_hallucination_review() -> None:
+    """Asset manifests must record keyframe review verdicts for generated clips."""
+    manifest = _asset_manifest_for_hallucination()
+    validate_artifact("asset_manifest", manifest)
+
+    bad = deepcopy(manifest)
+    del bad["assets"][0]["hallucination_review"]["reviewer"]
+    with pytest.raises(Exception):
+        validate_artifact("asset_manifest", bad)
+
+    bad = deepcopy(manifest)
+    bad["assets"][0]["hallucination_review"]["status"] = "WAIVED"
+    with pytest.raises(Exception):
+        validate_artifact("asset_manifest", bad)
+
+    waived = deepcopy(manifest)
+    waived["assets"][0]["hallucination_review"]["status"] = "WAIVED"
+    waived["assets"][0]["hallucination_review"]["waiver_decision_id"] = "d-waive-001"
+    validate_artifact("asset_manifest", waived)
+
+
+def test_hallucination_contract_rejects_missing_scene_checks_for_high_risk_scene() -> None:
+    verdict = check_hallucination_contract(
+        _bible_with_truth_contract(),
+        _scene_plan_for_hallucination(include_checks=False),
+        {"version": "1.0", "assets": []},
+    )
+
+    assert verdict["status"] == "FAIL"
+    assert any("hallucination_checks" in issue for issue in verdict["issues"])
+
+
+def test_hallucination_contract_rejects_missing_asset_review() -> None:
+    verdict = check_hallucination_contract(
+        _bible_with_truth_contract(),
+        _scene_plan_for_hallucination(),
+        _asset_manifest_for_hallucination(include_review=False),
+    )
+
+    assert verdict["status"] == "FAIL"
+    assert any("hallucination_review" in issue for issue in verdict["issues"])
+
+
+def test_hallucination_contract_rejects_blocker_flag() -> None:
+    verdict = check_hallucination_contract(
+        _bible_with_truth_contract(),
+        _scene_plan_for_hallucination(),
+        _asset_manifest_for_hallucination(review_status="FLAG", check_status="FLAG"),
+    )
+
+    assert verdict["status"] == "FAIL"
+    assert any("FLAG" in issue for issue in verdict["issues"])
+
+
+def test_hallucination_contract_accepts_product_visible_scene_with_review() -> None:
+    verdict = check_hallucination_contract(
+        _bible_with_truth_contract(),
+        _scene_plan_for_hallucination(),
+        _asset_manifest_for_hallucination(),
+    )
+
+    assert verdict["status"] == "PASS"
+    assert verdict["summary"]["high_risk_scenes"] == 1
+    assert verdict["summary"]["reviewed_assets"] == 1
+
+
+def test_hallucination_contract_accepts_approved_waiver() -> None:
+    verdict = check_hallucination_contract(
+        _bible_with_truth_contract(),
+        _scene_plan_for_hallucination(),
+        _asset_manifest_for_hallucination(
+            review_status="WAIVED",
+            check_status="WAIVED",
+            waiver_decision_id="d-waive-001",
+        ),
+        _approved_hallucination_waiver_log(),
+    )
+
+    assert verdict["status"] == "WARN"
+    assert verdict["summary"]["waivers"] == 1
+
+
+def test_hallucination_contract_rejects_visual_accuracy_decision_for_waiver() -> None:
+    decision_log = _approved_hallucination_waiver_log()
+    decision_log["decisions"][0]["category"] = "visual_accuracy_check"
+
+    verdict = check_hallucination_contract(
+        _bible_with_truth_contract(),
+        _scene_plan_for_hallucination(),
+        _asset_manifest_for_hallucination(
+            review_status="WAIVED",
+            check_status="WAIVED",
+            waiver_decision_id="d-waive-001",
+        ),
+        decision_log,
+    )
+
+    assert verdict["status"] == "FAIL"
+    assert any("hallucination_review_waiver" in issue for issue in verdict["issues"])
+
+
+def test_hallucination_contract_rejects_waiver_without_user_approval() -> None:
+    verdict = check_hallucination_contract(
+        _bible_with_truth_contract(),
+        _scene_plan_for_hallucination(),
+        _asset_manifest_for_hallucination(
+            review_status="WAIVED",
+            check_status="WAIVED",
+            waiver_decision_id="d-waive-001",
+        ),
+        {"version": "1.0", "project_id": "missing-waiver", "decisions": []},
+    )
+
+    assert verdict["status"] == "FAIL"
+    assert any("waiver" in issue.lower() for issue in verdict["issues"])
+
+
+def test_hallucination_contract_accepts_non_product_text_card_without_checks() -> None:
+    verdict = check_hallucination_contract(
+        _bible_with_truth_contract(),
+        _scene_plan_for_hallucination(include_checks=False, text_card=True),
+        {"version": "1.0", "assets": []},
+    )
+
+    assert verdict["status"] == "PASS"
+    assert verdict["summary"]["high_risk_scenes"] == 0
+
+
 def test_ad_video_scene_plan_schema_requires_scene_governance_fields() -> None:
     """Ad-video scene plans must carry fields used by derivative and motion gates."""
     scene_plan = {
@@ -334,6 +673,7 @@ def test_brief_enrichment_director_requires_creative_requirements_worksheet_befo
     assert "`mandatory_marketing`" in brief_enrichment
     assert "`cta`" in brief_enrichment
     assert "`product_fidelity_references`" in brief_enrichment
+    assert "`truth_and_safety_constraints`" in brief_enrichment
     assert "RECOMMEND FOR ME" in brief_enrichment
     assert "FROM BRIEF or DELEGATED" in brief_enrichment
 
@@ -354,6 +694,7 @@ def test_executive_producer_gate_g0_checks_creative_requirements() -> None:
     assert "creative_requirements" in ep
     assert "product_model" in ep
     assert "product_fidelity_references" in ep
+    assert "truth_and_safety_constraints" in ep
     assert "FROM BRIEF or DELEGATED" in ep
 
 
@@ -837,3 +1178,55 @@ def test_ad_video_contract_mentions_product_identity_reference_flow() -> None:
     assert "product_identity_reference_selection" in proposal
     assert "product_identity_reference_selection" in ep
     assert "`product_identity_reference` + `asset_manifest`" in guide
+
+
+def test_ad_video_contract_mentions_hallucination_flow() -> None:
+    """Manifest and director skills must expose the truth-contract review flow."""
+    manifest = _load_ad_video_manifest()
+    guide = (ROOT / "AGENT_GUIDE.md").read_text(encoding="utf-8")
+    reviewer = (ROOT / "skills" / "meta" / "reviewer.md").read_text(encoding="utf-8")
+    bible = _read_skill("bible-director.md")
+    scene = _read_skill("scene-director.md")
+    asset = _read_skill("asset-director.md")
+    cinematic_asset = _read_skill("asset-director-cinematic.md")
+    animated_asset = _read_skill("asset-director-animated.md")
+    ep = _read_skill("executive-producer.md")
+
+    brief_enrichment_stage = next(stage for stage in manifest["stages"] if stage["name"] == "brief_enrichment")
+    bible_stage = next(stage for stage in manifest["stages"] if stage["name"] == "bible")
+    scene_stage = next(stage for stage in manifest["stages"] if stage["name"] == "scene_plan")
+    asset_stage = next(stage for stage in manifest["stages"] if stage["name"] == "assets")
+    compose_stage = next(stage for stage in manifest["stages"] if stage["name"] == "compose")
+    publish_stage = next(stage for stage in manifest["stages"] if stage["name"] == "publish")
+    contract_text = "\n".join(
+        brief_enrichment_stage.get("review_focus", [])
+        + bible_stage.get("review_focus", [])
+        + bible_stage.get("success_criteria", [])
+        + scene_stage.get("review_focus", [])
+        + scene_stage.get("success_criteria", [])
+        + asset_stage.get("review_focus", [])
+        + asset_stage.get("success_criteria", [])
+        + compose_stage.get("review_focus", [])
+        + publish_stage.get("review_focus", [])
+    )
+
+    assert "truth_and_safety_constraints" in contract_text
+    assert "truth_contract" in contract_text
+    assert "hallucination_checks" in contract_text
+    assert "hallucination_review" in contract_text
+    assert "hallucination_contract_check" in contract_text
+    assert "FLAG" in contract_text
+    assert "hallucination_review_waiver" in contract_text
+
+    assert "`production_bible.truth_contract`" in guide
+    assert "`hallucination_checks[]`" in guide
+    assert "`asset_manifest.assets[].hallucination_review`" in guide
+    assert "`hallucination_review_waiver`" in guide
+    assert "production_bible.truth_contract" in bible
+    assert "`scene_plan.scenes[].hallucination_checks[]`" in bible
+    assert "`hallucination_checks[]`" in scene
+    assert "hallucination_contract_check" in asset
+    assert "hallucination_review" in cinematic_asset
+    assert "hallucination_review" in animated_asset
+    assert "hallucination_contract_check" in ep
+    assert "Ad-Video Hallucination Review" in reviewer

@@ -58,6 +58,7 @@ stages:
   review_focus:
     - user_approved == true (G-0 requires explicit APPROVE reply — not implicit agreement)
     - creative_requirements contains every required worksheet dimension before enriched brief approval
+    - creative_requirements.truth_and_safety_constraints captures objective facts, physical constraints, geometry, motion coherence, and values/safety guardrails
     - every creative_requirements.*.source is FROM BRIEF or DELEGATED
     - No required worksheet dimension is INFERRED
     - All 5 narrative arc beats populated with full visual + emotional + key_action detail
@@ -103,8 +104,10 @@ stages:
     - deliverables.primary aspect_ratio matches platform default
     - rejected_approaches present in intelligence section
     - cta is non-null (must be set before execution_approved=true)
+    - truth_contract contains objective_facts, physical_constraints, product_geometry_rules, motion_coherence_rules, and values_guardrails
   success_criteria:
     - Schema-valid production_bible with both approval flags true
+    - production_bible.truth_contract is populated with source-backed requirements
 
 - name: idea
   skill: pipelines/ad-video/idea-director
@@ -186,6 +189,7 @@ stages:
     for text_card and packshot scene types'
   - product_visibility and product_reference_required present on every scene
   - Product-visible generated scenes set product_reference_required=true
+  - High-risk generated scenes include hallucination_checks derived from production_bible.truth_contract
   - Total scene duration covers script duration (±0.5s)
   - crop_regions present on every scene with entries for every opted-in derivative variant
   - core field present on every scene
@@ -195,6 +199,7 @@ stages:
   - scene_plan artifact produced
   - sum(scene.duration) within ±0.5s of total script duration
   - Product-visible scenes declare product_visibility != none and product_reference_required=true
+  - Generated high-risk scenes declare hallucination_checks with check_id, category, requirement, prohibited_failure, severity, and evidence_source
   - 'If derivative_variants non-empty: all scenes have crop_regions entries for every selected variant'
 - name: assets
   skill: pipelines/ad-video/asset-director
@@ -256,6 +261,8 @@ stages:
     - All scene assets match scene_plan required_assets
     - Style consistency across all generated images
     - asset_manifest complete with all required files
+    - Generated high-risk visual assets record hallucination_review with start/mid/end keyframe paths and per-check verdicts
+    - hallucination_contract_check returns PASS or documented WARN before asset review
     - narration_durations populated in EP_STATE
     - subtitle_file present in asset_manifest
   - name: asset_review
@@ -282,6 +289,9 @@ stages:
   - Sample sub-stage includes at least one product-visible scene (not chronological-only
     if product appears late)
   - product_identity_consistency_check returns PASS or documented WARN before asset review
+  - hallucination_contract_check returns PASS or documented WARN before sample approval and before asset review
+  - blocker FLAG hallucination verdicts regenerate or reroute before compose
+  - hallucination-review waivers have user-approved decision_log entries with category hallucination_review_waiver
   - no text-only generation for product-visible scenes unless risk_accepted is user-approved
   - sample_approved == true before full generation proceeds
   - asset_review_approved == true before compose begins
@@ -292,6 +302,8 @@ stages:
   - product_identity_reference artifact produced
   - asset_manifest artifact produced
   - Product-visible generated assets record product_identity_conditioning metadata
+  - Generated high-risk visual assets record hallucination_review metadata
+  - No blocker hallucination_review FLAG reaches compose
   - sample_approved == true
   - asset_review_approved == true
   - music_review_approved == true
@@ -332,6 +344,8 @@ stages:
   - audio_mixer
   review_focus:
   - Primary render complete at declared aspect_ratio_primary (16:9 or 9:16)
+  - asset_manifest has no blocker hallucination_review FLAG before render
+  - hallucination_contract_check previously passed or warned with documented user-approved waiver
   - crop_regions verified present before each derivative render
   - Each derivative is a separate output file
   - Duration within ±5% of target
@@ -350,6 +364,7 @@ stages:
   checkpoint_required: false
   review_focus:
   - output_file_matrix present with all rendered files
+  - no blocker hallucination_review FLAG or unapproved waiver is present in the published asset_manifest
   - 'Metadata complete: title, description, tags, platform targets'
   - Thumbnail concept written
   success_criteria:

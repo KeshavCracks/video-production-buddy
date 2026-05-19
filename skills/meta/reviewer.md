@@ -124,8 +124,8 @@ Structure your review as:
 | proposal | Delivery promise clarity, renderer family AND render runtime selection, music/voice plan, decision log started |
 | idea | Hook uniqueness, research depth, angle diversity |
 | script | Timing accuracy, narrative arc, enhancement cue density |
-| scene_plan | Full coverage, visual variety, asset feasibility, slideshow risk score |
-| assets | File existence, style consistency, budget adherence |
+| scene_plan | Full coverage, visual variety, asset feasibility, slideshow risk score, hallucination_checks for high-risk ad-video scenes |
+| assets | File existence, style consistency, budget adherence, hallucination_review for generated high-risk visuals |
 | edit | Timeline coverage, audio sync, subtitle presence, delivery promise compliance |
 | compose | Playability, duration accuracy, audio quality, pre-compose validation pass |
 | publish | SEO quality, metadata completeness, export packaging |
@@ -210,6 +210,35 @@ Run at **every stage** after proposal. The decision log (`schemas/artifacts/deci
 - Missing decision log after proposal: **SUGGESTION** (first time), **CRITICAL** (if still missing at edit stage)
 - Decision with only 1 option considered: **SUGGESTION** — "Log rejected alternatives for auditability"
 - All decisions at confidence 1.0: **SUGGESTION** — "Unrealistic confidence — at least provider selection involves tradeoffs"
+
+## Ad-Video Hallucination Review
+
+Run at **scene_plan**, **assets**, **compose**, and **publish** for the `ad-video`
+pipeline.
+
+### Checks
+
+1. **Truth contract presence:** `production_bible.truth_contract` must include objective
+   facts, physical constraints, product geometry rules, motion-coherence rules, and
+   values/safety guardrails. Missing contract: **CRITICAL**.
+2. **Scene check coverage:** every high-risk generated scene must include
+   `hallucination_checks[]` with check_id, category, requirement, prohibited_failure,
+   severity, and evidence_source. Missing checks: **CRITICAL**.
+3. **Keyframe review evidence:** generated high-risk visual assets must include
+   `hallucination_review.keyframe_paths` and per-check verdicts. Missing review:
+   **CRITICAL**.
+4. **Blocker verdicts:** any `FLAG` on a blocker check must regenerate or reroute before
+   compose/publish. A blocker `FLAG` in the final asset manifest is **CRITICAL**.
+5. **Waivers:** `WAIVED` reviews require a user-approved `decision_log` entry with
+   category `hallucination_review_waiver`. Missing approval: **CRITICAL**.
+
+### Severity
+
+- Objective-fact, physical-plausibility, product-geometry, motion-coherence, or
+  values/safety blocker reaching compose/publish: **CRITICAL**
+- WARN verdict shown to the user with keyframe paths: **SUGGESTION** or note, depending
+  on risk
+- Approved waiver with documented user decision: note in review summary, do not hide it
 
 ## Creative Differentiation Review
 

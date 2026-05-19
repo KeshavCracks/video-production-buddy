@@ -38,6 +38,33 @@ This drives the Product Identity Reference contract. Product-visible generated s
 cannot proceed as text-only prompts unless `production_proposal.product_reference_strategy`
 is `risk_accepted` and the user-approved waiver is recorded in `product_identity_reference`.
 
+## Hallucination Checks
+
+For every high-risk generated scene, add `hallucination_checks[]` derived from
+`production_bible.truth_contract`.
+
+High-risk scenes include:
+- any scene where `product_visibility != "none"` or `product_reference_required == true`
+- any `type: "generated"` scene, including lower-risk lifestyle/environment shots
+- any motion-required scene whose `required_assets[]` generate image/video/animation assets
+
+Do not add checks to pure `text_card`, `transition`, `diagram`, or deterministic
+Remotion/HyperFrames scenes unless they contain factual claims or product/app UI that
+can be wrong.
+
+Each check must contain:
+- `check_id`
+- `category`: `objective_fact`, `physical_plausibility`, `product_geometry`,
+  `motion_coherence`, or `values_safety`
+- `requirement`
+- `prohibited_failure`
+- `severity`: `blocker` or `warning`
+- `evidence_source`
+
+Use `blocker` for violations that must not reach final render: wrong product geometry,
+wrong model/claim, physically impossible product interaction, unsafe depiction, or a
+values/legal breach. Use `warning` for judgment calls that can be shown at asset review.
+
 ## Safe Zones
 
 Safe zones depend on `EP_STATE.aspect_ratio_primary` — check this before designing any scene framing.
@@ -113,6 +140,16 @@ Include only the variants that are opted in. If no derivatives: omit `crop_regio
       "motion_required": false,
       "product_visibility": "none",
       "product_reference_required": false,
+      "hallucination_checks": [
+        {
+          "check_id": "HC-FACT-1",
+          "category": "objective_fact",
+          "requirement": "Final CTA and brand name match production_bible.identity.",
+          "prohibited_failure": "Invented CTA, misspelled brand, or wrong product name.",
+          "severity": "blocker",
+          "evidence_source": "production_bible.truth_contract.objective_facts[0]"
+        }
+      ],
       "core": true,
       "crop_regions": {
         "9:16": {"x": 656, "y": 0, "w": 608, "h": 1080}
@@ -136,6 +173,7 @@ After reading this base document:
 - [ ] Every scene has `core` field
 - [ ] Every scene has `product_visibility` and `product_reference_required`
 - [ ] Every product-visible scene has `product_reference_required: true`
+- [ ] Every high-risk generated scene has `hallucination_checks[]`
 - [ ] If derivative_variants non-empty: every scene has `crop_regions` entries for each opted-in variant
 - [ ] No more than 3 consecutive scenes of the same `scene_type`
 - [ ] Scenes with `motion_required: true` are realistic given production plan

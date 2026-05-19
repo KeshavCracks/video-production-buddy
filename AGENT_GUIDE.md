@@ -231,7 +231,8 @@ For brands selling physical products with recognizable geometry (smartphones, ve
 **Why this matters:** text-to-video models (Wan, Kling, Seedance) cannot render specific product geometry from prose alone — they generate plausible-looking generic objects. Without a reference image, a "Find X9 Pro hero shot" prompt produces a generic premium black phone, not OPPO's specific device. For brand-paying advertisers, this is unacceptable risk; for personal projects, it's acceptable but should be flagged.
 
 The intake and brief-enrichment directors capture this need through
-`creative_requirements.product_fidelity_references`. The proposal director then locks
+`creative_requirements.product_fidelity_references` and
+`creative_requirements.truth_and_safety_constraints`. The proposal director then locks
 `production_proposal.product_reference_strategy`, and the asset director writes the
 canonical `product_identity_reference` artifact before any product-visible video
 generation. If the user provided product photos, the approved reference points at
@@ -604,7 +605,9 @@ Key contract points:
 - `brief_enrichment`, `intelligence`, and `bible` create the strategic contract.
   `production_bible` owns the approved arc, beats, emotional targets, visual
   motifs, audio direction, primary format, CTA, compliance checkpoints, and
-  rejected approaches.
+  rejected approaches. It also owns `truth_contract`: objective facts, physical
+  constraints, product geometry rules, motion-coherence rules, and values/safety
+  guardrails used to block hallucinated assets before final render.
 - `idea` generates execution concepts inside the approved `production_bible`;
   it must not reopen the arc, beats, hook mechanic, or mandatory motifs.
 - `proposal` locks technical production parameters: derivative variants,
@@ -615,6 +618,8 @@ Key contract points:
   environment, product-interaction, and b-roll scenes need real video clips.
   Stills are only acceptable for text cards, packshots, and end cards. Every
   scene must declare `product_visibility` and `product_reference_required`.
+  High-risk generated scenes must also declare `hallucination_checks[]` derived
+  from `production_bible.truth_contract`.
 - `assets` always runs a sample approval sub-stage before full generation.
   The sample must include at least one product-visible scene when the product is
   visible anywhere in the ad. After the sample is approved, the asset stage still
@@ -625,6 +630,13 @@ Key contract points:
   from the approved reference and animate it with image-to-video. Text-only
   product-visible video is allowed only with a user-approved `risk_accepted`
   waiver, and generated visual assets must record `product_identity_conditioning`.
+- Before sample approval and before full asset review, generated high-risk visual
+  assets must extract start/mid/end keyframes into `assets/keyframes/<scene_id>/`
+  and record `asset_manifest.assets[].hallucination_review` with per-check
+  PASS/WARN/FLAG/WAIVED verdicts. `hallucination_contract_check` FAIL blocks
+  compose/publish. FLAG blocker verdicts require regeneration or rerouting.
+  Waivers require an explicit user-approved `hallucination_review_waiver`
+  decision in `decision_log`.
 - Runtime and provider substitutions are governance events. If the selected
   `render_runtime`, TTS provider, video provider, image provider, or music path
   becomes unavailable, stop and ask before swapping. Record the decision.
