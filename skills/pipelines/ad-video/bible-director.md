@@ -271,7 +271,9 @@ preference being contradicted.
 
 ### Step 4 — Build audio contract
 
-- `voice_character.tone`: from identity.tone + emotional_profile
+- `voice_character.tone`: from identity.tone + emotional_profile; include concrete delivery adjectives, not generic brand tone.
+- `voice_character.pacing`: measured / energetic / conversational, chosen from the narrative pacing model and platform.
+- `voice_character.persona`: include narrator role and any required perceived gender/register/age when the brief implies one. Proposal-director will reject voice candidates that conflict with this persona.
 - `music_direction.arc`: derived from intensity curve
 - `music_direction.tempo` + `genre_direction`: from platform_trends + pacing_model.
   Filter and dedupe trends before consuming so stale or duplicate signals

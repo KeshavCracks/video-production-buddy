@@ -45,15 +45,27 @@ from tools.video.pexels_video import PexelsVideo
 # Legacy briefs without tts_directive use the historical 0.95 baseline.
 speed = section.get("tts_directive", {}).get("speed_mult", 0.95)
 audio_contract = production_proposal["audio_contract"]
+model = audio_contract["voice_model"]
+section_performance = section.get("voice_performance", {})
+performance_parts = [
+    f"Overall tone: {audio_contract['voice_performance']['tone']}",
+    f"Baseline emotion: {audio_contract['voice_performance']['baseline_emotion']}",
+    f"Section emotion: {section_performance.get('emotion', audio_contract['voice_performance']['baseline_emotion'])}",
+    f"Intonation: {section_performance.get('intonation', audio_contract['voice_performance']['intonation'])}",
+    f"Rhythm: {section_performance.get('rhythm', audio_contract['voice_performance']['rhythm'])}",
+    f"Pause policy: {section_performance.get('pause_after_seconds', 0)}s after this section; {audio_contract['voice_performance']['pause_policy']}",
+    section.get("speaker_directions", ""),
+]
+instructions = " ".join(part for part in performance_parts if part)
 
 tts = CosyVoiceTTS()
 result = tts.execute({
     "text": section["text"],
     "voice": audio_contract["voice_id"],  # e.g. "Ethan"
-    "model": "qwen3-tts-flash",
+    "model": model,
     "language_type": "English",
     "speed": speed,
-    "instructions": section.get("speaker_directions", ""),
+    "instructions": instructions,
     "format": "mp3",
     "output_path": f"assets/audio/{section['id']}_narration.mp3",
 })
@@ -240,6 +252,9 @@ After sample approval, generate all remaining assets:
 ### Step 1: TTS Narration (Complete)
 For each `script.sections[]` item not yet generated, call `CosyVoiceTTS().execute(…)` (see Tool Call Pattern above):
 - Use voice from `production_proposal.audio_contract.voice_id`
+- Use model from `production_proposal.audio_contract.voice_model`
+- Pass the combined `speaker_directions` + `voice_performance` instructions to the TTS tool
+- For Qwen/DashScope, use `qwen3-tts-instruct-flash` whenever instructions are non-empty; never accept a run where instructions were ignored by `qwen3-tts-flash`
 - Apply `playbook.audio.hero_moment_voice_shift` instruction on `cta_brand` section
 - Store output at `assets/audio/{section_id}_narration.mp3`
 - After each call: record actual duration. Prefer `result.duration_seconds` if present; if absent, probe via `ffprobe -show_entries format=duration` on the output file. Record in `asset_manifest.narration_durations`.

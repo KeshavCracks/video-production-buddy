@@ -134,8 +134,14 @@ CHECK: Approval gate
 - production_proposal.render_runtime present
 - production_proposal.product_reference_strategy present
 - production_proposal.derivatives_added present (may be empty if no variants chosen)
+- production_proposal.audio_contract.voice_model present
+- production_proposal.audio_contract.voice_gender present
+- production_proposal.audio_contract.voice_persona present
+- production_proposal.audio_contract.voice_performance present with tone, baseline_emotion, emotion_arc, intonation, rhythm, pause_policy
+- production_proposal.audio_contract.voice_sample_approved == true
+- If production_proposal.audio_contract.voice_model is qwen3-tts-flash and any script delivery instructions are expected: REVISE proposal — use qwen3-tts-instruct-flash
 - production_bible.visual.render_runtime is optional audit context only; do not require it
-- Store in EP_STATE: style_mode, render_runtime, derivative_variants, approved_budget_usd
+- Store in EP_STATE: style_mode, render_runtime, derivative_variants, approved_budget_usd, audio_contract
 - Store in EP_STATE: product_reference_strategy
 CHECK: Primary aspect ratio
 - production_bible.deliverables.primary.aspect_ratio present? ("16:9" or "9:16")
@@ -154,6 +160,10 @@ CHECK: Word count vs duration
 CHECK: Beat coverage (verify against production_bible)
 - Each beat in production_bible.narrative.emotional_beat_sequence has a corresponding script section
 - Final section ends with identity.cta text and brand name
+CHECK: Voice performance propagation
+- Every script section has non-empty speaker_directions
+- Every script section has voice_performance with emotion, intonation, rhythm, pace, pause_after_seconds
+- Section voice_performance stays compatible with production_proposal.audio_contract.voice_gender, voice_persona, and voice_performance
 CHECK: Script user approval gate
 - Has the user explicitly approved the narration text in a two-message exchange?
 - The first message presented the text; the second requested approval; the user replied with an explicit "Approve" or revision.
@@ -194,6 +204,10 @@ CHECK: Sample gate — two-message protocol enforced
 CHECK: Provider swap approval
 - If any pre-approved provider was substituted during generation: was user explicitly notified and did user approve?
 - If a swap happened silently (not logged as user_approved:true in decision_log): REVISE assets — "Provider swap was not user-approved. Regenerate with approved provider or surface to user."
+CHECK: Narration instruction handoff
+- Every narration asset used production_proposal.audio_contract.voice_model
+- If narration passed speaker_directions or voice_performance to Qwen/DashScope, model must be qwen3-tts-instruct-flash
+- If model/instructions mismatch: REVISE assets before compose; do not accept audio where delivery instructions were ignored
 CHECK: Asset review gate
 - asset_review_approved must be true (user saw and approved individual asset files)
 - If skipped: REVISE assets — "User has not reviewed generated assets. Present asset file list for review."

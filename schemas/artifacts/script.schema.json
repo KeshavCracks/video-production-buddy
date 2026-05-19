@@ -72,6 +72,40 @@
             }
           },
           "speaker_directions": { "type": "string" },
+          "voice_performance": {
+            "type": "object",
+            "description": "Structured per-section delivery controls for ad-video TTS. Mirrors production_proposal.audio_contract.voice_performance while adapting emotion, intonation, rhythm, and pauses to this beat.",
+            "required": ["emotion", "intonation", "rhythm", "pace", "pause_after_seconds"],
+            "additionalProperties": false,
+            "properties": {
+              "emotion": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Specific emotion for this section, e.g. intrigue, relief, confidence."
+              },
+              "intonation": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Section-specific pitch movement, emphasis, and resolve."
+              },
+              "rhythm": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Section-specific phrase rhythm, breath placement, and anti-monotony notes."
+              },
+              "pace": {
+                "type": "string",
+                "enum": ["measured", "conversational", "energetic", "urgent", "slow"],
+                "description": "Human-readable pace label; tts_directive.speed_mult remains the numeric control."
+              },
+              "pause_after_seconds": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 2,
+                "description": "Desired silence/breath room after this section before the next narration beat."
+              }
+            }
+          },
           "enhancement_cues": {
             "type": "array",
             "items": {

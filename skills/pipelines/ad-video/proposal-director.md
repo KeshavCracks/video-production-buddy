@@ -127,12 +127,26 @@ authoritative runtime lock for downstream stages.
 
 ### Step 3b: Lock the audio_contract (MANDATORY)
 
-Present voice candidates to the user (provider, voice_id, sample if practical) and get explicit sign-off **before** any TTS spend. Voice choice is locked here so all sections in the script use the same voice — preventing tone drift across narration segments. Also lock loudness target by platform.
+Present voice candidates to the user (provider, voice_id, model, and a short sample when practical) and get explicit sign-off **before** batch TTS spend. Voice choice is locked here so all sections in the script use the same voice — preventing tone drift across narration segments. Also lock the expressive performance contract: perceived gender/register, persona, emotion arc, intonation, rhythm, and pause policy. The proposal must reject a voice whose provider description conflicts with `production_bible.audio.voice_character.persona` (for example, do not lock a male voice when the bible calls for a female narrator).
+
+For Qwen/DashScope narration, use `qwen3-tts-instruct-flash` whenever script sections will carry `speaker_directions` or `voice_performance`. Do not pair `qwen3-tts-flash` with delivery instructions; that model does not accept them and will make the narration sound generic.
 
 ```json
 "audio_contract": {
   "voice_provider": "cosyvoice",        // cosyvoice | elevenlabs | openai
   "voice_id": "Dylan",                   // provider-specific voice id
+  "voice_model": "qwen3-tts-instruct-flash",
+  "voice_gender": "male",                // female | male | neutral | mixed | unspecified
+  "voice_persona": "warm product narrator with documentary restraint",
+  "voice_performance": {
+    "tone": "warm, confident, and precise; not an announcer",
+    "baseline_emotion": "calm assurance",
+    "emotion_arc": "curiosity -> tactile reveal -> confident CTA",
+    "intonation": "natural conversational rises, gentle downward resolves on proof points",
+    "rhythm": "varied phrase lengths with breath room around each reveal",
+    "pause_policy": "0.3-0.5s after major product claims and before the CTA"
+  },
+  "voice_sample_approved": true,          // user heard and approved this voice/model/performance lock
   "target_speed_wps": 2.5,               // words per second (script-director uses this for word budgets)
   "target_lufs": -14,                    // TikTok/Reels/Shorts=-14, YouTube=-13, broadcast=-23
   "max_section_drift_pct": 5,            // asset-director auto-retries if a section's actual TTS duration overruns by more than this
@@ -140,7 +154,7 @@ Present voice candidates to the user (provider, voice_id, sample if practical) a
 }
 ```
 
-If the user has not chosen, present 2–3 candidates with one **recommended** option labeled, and the trade-offs (cost / regional availability / cloning support).
+If the user has not chosen, present 2–3 candidates with one **recommended** option labeled, and the trade-offs (cost / regional availability / cloning support / expressive fit). Do not advance while `voice_sample_approved` is false.
 
 ### Step 3c: Lock the visual_contract (MANDATORY)
 

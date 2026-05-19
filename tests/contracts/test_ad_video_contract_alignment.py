@@ -53,6 +53,18 @@ def _minimal_production_proposal() -> dict:
         "audio_contract": {
             "voice_provider": "qwen3",
             "voice_id": "Dylan",
+            "voice_model": "qwen3-tts-instruct-flash",
+            "voice_gender": "male",
+            "voice_persona": "warm product narrator with documentary restraint",
+            "voice_performance": {
+                "tone": "warm, confident, and precise",
+                "baseline_emotion": "calm assurance",
+                "emotion_arc": "curiosity -> clarity -> confident CTA",
+                "intonation": "natural conversational rises; no hard-sell announcer cadence",
+                "rhythm": "varied sentence lengths with clean pauses around claims",
+                "pause_policy": "brief pause after each product proof point",
+            },
+            "voice_sample_approved": True,
             "target_speed_wps": 2.5,
             "target_lufs": -14,
             "max_section_drift_pct": 5,
@@ -69,6 +81,180 @@ def _minimal_production_proposal() -> dict:
             "anti_template_checklist": ["hero product visible before the CTA"],
         },
     }
+
+
+def _voice_performance_lock() -> dict:
+    return {
+        "voice_model": "qwen3-tts-instruct-flash",
+        "voice_gender": "male",
+        "voice_persona": "late-20s product filmmaker, intimate but confident",
+        "voice_performance": {
+            "tone": "hushed confidence with slight breathiness",
+            "baseline_emotion": "observant wonder",
+            "emotion_arc": "quiet intrigue -> tactile reveal -> assured CTA",
+            "intonation": "low-rise starts, gentle downward resolves, no announcer cadence",
+            "rhythm": "measured phrases with varied clause length; never metronomic",
+            "pause_policy": "short breath before each reveal; 0.3-0.5s after product claims",
+        },
+        "voice_sample_approved": True,
+    }
+
+
+def test_production_proposal_audio_contract_locks_voice_performance_controls() -> None:
+    """Proposal must lock the expressive voice controls before TTS generation."""
+    proposal = _minimal_production_proposal()
+    proposal["audio_contract"].update(_voice_performance_lock())
+
+    validate_artifact("production_proposal", proposal)
+
+    for required_field in [
+        "voice_model",
+        "voice_gender",
+        "voice_persona",
+        "voice_performance",
+        "voice_sample_approved",
+    ]:
+        bad = deepcopy(proposal)
+        del bad["audio_contract"][required_field]
+        with pytest.raises(Exception):
+            validate_artifact("production_proposal", bad)
+
+    bad = deepcopy(proposal)
+    del bad["audio_contract"]["voice_performance"]["rhythm"]
+    with pytest.raises(Exception):
+        validate_artifact("production_proposal", bad)
+
+
+def test_production_proposal_rejects_non_instruct_qwen_voice_model() -> None:
+    """Qwen narration with delivery controls must lock an instruct-capable model."""
+    proposal = _minimal_production_proposal()
+
+    bad = deepcopy(proposal)
+    bad["audio_contract"]["voice_model"] = "qwen3-tts-flash"
+    with pytest.raises(Exception):
+        validate_artifact("production_proposal", bad)
+
+
+def test_production_proposal_rejects_qwen_flash_even_when_provider_is_cosyvoice() -> None:
+    """Qwen model rules must follow the model family, not only voice_provider."""
+    proposal = _minimal_production_proposal()
+    proposal["audio_contract"]["voice_provider"] = "cosyvoice"
+    proposal["audio_contract"]["voice_id"] = "Dylan"
+
+    bad = deepcopy(proposal)
+    bad["audio_contract"]["voice_model"] = "qwen3-tts-flash"
+    with pytest.raises(Exception):
+        validate_artifact("production_proposal", bad)
+
+
+def test_production_proposal_rejects_known_qwen_voice_gender_mismatch() -> None:
+    """Known gendered Qwen voices must match the approved voice_gender lock."""
+    proposal = _minimal_production_proposal()
+
+    bad = deepcopy(proposal)
+    bad["audio_contract"]["voice_id"] = "Dylan"
+    bad["audio_contract"]["voice_gender"] = "female"
+    with pytest.raises(Exception):
+        validate_artifact("production_proposal", bad)
+
+    female_voice = deepcopy(proposal)
+    female_voice["audio_contract"]["voice_id"] = "Cherry"
+    female_voice["audio_contract"]["voice_gender"] = "female"
+    validate_artifact("production_proposal", female_voice)
+
+
+def test_script_schema_accepts_structured_voice_performance_per_section() -> None:
+    """Ad-video scripts need structured delivery cues, not just raw narration text."""
+    script = {
+        "version": "1.0",
+        "title": "Voice Performance Script",
+        "total_duration_seconds": 6,
+        "sections": [
+            {
+                "id": "hook",
+                "text": "Night changes when the lens starts listening.",
+                "start_seconds": 0,
+                "end_seconds": 3,
+                "speaker_directions": "Hushed, intimate, slightly breathy; do not sell.",
+                "voice_performance": {
+                    "emotion": "intrigue",
+                    "intonation": "soft rise on 'Night', downward resolve on 'listening'",
+                    "rhythm": "slow first phrase, tiny breath before the final clause",
+                    "pace": "measured",
+                    "pause_after_seconds": 0.35,
+                },
+            }
+        ],
+    }
+
+    validate_artifact("script", script)
+
+    bad = deepcopy(script)
+    del bad["sections"][0]["voice_performance"]["intonation"]
+    with pytest.raises(Exception):
+        validate_artifact("script", bad)
+
+
+def test_ad_video_script_validation_requires_section_voice_cues() -> None:
+    """Ad-video checkpoint validation must reject scripts that would drop TTS delivery controls."""
+    script = {
+        "version": "1.0",
+        "title": "Missing Voice Cues",
+        "style_mode": "cinematic",
+        "total_duration_seconds": 6,
+        "sections": [
+            {
+                "id": "hook",
+                "text": "Night changes when the lens starts listening.",
+                "start_seconds": 0,
+                "end_seconds": 3,
+            }
+        ],
+    }
+
+    with pytest.raises(Exception, match="speaker_directions"):
+        validate_artifact("script", script)
+
+    contextual_script = deepcopy(script)
+    contextual_script.pop("style_mode")
+    with pytest.raises(Exception, match="speaker_directions"):
+        validate_artifact("script", contextual_script, pipeline_type="ad-video")
+
+    generic_script = deepcopy(contextual_script)
+    validate_artifact("script", generic_script)
+
+    script["sections"][0]["speaker_directions"] = "Hushed, intimate, slightly breathy."
+    with pytest.raises(Exception, match="voice_performance"):
+        validate_artifact("script", script, pipeline_type="ad-video")
+
+    script["sections"][0]["voice_performance"] = {
+        "emotion": "intrigue",
+        "intonation": "soft rise on 'Night', downward resolve on 'listening'",
+        "rhythm": "slow first phrase, tiny breath before the final clause",
+        "pace": "measured",
+        "pause_after_seconds": 0.35,
+    }
+    validate_artifact("script", script, pipeline_type="ad-video")
+
+
+def test_explicit_non_ad_pipeline_context_does_not_apply_ad_video_script_heuristics() -> None:
+    """An explicit non-ad pipeline must not be overridden by shared style_mode."""
+    script = {
+        "version": "1.0",
+        "title": "Explainer Script",
+        "style_mode": "animated",
+        "total_duration_seconds": 6,
+        "sections": [
+            {
+                "id": "intro",
+                "text": "A neural network learns by adjusting tiny weights.",
+                "start_seconds": 0,
+                "end_seconds": 6,
+            }
+        ],
+    }
+
+    validate_artifact("script", script, pipeline_type="animated-explainer")
 
 
 def test_scene_plan_schema_accepts_animated_scene_contract_fields() -> None:
@@ -1127,9 +1313,15 @@ def test_ad_video_directors_reference_current_contract_names() -> None:
     assert 'production_plan["voice_selection"]["voice_id"]' not in asset
     assert 'audio_contract = production_proposal["audio_contract"]' in asset
     assert 'audio_contract["voice_id"]' in asset
+    assert 'model = audio_contract["voice_model"]' in asset
+    assert "voice_performance" in asset
+    assert "speaker_directions" in asset
 
     assert 'either `"remotion"` or `"hyperframes"`' not in proposal
     assert '"ffmpeg"' in proposal
+    assert '"voice_model": "qwen3-tts-instruct-flash"' in proposal
+    assert "voice_performance" in proposal
+    assert "voice_sample_approved" in proposal
     assert "Populate `deliverables.derivatives` in production_bible" not in proposal
     assert "Lock `visual.render_runtime` in production_bible" not in proposal
 

@@ -111,12 +111,95 @@
       "required": [
         "voice_provider",
         "voice_id",
+        "voice_model",
+        "voice_gender",
+        "voice_persona",
+        "voice_performance",
+        "voice_sample_approved",
         "target_speed_wps",
         "target_lufs",
         "max_section_drift_pct",
         "duck_depth_db"
       ],
       "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": ["voice_model"],
+            "properties": {
+              "voice_model": { "pattern": "^qwen3-tts-" }
+            }
+          },
+          "then": {
+            "properties": {
+              "voice_model": { "const": "qwen3-tts-instruct-flash" }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["voice_model", "voice_id"],
+            "properties": {
+              "voice_model": { "pattern": "^qwen3-tts-" },
+              "voice_id": { "enum": ["Ethan", "Dylan", "Kai"] }
+            }
+          },
+          "then": {
+            "properties": {
+              "voice_gender": { "const": "male" }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["voice_model", "voice_id"],
+            "properties": {
+              "voice_model": { "pattern": "^qwen3-tts-" },
+              "voice_id": { "enum": ["Cherry", "Serena"] }
+            }
+          },
+          "then": {
+            "properties": {
+              "voice_gender": { "const": "female" }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["voice_provider", "voice_id"],
+            "properties": {
+              "voice_provider": { "const": "cosyvoice" },
+              "voice_id": { "enum": ["longanyang", "longxiaobai", "longxiaocheng"] }
+            }
+          },
+          "then": {
+            "properties": {
+              "voice_gender": { "const": "male" }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["voice_provider", "voice_id"],
+            "properties": {
+              "voice_provider": { "const": "cosyvoice" },
+              "voice_id": {
+                "enum": [
+                  "longxiaochun",
+                  "longxiaoxia",
+                  "longxiaoman",
+                  "longxiaoxuan"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "voice_gender": { "const": "female" }
+            }
+          }
+        }
+      ],
       "properties": {
         "voice_provider": {
           "type": "string",
@@ -125,7 +208,71 @@
         },
         "voice_id": {
           "type": "string",
-          "description": "Provider-specific voice id (e.g. 'Dylan' for cosyvoice)."
+          "description": "Provider-specific voice id (e.g. 'Dylan' for qwen3, 'longanyang' for cosyvoice)."
+        },
+        "voice_model": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Provider-specific TTS model or variant. For Qwen/DashScope narration with speaker_directions or voice_performance, use qwen3-tts-instruct-flash so delivery instructions reach the model."
+        },
+        "voice_gender": {
+          "type": "string",
+          "enum": ["female", "male", "neutral", "mixed", "unspecified"],
+          "description": "User-approved perceived voice gender/register. Must match the selected voice and production_bible.audio.voice_character."
+        },
+        "voice_persona": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Concise approved narrator persona, e.g. 'late-20s product filmmaker, intimate but confident'."
+        },
+        "voice_performance": {
+          "type": "object",
+          "required": [
+            "tone",
+            "baseline_emotion",
+            "emotion_arc",
+            "intonation",
+            "rhythm",
+            "pause_policy"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "tone": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Overall vocal tone/register; must be specific enough to reject generic announcer delivery."
+            },
+            "baseline_emotion": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Default emotional state before per-section variation."
+            },
+            "emotion_arc": {
+              "type": "string",
+              "minLength": 1,
+              "description": "How emotion changes across hook, build, reveal, and CTA."
+            },
+            "intonation": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Pitch movement and emphasis policy, including what to avoid."
+            },
+            "rhythm": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Phrase rhythm, speed variation, breath/pause style, and anti-monotony constraints."
+            },
+            "pause_policy": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Where the narrator should leave silence or breath room around reveals and claims."
+            }
+          }
+        },
+        "voice_sample_approved": {
+          "type": "boolean",
+          "const": true,
+          "description": "True only after the user has heard and approved a representative voice sample for this voice_id/model/performance lock."
         },
         "target_speed_wps": {
           "type": "number",

@@ -295,13 +295,24 @@
     },
     "audio": {
       "type": "object",
+      "required": ["voice_character", "music_direction", "av_sync_notes"],
       "properties": {
         "voice_character": {
           "type": "object",
+          "required": ["tone", "pacing", "persona"],
+          "additionalProperties": false,
           "properties": {
-            "tone": { "type": "string" },
+            "tone": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Narrator tone/register specific enough for proposal-director to choose an aligned voice."
+            },
             "pacing": { "type": "string", "enum": ["measured", "energetic", "conversational"] },
-            "persona": { "type": "string" }
+            "persona": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Narrator persona including any required perceived gender/age/register when relevant."
+            }
           }
         },
         "music_direction": {

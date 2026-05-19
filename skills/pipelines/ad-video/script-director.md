@@ -115,6 +115,15 @@ If the bible has no intensity_curve (legacy briefs), omit `tts_directive`
 entirely — asset-director treats absent as 1.0 baseline. Do not hand-author
 speed_mult values; the helper's range is calibrated to keep delivery natural.
 
+## Voice Performance Directions
+
+Every ad-video script section must include both:
+
+- `speaker_directions`: one concise natural-language instruction that a TTS model can follow directly.
+- `voice_performance`: structured controls for `emotion`, `intonation`, `rhythm`, `pace`, and `pause_after_seconds`.
+
+Derive these from `production_bible.audio.voice_character`, `production_proposal.audio_contract.voice_performance`, and the section's emotional beat. Keep the locked voice persona consistent across all sections, but vary emotion, intonation, rhythm, and pauses by scene. If the section directions would require a different perceived gender/register/persona from `production_proposal.audio_contract.voice_gender` or `voice_persona`, stop and return to proposal instead of papering over the mismatch.
+
 ## Script Artifact Format
 
 ```json
@@ -136,6 +145,14 @@ speed_mult values; the helper's range is calibrated to keep delivery natural.
       "end_seconds": 5,
       "duration_estimate_seconds": 5,
       "tts_directive": {"speed_mult": 0.98},
+      "speaker_directions": "Warm urgency, conversational rather than announcer-like; slight pause after '45 minutes'.",
+      "voice_performance": {
+        "emotion": "quiet urgency",
+        "intonation": "small rise on 'Every morning', downward resolve on 'back'",
+        "rhythm": "short opening phrase, breath after the time claim",
+        "pace": "measured",
+        "pause_after_seconds": 0.3
+      },
       "mode_annotations": {
         "animated": "Countdown timer animation: 0:45 → 0:00",
         "cinematic": "Close-up alarm clock, hand slamming snooze"
@@ -253,6 +270,7 @@ the estimated and target durations — use those numbers to guide the trim.
 - [ ] Sections include: `hook`, at least one `build`, `reveal`, `cta_brand`
 - [ ] `cta_brand.narration` ends with `brand_name`
 - [ ] `mode_annotations` present on every section
+- [ ] `speaker_directions` and `voice_performance` present on every section, aligned with `production_proposal.audio_contract.voice_performance`
 - [ ] `duration_estimate_seconds` values sum to approximately `target_duration_seconds`
 - [ ] **`check_hook_window_compliance` returns `None`** (hook fits the platform window)
 - [ ] User has read and approved the narration text (user review gate passed)

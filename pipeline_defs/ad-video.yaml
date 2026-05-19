@@ -139,6 +139,8 @@ stages:
   - style_mode locked (confirmed or changed from bible candidate)
   - 'render_runtime selected and logged (HARD RULE: present both if both available)'
   - product_reference_strategy locked and logged as product_identity_reference_selection
+  - audio_contract locks voice_model, voice_gender, voice_persona, voice_performance, and voice_sample_approved
+  - Qwen/DashScope voice instructions use qwen3-tts-instruct-flash, not qwen3-tts-flash
   - Physical/product-visible ads use provided reference, generated concept reference, or explicit risk_accepted waiver
   - Derivatives explicitly opted in or out (9:16, 1:1, 15s short)
   - Subtitles and dubbing preferences explicitly confirmed
@@ -150,6 +152,8 @@ stages:
   - render_runtime locked in production_proposal.render_runtime
   - product_reference_strategy locked in production_proposal.product_reference_strategy
   - derivatives locked in production_proposal.derivatives_added
+  - voice_model and voice_performance locked in production_proposal.audio_contract
+  - production_proposal.audio_contract.voice_sample_approved == true
 - name: script
   skill: pipelines/ad-video/script-director
   required_artifacts_in:
@@ -166,11 +170,13 @@ stages:
   - 'Four beats present: hook, build, reveal, cta_brand'
   - Word count within ±10% of target_duration_seconds × production_proposal.audio_contract.target_speed_wps
   - Mode annotations present on lines where animated/cinematic treatment differs
+  - speaker_directions and voice_performance present on every section
   - CTA section ends with brand name — non-negotiable
   - User has READ and APPROVED the full narration text before TTS generation begins
   success_criteria:
   - script artifact produced with sections array
   - total_words within ±10% of target_duration_seconds × production_proposal.audio_contract.target_speed_wps
+  - every script section has delivery instructions compatible with production_proposal.audio_contract.voice_performance
   - script.user_approved == true (user explicitly approved the narration text)
 - name: scene_plan
   skill: pipelines/ad-video/scene-director
@@ -257,6 +263,7 @@ stages:
     human_approval_default: false
     review_focus:
     - TTS audio file generated for every script section
+    - Narration uses the locked production_proposal.audio_contract.voice_model and passes section delivery instructions to TTS
     - Subtitle file (SRT/VTT) generated
     - All scene assets match scene_plan required_assets
     - Style consistency across all generated images
@@ -297,6 +304,7 @@ stages:
   - asset_review_approved == true before compose begins
   - music_review_approved == true before compose begins
   - TTS files present for all sections
+  - Narration model/instructions match production_proposal.audio_contract
   - Budget not exceeded
   success_criteria:
   - product_identity_reference artifact produced

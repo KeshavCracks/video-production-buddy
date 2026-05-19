@@ -136,7 +136,11 @@ def _validate_artifacts_for_stage(
                 f"Artifact {artifact_name!r} must be a JSON object matching its schema"
             )
         try:
-            validate_artifact(artifact_name, artifact_data)
+            validate_artifact(
+                artifact_name,
+                artifact_data,
+                pipeline_type=pipeline_type,
+            )
         except Exception as exc:
             raise CheckpointValidationError(
                 f"Artifact {artifact_name!r} failed schema validation: {exc}"

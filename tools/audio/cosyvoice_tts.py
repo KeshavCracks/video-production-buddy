@@ -1,7 +1,8 @@
 """Bailian TTS via Alibaba Cloud Bailian / DashScope API.
 
-Supports qwen3-tts-flash (default) via the native DashScope multimodal endpoint,
-and CosyVoice v3 models via the OpenAI-compatible audio/speech endpoint.
+Supports qwen3-tts-flash and qwen3-tts-instruct-flash via the native DashScope
+multimodal endpoint, and CosyVoice v3 models via the OpenAI-compatible
+audio/speech endpoint.
 Both use DASHSCOPE_API_KEY.
 """
 
@@ -138,6 +139,7 @@ class CosyVoiceTTS(BaseTool):
         "bilingual Chinese/English video production",
         "first fallback when ElevenLabs is unavailable — uses DASHSCOPE_API_KEY already set for Wan video generation",
         "fast low-cost TTS via qwen3-tts-flash",
+        "delivery-controlled ad narration via qwen3-tts-instruct-flash",
     ]
     not_good_for = ["fully offline production", "voice clone matching"]
 
@@ -192,7 +194,7 @@ class CosyVoiceTTS(BaseTool):
         cpu_cores=1, ram_mb=256, vram_mb=0, disk_mb=50, network_required=True
     )
     retry_policy = RetryPolicy(max_retries=2, retryable_errors=["rate_limit", "timeout"])
-    idempotency_key_fields = ["text", "voice", "model", "speed"]
+    idempotency_key_fields = ["text", "voice", "model", "speed", "instructions"]
     side_effects = ["writes audio file to output_path", "calls Bailian/DashScope API"]
     user_visible_verification = ["Listen to generated audio for natural speech quality"]
 
@@ -294,6 +296,13 @@ class CosyVoiceTTS(BaseTool):
         voice = inputs.get("voice", "Cherry")
         speed = inputs.get("speed", 1.0)
         fmt = inputs.get("format", "mp3")
+        instructions = inputs.get("instructions")
+
+        if instructions and "instruct" not in model:
+            raise ValueError(
+                "instructions require qwen3-tts-instruct-flash; "
+                f"selected model {model!r} would ignore delivery instructions"
+            )
 
         parameters: dict[str, Any] = {
             "voice": voice,
@@ -302,8 +311,8 @@ class CosyVoiceTTS(BaseTool):
         lang = inputs.get("language_type", "auto")
         if lang != "auto":
             parameters["language_type"] = lang
-        if inputs.get("instructions") and "instruct" in model:
-            parameters["instructions"] = inputs["instructions"]
+        if instructions:
+            parameters["instructions"] = instructions
 
         payload = {
             "model": model,

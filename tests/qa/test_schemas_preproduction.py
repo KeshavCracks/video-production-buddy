@@ -713,7 +713,20 @@ MINIMAL_BIBLE = {
         "style_mode": "animated",
         "render_runtime": "remotion",
     },
-    "audio": {},
+    "audio": {
+        "voice_character": {
+            "tone": "warm and direct",
+            "pacing": "energetic",
+            "persona": "trusted peer narrator",
+        },
+        "music_direction": {
+            "mood": "focused optimism",
+            "tempo": "medium",
+            "genre_direction": "lo-fi indie",
+            "arc": "sparse at hook, fuller at reveal",
+        },
+        "av_sync_notes": "Music swell on product reveal.",
+    },
     "brand_constraints": {
         "brand_name_in_final_frame": True,
     },

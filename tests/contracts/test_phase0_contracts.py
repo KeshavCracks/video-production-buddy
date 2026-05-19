@@ -463,6 +463,31 @@ class TestCheckpoint:
                 pipeline_type="ad-video",
             )
 
+    def test_ad_video_script_checkpoint_requires_voice_cues(self, tmp_path):
+        with pytest.raises(CheckpointValidationError, match="speaker_directions"):
+            write_checkpoint(
+                tmp_path,
+                "proj",
+                "script",
+                "completed",
+                {
+                    "script": {
+                        "version": "1.0",
+                        "title": "Missing voice cues",
+                        "total_duration_seconds": 5,
+                        "sections": [
+                            {
+                                "id": "hook",
+                                "text": "A sparse ad-video line.",
+                                "start_seconds": 0,
+                                "end_seconds": 5,
+                            }
+                        ],
+                    }
+                },
+                pipeline_type="ad-video",
+            )
+
     def test_invalid_canonical_artifact_rejected(self, tmp_path):
         with pytest.raises(CheckpointValidationError):
             write_checkpoint(
