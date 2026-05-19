@@ -11,6 +11,9 @@ import pytest
 import yaml
 
 from schemas.artifacts import validate_artifact
+from tools.validation.product_identity_consistency_check import (
+    check_product_identity_consistency,
+)
 from tools.validation.runtime_consistency_check import check_runtime_consistency
 from tools.validation.scene_fidelity_check import check_kvm_coverage
 from tools.video.video_compose import VideoCompose
@@ -33,6 +36,40 @@ def _json_fences(markdown: str) -> list[str]:
     return re.findall(r"```json\s*\n(.*?)\n```", markdown, flags=re.DOTALL)
 
 
+def _minimal_production_proposal() -> dict:
+    return {
+        "version": "1.0",
+        "selected_idea_id": "C2",
+        "style_mode": "cinematic",
+        "render_runtime": "ffmpeg",
+        "product_reference_strategy": "generate_concept_reference",
+        "subtitles": {"mode": "burnt-in", "language": "en", "user_confirmed": True},
+        "dubbing": [],
+        "derivatives_added": [],
+        "budget_confirmed": True,
+        "approved_budget_usd": 5.0,
+        "music_strategy": "generative_loose",
+        "audio_contract": {
+            "voice_provider": "qwen3",
+            "voice_id": "Dylan",
+            "target_speed_wps": 2.5,
+            "target_lufs": -14,
+            "max_section_drift_pct": 5,
+            "duck_depth_db": -18,
+        },
+        "visual_contract": {
+            "style_direction": "editorial-tech",
+            "typography_pairing": {
+                "display": "Inter 800",
+                "body": "Inter 400",
+            },
+            "color_rhythm": "held-accent",
+            "atmosphere": {"default_layers": [{"type": "grain", "intensity": 0.04}]},
+            "anti_template_checklist": ["hero product visible before the CTA"],
+        },
+    }
+
+
 def test_scene_plan_schema_accepts_animated_scene_contract_fields() -> None:
     """Animated scene-director fields must validate under scene_plan.schema.json."""
     scene_plan = {
@@ -49,6 +86,8 @@ def test_scene_plan_schema_accepts_animated_scene_contract_fields() -> None:
                 "end_seconds": 5,
                 "core": True,
                 "motion_required": False,
+                "product_visibility": "none",
+                "product_reference_required": False,
                 "fulfills_kvm": ["KVM-1"],
                 "motion_specs": ["text_entrance_fade"],
                 "style_layers": [
@@ -60,6 +99,111 @@ def test_scene_plan_schema_accepts_animated_scene_contract_fields() -> None:
     }
 
     validate_artifact("scene_plan", scene_plan)
+
+
+def test_production_proposal_schema_requires_product_reference_strategy() -> None:
+    """Proposal must lock the product-reference strategy before assets can run."""
+    proposal = _minimal_production_proposal()
+    validate_artifact("production_proposal", proposal)
+
+    for strategy in [
+        "not_applicable",
+        "use_provided_reference",
+        "generate_concept_reference",
+        "risk_accepted",
+    ]:
+        proposal["product_reference_strategy"] = strategy
+        validate_artifact("production_proposal", proposal)
+
+    bad = _minimal_production_proposal()
+    del bad["product_reference_strategy"]
+    with pytest.raises(Exception):
+        validate_artifact("production_proposal", bad)
+
+    bad = _minimal_production_proposal()
+    bad["product_reference_strategy"] = "text_prompt_only"
+    with pytest.raises(Exception):
+        validate_artifact("production_proposal", bad)
+
+
+def test_scene_plan_schema_requires_product_visibility_metadata_for_ad_video() -> None:
+    """Ad-video scenes must declare whether product identity conditioning is needed."""
+    scene_plan = {
+        "version": "1.0",
+        "style_mode": "cinematic",
+        "total_duration_seconds": 5,
+        "scenes": [
+            {
+                "id": "scene-1",
+                "type": "generated",
+                "description": "Macro hero shot of the product camera module.",
+                "start_seconds": 0,
+                "end_seconds": 5,
+                "core": True,
+                "motion_required": True,
+            }
+        ],
+    }
+
+    with pytest.raises(Exception):
+        validate_artifact("scene_plan", scene_plan)
+
+    scene_plan["scenes"][0]["product_visibility"] = "hero"
+    scene_plan["scenes"][0]["product_reference_required"] = True
+    validate_artifact("scene_plan", scene_plan)
+
+    scene_plan["scenes"][0]["product_reference_required"] = False
+    with pytest.raises(Exception):
+        validate_artifact("scene_plan", scene_plan)
+
+
+def test_asset_manifest_schema_accepts_product_identity_conditioning_metadata() -> None:
+    """Product-visible generated assets must be able to record conditioning metadata."""
+    manifest = {
+        "version": "1.0",
+        "assets": [
+            {
+                "id": "scene-1-video",
+                "type": "video",
+                "path": "assets/video/scene-1.mp4",
+                "source_tool": "wan_video_api",
+                "scene_id": "scene-1",
+                "model": "wan2.7-i2v",
+                "product_identity_conditioning": {
+                    "approved_reference_id": "pir-001",
+                    "approved_reference_path": "reference_assets/product_phone.png",
+                    "conditioning_mode": "reference_to_video",
+                    "generation_tool": "wan_video_api",
+                    "generation_model": "wan2.7-i2v",
+                    "fidelity_verdict": "PASS",
+                },
+            }
+        ],
+    }
+    validate_artifact("asset_manifest", manifest)
+
+    bad = deepcopy(manifest)
+    del bad["assets"][0]["product_identity_conditioning"]["conditioning_mode"]
+    with pytest.raises(Exception):
+        validate_artifact("asset_manifest", bad)
+
+    bad = deepcopy(manifest)
+    del bad["assets"][0]["product_identity_conditioning"]["approved_reference_path"]
+    with pytest.raises(Exception):
+        validate_artifact("asset_manifest", bad)
+
+    waived = deepcopy(manifest)
+    conditioning = waived["assets"][0]["product_identity_conditioning"]
+    conditioning["conditioning_mode"] = "text_only_waived"
+    conditioning["waiver_decision_id"] = "d-002"
+    del conditioning["approved_reference_id"]
+    del conditioning["approved_reference_path"]
+    validate_artifact("asset_manifest", waived)
+
+    bad = deepcopy(waived)
+    del bad["assets"][0]["product_identity_conditioning"]["waiver_decision_id"]
+    with pytest.raises(Exception):
+        validate_artifact("asset_manifest", bad)
 
 
 def test_ad_video_scene_plan_schema_requires_scene_governance_fields() -> None:
@@ -119,6 +263,8 @@ def test_ad_video_scene_plan_schema_requires_crop_regions_for_derivatives() -> N
     scene_plan["scenes"][0]["crop_regions"] = {
         "9:16": {"x": 656, "y": 0, "w": 608, "h": 1080}
     }
+    scene_plan["scenes"][0]["product_visibility"] = "none"
+    scene_plan["scenes"][0]["product_reference_required"] = False
     validate_artifact("scene_plan", scene_plan)
 
 
@@ -402,6 +548,203 @@ def test_runtime_consistency_rejects_approved_swap_without_selected_runtime() ->
     assert any("does not select actual runtime 'hyperframes'" in issue for issue in verdict["issues"])
 
 
+def test_decision_log_accepts_product_identity_reference_selection_category() -> None:
+    decision_log = {
+        "version": "1.0",
+        "project_id": "product-reference-regression",
+        "decisions": [
+            {
+                "decision_id": "d-001",
+                "stage": "proposal",
+                "category": "product_identity_reference_selection",
+                "subject": "Product identity reference strategy",
+                "options_considered": [
+                    {
+                        "option_id": "generate_concept_reference",
+                        "label": "Generate concept reference",
+                        "score": 0.8,
+                        "reason": "No user product photo was available.",
+                    }
+                ],
+                "selected": "generate_concept_reference",
+                "reason": "User approved generated reference candidates before video generation.",
+                "user_visible": True,
+                "user_approved": True,
+            }
+        ],
+    }
+
+    validate_artifact("decision_log", decision_log)
+
+
+def _approved_product_identity_reference(source_type: str = "generated") -> dict:
+    return {
+        "version": "1.0",
+        "reference_id": "pir-001",
+        "product_name": "OPPO Find X9 Pro",
+        "source_type": source_type,
+        "approval_status": "approved",
+        "selected_reference_image_path": "reference_assets/product_oppo.png",
+        "required_visual_features": [
+            "large circular camera island",
+            "OPPO wordmark placement",
+        ],
+        "prohibited_variations": [
+            "different lens count",
+            "generic phone silhouette",
+        ],
+        "user_approval": {
+            "approved": True,
+            "approved_by": "user",
+            "approved_at": "2026-05-19T09:00:00Z",
+            "decision_id": "d-001",
+        },
+    }
+
+
+def _product_visible_scene_plan() -> dict:
+    return {
+        "version": "1.0",
+        "style_mode": "cinematic",
+        "scenes": [
+            {
+                "id": "scene-1",
+                "type": "generated",
+                "description": "Hero push-in on OPPO Find X9 Pro camera island.",
+                "start_seconds": 0,
+                "end_seconds": 5,
+                "core": True,
+                "motion_required": True,
+                "product_visibility": "hero",
+                "product_reference_required": True,
+            }
+        ],
+    }
+
+
+def _conditioned_asset_manifest(conditioning_mode: str = "reference_to_video") -> dict:
+    return {
+        "version": "1.0",
+        "assets": [
+            {
+                "id": "scene-1-video",
+                "type": "video",
+                "path": "assets/video/scene-1.mp4",
+                "source_tool": "wan_video_api",
+                "scene_id": "scene-1",
+                "model": "wan2.7-i2v",
+                "product_identity_conditioning": {
+                    "approved_reference_id": "pir-001",
+                    "approved_reference_path": "reference_assets/product_oppo.png",
+                    "conditioning_mode": conditioning_mode,
+                    "generation_tool": "wan_video_api",
+                    "generation_model": "wan2.7-i2v",
+                    "fidelity_verdict": "PASS",
+                },
+            }
+        ],
+    }
+
+
+def test_product_identity_consistency_rejects_visible_scene_without_reference_or_waiver() -> None:
+    reference = {
+        "version": "1.0",
+        "reference_id": "pir-none",
+        "product_name": "OPPO Find X9 Pro",
+        "source_type": "not_applicable",
+        "approval_status": "not_required",
+        "required_visual_features": [],
+        "prohibited_variations": [],
+    }
+
+    verdict = check_product_identity_consistency(
+        reference,
+        _product_visible_scene_plan(),
+        {"version": "1.0", "assets": []},
+    )
+
+    assert verdict["status"] == "FAIL"
+    assert any("approved product identity reference" in issue for issue in verdict["issues"])
+
+
+def test_product_identity_consistency_accepts_approved_generated_reference_and_conditioned_assets() -> None:
+    verdict = check_product_identity_consistency(
+        _approved_product_identity_reference(),
+        _product_visible_scene_plan(),
+        _conditioned_asset_manifest(),
+    )
+
+    assert verdict["status"] == "PASS"
+    assert verdict["summary"]["product_visible_scenes"] == 1
+    assert verdict["summary"]["conditioned_assets_checked"] == 1
+
+
+def test_product_identity_consistency_rejects_risk_waiver_without_user_approval() -> None:
+    reference = {
+        "version": "1.0",
+        "reference_id": "pir-risk",
+        "product_name": "OPPO Find X9 Pro",
+        "source_type": "risk_accepted",
+        "approval_status": "pending",
+        "required_visual_features": [],
+        "prohibited_variations": ["generic phone silhouette"],
+        "risk_waiver": {
+            "reason": "User has no product photos.",
+            "user_approved": False,
+            "decision_id": "d-001",
+        },
+    }
+    manifest = _conditioned_asset_manifest(conditioning_mode="text_only_waived")
+    manifest["assets"][0]["product_identity_conditioning"].pop("approved_reference_path")
+
+    verdict = check_product_identity_consistency(
+        reference,
+        _product_visible_scene_plan(),
+        manifest,
+    )
+
+    assert verdict["status"] == "FAIL"
+    assert any("risk waiver" in issue for issue in verdict["issues"])
+
+
+def test_product_identity_consistency_accepts_non_product_visible_not_applicable() -> None:
+    reference = {
+        "version": "1.0",
+        "reference_id": "pir-none",
+        "product_name": "Acme SaaS",
+        "source_type": "not_applicable",
+        "approval_status": "not_required",
+        "required_visual_features": [],
+        "prohibited_variations": [],
+    }
+    scene_plan = {
+        "version": "1.0",
+        "style_mode": "animated",
+        "scenes": [
+            {
+                "id": "scene-1",
+                "type": "text_card",
+                "description": "Animated headline card.",
+                "start_seconds": 0,
+                "end_seconds": 5,
+                "core": True,
+                "motion_required": False,
+                "product_visibility": "none",
+                "product_reference_required": False,
+            }
+        ],
+    }
+
+    verdict = check_product_identity_consistency(
+        reference,
+        scene_plan,
+        {"version": "1.0", "assets": []},
+    )
+
+    assert verdict["status"] == "PASS"
+    assert verdict["summary"]["product_visible_scenes"] == 0
+
+
 def test_video_compose_render_accepts_artifact_paths(tmp_path: Path) -> None:
     """The tool may receive path strings from older directors; it must coerce them."""
     edit_path = tmp_path / "edit_decisions.json"
@@ -456,3 +799,41 @@ def test_ad_video_directors_reference_current_contract_names() -> None:
 
     assert "production_bible.kvms" not in animated_scene
     assert "production_bible.visual.key_visual_moments" in animated_scene
+
+
+def test_ad_video_contract_mentions_product_identity_reference_flow() -> None:
+    manifest = _load_ad_video_manifest()
+    guide = (ROOT / "AGENT_GUIDE.md").read_text(encoding="utf-8")
+    brief_enrichment = _read_skill("brief-enrichment-director.md")
+    proposal = _read_skill("proposal-director.md")
+    scene = _read_skill("scene-director.md")
+    asset = _read_skill("asset-director.md")
+    ep = _read_skill("executive-producer.md")
+
+    proposal_stage = next(stage for stage in manifest["stages"] if stage["name"] == "proposal")
+    scene_stage = next(stage for stage in manifest["stages"] if stage["name"] == "scene_plan")
+    asset_stage = next(stage for stage in manifest["stages"] if stage["name"] == "assets")
+    asset_substage_names = [substage["name"] for substage in asset_stage.get("sub_stages", [])]
+    contract_text = "\n".join(
+        proposal_stage.get("review_focus", [])
+        + proposal_stage.get("success_criteria", [])
+        + scene_stage.get("review_focus", [])
+        + scene_stage.get("success_criteria", [])
+        + asset_stage.get("review_focus", [])
+        + asset_stage.get("success_criteria", [])
+    )
+
+    assert "product_reference_strategy" in contract_text
+    assert "product_identity_reference" in asset_stage.get("produces", [])
+    assert "product_reference" in asset_substage_names
+    assert "no text-only" in contract_text.lower()
+    assert "Product Identity Reference" in brief_enrichment
+    assert "`product_reference_strategy`" in proposal
+    assert "`product_visibility`" in scene
+    assert "`product_reference_required`" in scene
+    assert "product_identity_consistency_check" in asset
+    assert asset.index("## Product Reference Sub-Stage") < asset.index("## Sample Sub-Stage")
+    assert "sample sub-stage first" not in asset
+    assert "product_identity_reference_selection" in proposal
+    assert "product_identity_reference_selection" in ep
+    assert "`product_identity_reference` + `asset_manifest`" in guide

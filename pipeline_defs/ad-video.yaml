@@ -135,6 +135,8 @@ stages:
   review_focus:
   - style_mode locked (confirmed or changed from bible candidate)
   - 'render_runtime selected and logged (HARD RULE: present both if both available)'
+  - product_reference_strategy locked and logged as product_identity_reference_selection
+  - Physical/product-visible ads use provided reference, generated concept reference, or explicit risk_accepted waiver
   - Derivatives explicitly opted in or out (9:16, 1:1, 15s short)
   - Subtitles and dubbing preferences explicitly confirmed
   - CTA confirmed non-null
@@ -143,6 +145,7 @@ stages:
   - Schema-valid production_proposal artifact produced
   - style_mode locked in production_proposal.style_mode
   - render_runtime locked in production_proposal.render_runtime
+  - product_reference_strategy locked in production_proposal.product_reference_strategy
   - derivatives locked in production_proposal.derivatives_added
 - name: script
   skill: pipelines/ad-video/script-director
@@ -181,6 +184,8 @@ stages:
   review_focus:
   - 'All broll and generated scenes have motion_required: true — stills only permitted
     for text_card and packshot scene types'
+  - product_visibility and product_reference_required present on every scene
+  - Product-visible generated scenes set product_reference_required=true
   - Total scene duration covers script duration (±0.5s)
   - crop_regions present on every scene with entries for every opted-in derivative variant
   - core field present on every scene
@@ -189,13 +194,17 @@ stages:
   success_criteria:
   - scene_plan artifact produced
   - sum(scene.duration) within ±0.5s of total script duration
+  - Product-visible scenes declare product_visibility != none and product_reference_required=true
   - 'If derivative_variants non-empty: all scenes have crop_regions entries for every selected variant'
 - name: assets
   skill: pipelines/ad-video/asset-director
   required_artifacts_in:
   - scene_plan
   - script
+  - production_proposal
+  - production_bible
   produces:
+  - product_identity_reference
   - asset_manifest
   checkpoint_required: false
   required_tools:
@@ -216,6 +225,17 @@ stages:
   - pexels_video
   - pixabay_video
   sub_stages:
+  - name: product_reference
+    description: Resolve Product Identity Reference before sample generation. Use an existing
+      user product image, generate 2-4 concept reference candidates for approval, record
+      an external URL reference, or stop for an explicit risk_accepted waiver. No product-visible
+      video clip may be generated before product_identity_reference is approved or waived.
+    human_approval_default: true
+    review_focus:
+    - product_identity_reference artifact exists and validates
+    - selected reference image path or risk_accepted waiver is user-approved
+    - product_identity_reference_selection decision is logged
+    - no text-only generation for product-visible scenes unless risk_accepted is user-approved
   - name: sample
     description: Generate 10–15s preview clip from first 2–3 scenes. Always runs.
       State the file PATH only — do NOT describe visual content. Wait for user to
@@ -258,15 +278,20 @@ stages:
     - Music arc confirmed matches brief direction specified in production_plan.music_source.mood_direction
     - music_review_approved == true
   review_focus:
+  - product_reference sub-stage completed before sample generation
   - Sample sub-stage includes at least one product-visible scene (not chronological-only
     if product appears late)
+  - product_identity_consistency_check returns PASS or documented WARN before asset review
+  - no text-only generation for product-visible scenes unless risk_accepted is user-approved
   - sample_approved == true before full generation proceeds
   - asset_review_approved == true before compose begins
   - music_review_approved == true before compose begins
   - TTS files present for all sections
   - Budget not exceeded
   success_criteria:
+  - product_identity_reference artifact produced
   - asset_manifest artifact produced
+  - Product-visible generated assets record product_identity_conditioning metadata
   - sample_approved == true
   - asset_review_approved == true
   - music_review_approved == true

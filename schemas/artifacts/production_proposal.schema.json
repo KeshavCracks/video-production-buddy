@@ -2,12 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "openmontage/artifacts/production_proposal",
   "title": "Production Proposal",
-  "description": "Technical-parameter proposal produced by proposal-director. Locks style_mode, render_runtime, subtitles, dubbing, derivatives, audio_contract, and visual_contract for the ad-video pipeline. Creative direction is owned upstream by the production_bible — this artifact carries only execution decisions.",
+  "description": "Technical-parameter proposal produced by proposal-director. Locks style_mode, render_runtime, product_reference_strategy, subtitles, dubbing, derivatives, audio_contract, and visual_contract for the ad-video pipeline. Creative direction is owned upstream by the production_bible — this artifact carries only execution decisions.",
   "type": "object",
   "required": [
     "selected_idea_id",
     "style_mode",
     "render_runtime",
+    "product_reference_strategy",
     "subtitles",
     "dubbing",
     "derivatives_added",
@@ -36,6 +37,16 @@
       "type": "string",
       "enum": ["remotion", "hyperframes", "ffmpeg"],
       "description": "Composition engine locked at proposal. Animated→remotion, cinematic→ffmpeg by default; HyperFrames opt-in. Carried unchanged into edit_decisions.render_runtime."
+    },
+    "product_reference_strategy": {
+      "type": "string",
+      "enum": [
+        "not_applicable",
+        "use_provided_reference",
+        "generate_concept_reference",
+        "risk_accepted"
+      ],
+      "description": "Product identity preservation strategy locked before assets. Physical/product-visible ads use provided references when available, generate an approved concept reference when no asset exists, or require an explicit user-approved risk waiver before text-only video generation."
     },
     "subtitles": {
       "type": "object",

@@ -153,6 +153,15 @@
             "default": false,
             "description": "True when the scene needs actual motion video (not a still). Enforces the motion-required hard rule for animated/cinematic ad-video runs."
           },
+          "product_visibility": {
+            "type": "string",
+            "enum": ["none", "background", "partial", "hero", "detail", "packshot"],
+            "description": "How visibly the advertised product appears in this scene. Product-visible generated scenes must not rely on text-only identity prompting."
+          },
+          "product_reference_required": {
+            "type": "boolean",
+            "description": "True when the scene must be conditioned on an approved product_identity_reference or an explicit risk_accepted waiver before video generation."
+          },
           "crop_regions": {
             "type": "object",
             "minProperties": 1,
@@ -185,6 +194,24 @@
             }
           }
         },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "product_visibility": {
+                  "enum": ["background", "partial", "hero", "detail", "packshot"]
+                }
+              },
+              "required": ["product_visibility"]
+            },
+            "then": {
+              "required": ["product_reference_required"],
+              "properties": {
+                "product_reference_required": { "const": true }
+              }
+            }
+          }
+        ],
         "additionalProperties": false
       },
       "minItems": 1
@@ -203,7 +230,12 @@
         "properties": {
           "scenes": {
             "items": {
-              "required": ["core", "motion_required"]
+              "required": [
+                "core",
+                "motion_required",
+                "product_visibility",
+                "product_reference_required"
+              ]
             }
           }
         }

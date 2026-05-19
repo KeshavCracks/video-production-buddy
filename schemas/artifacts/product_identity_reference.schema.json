@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openmontage/artifacts/product_identity_reference",
+  "title": "Product Identity Reference",
+  "description": "Canonical ad-video artifact that records how product visual identity is preserved before any product-visible generated video is created.",
+  "type": "object",
+  "required": [
+    "version",
+    "reference_id",
+    "product_name",
+    "source_type",
+    "approval_status",
+    "required_visual_features",
+    "prohibited_variations"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "reference_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable id used by asset_manifest.assets[].product_identity_conditioning.approved_reference_id."
+    },
+    "product_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "user_provided",
+        "generated",
+        "external_url",
+        "risk_accepted",
+        "not_applicable"
+      ],
+      "description": "Where the approved identity reference came from, or why no reference is required."
+    },
+    "approval_status": {
+      "type": "string",
+      "enum": ["pending", "approved", "rejected", "not_required"],
+      "description": "Approved is required before product-visible video generation, except not_applicable cases."
+    },
+    "selected_reference_image_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Project-relative path to the approved reference image."
+    },
+    "selected_reference_url": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Approved public reference URL when source_type is external_url."
+    },
+    "candidate_reference_paths": {
+      "type": "array",
+      "description": "Generated concept candidates shown to the user before approval.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "generation_tool": {
+      "type": "string",
+      "description": "Tool used to generate concept-reference candidates, when source_type=generated."
+    },
+    "generation_model": {
+      "type": "string",
+      "description": "Model used to generate concept-reference candidates, when source_type=generated."
+    },
+    "required_visual_features": {
+      "type": "array",
+      "description": "Visual identity details that product-visible assets must preserve.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "prohibited_variations": {
+      "type": "array",
+      "description": "Product geometry, branding, color, or packaging mistakes that must be avoided.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "user_approval": {
+      "type": "object",
+      "required": ["approved", "approved_by", "approved_at"],
+      "additionalProperties": false,
+      "properties": {
+        "approved": { "type": "boolean", "const": true },
+        "approved_by": { "type": "string", "minLength": 1 },
+        "approved_at": { "type": "string", "format": "date-time" },
+        "decision_id": {
+          "type": "string",
+          "description": "decision_log.decisions[].decision_id for product_identity_reference_selection."
+        },
+        "approval_note": { "type": "string" }
+      }
+    },
+    "risk_waiver": {
+      "type": "object",
+      "required": ["reason", "user_approved", "approved_by", "approved_at"],
+      "additionalProperties": false,
+      "properties": {
+        "reason": { "type": "string", "minLength": 1 },
+        "user_approved": { "type": "boolean", "const": true },
+        "approved_by": { "type": "string", "minLength": 1 },
+        "approved_at": { "type": "string", "format": "date-time" },
+        "decision_id": {
+          "type": "string",
+          "description": "decision_log.decisions[].decision_id for product_identity_reference_selection."
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "source_type": { "enum": ["user_provided", "generated"] }
+        },
+        "required": ["source_type"]
+      },
+      "then": {
+        "required": ["selected_reference_image_path"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source_type": { "const": "external_url" }
+        },
+        "required": ["source_type"]
+      },
+      "then": {
+        "required": ["selected_reference_url"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "approval_status": { "const": "approved" },
+          "source_type": { "enum": ["user_provided", "generated", "external_url"] }
+        },
+        "required": ["approval_status", "source_type"]
+      },
+      "then": {
+        "required": ["user_approval"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source_type": { "const": "risk_accepted" }
+        },
+        "required": ["source_type"]
+      },
+      "then": {
+        "required": ["risk_waiver"],
+        "properties": {
+          "approval_status": { "const": "approved" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "source_type": { "const": "not_applicable" }
+        },
+        "required": ["source_type"]
+      },
+      "then": {
+        "properties": {
+          "approval_status": { "const": "not_required" }
+        }
+      }
+    }
+  ]
+}

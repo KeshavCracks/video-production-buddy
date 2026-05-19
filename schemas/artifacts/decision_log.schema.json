@@ -35,6 +35,7 @@
               "downgrade_approval",
               "music_source",
               "motion_commitment",
+              "product_identity_reference_selection",
               "concept_selection",
               "voice_selection",
               "capability_extension",

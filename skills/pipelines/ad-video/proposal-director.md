@@ -37,8 +37,14 @@ blocker to EP.
    from AGENT_GUIDE: present both Remotion and HyperFrames when both are available,
    include any applicable FFmpeg option, and never silently default. Record the
    user's choice in `decision_log` under category `render_runtime_selection`.
-6. **Budget confirmation** — itemized cost estimate by stage.
-7. **CTA verification** — confirm `production_bible.identity.cta` is non-null. If null,
+6. **Product reference strategy** — lock `product_reference_strategy` before assets:
+   `not_applicable`, `use_provided_reference`, `generate_concept_reference`, or
+   `risk_accepted`. For physical/product-visible ads, default to
+   `generate_concept_reference` when no user asset exists. `risk_accepted` is allowed
+   only after explicit user approval of the fidelity risk. Record the decision in
+   `decision_log` under category `product_identity_reference_selection`.
+7. **Budget confirmation** — itemized cost estimate by stage.
+8. **CTA verification** — confirm `production_bible.identity.cta` is non-null. If null,
    this is a pipeline error (should have been set at Round 2b). Surface as blocker to EP.
 
 ## What This Director No Longer Owns
@@ -90,6 +96,13 @@ RENDER ENGINE
   • FFmpeg — [for cinematic/source-footage concepts; brief pro/con]
   Which do you prefer?
 
+PRODUCT IDENTITY REFERENCE
+  Strategy:
+  • Use provided reference — safest when projects/<project>/reference_assets/product_*.png|jpg exists
+  • Generate concept reference — recommended when no user product photo exists
+  • Risk accepted — text-only product generation; requires explicit user-approved fidelity-risk waiver
+  • Not applicable — no physical/product-visible identity to preserve
+
 ESTIMATED COST
   [Itemized by stage]
   Total: [estimate]
@@ -101,6 +114,11 @@ Parse response. Populate:
 - `production_proposal.derivatives_added[]` with user-selected variants
 - Lock `production_proposal.style_mode`
 - Lock `production_proposal.render_runtime`
+- Lock `production_proposal.product_reference_strategy`
+
+If the strategy changes cost or reliability, explain the tradeoff before approval.
+Create a `product_identity_reference_selection` decision containing all options considered,
+the selected strategy, and `user_approved: true` after the user approves it.
 
 Do not require `production_bible.visual.render_runtime` before this point. The
 bible stage runs before proposal approval, so its `visual.render_runtime` field
@@ -166,6 +184,7 @@ Write `production_proposal` artifact to
   "selected_idea_id": "C2",
   "style_mode": "animated",
   "render_runtime": "remotion",
+  "product_reference_strategy": "generate_concept_reference",
   "subtitles": { "mode": "burnt-in", "language": "en" },
   "dubbing": [],
   "derivatives_added": ["variant_id_1"],
@@ -179,4 +198,6 @@ Write `production_proposal` artifact to
 
 - **Re-deciding creative direction**: Arc, beats, motifs, audio — all locked. Do not re-open.
 - **Silently defaulting runtime**: AGENT_GUIDE hard rule — always present both options.
+- **Skipping product identity strategy**: product-visible ads must lock
+  `product_reference_strategy` and log `product_identity_reference_selection` before assets.
 - **Skipping CTA verification**: If `identity.cta` is null here, something went wrong upstream.

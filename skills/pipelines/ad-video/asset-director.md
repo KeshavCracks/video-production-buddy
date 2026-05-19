@@ -2,7 +2,7 @@
 
 ## When to Use
 
-You are the Asset Director (base). You receive `scene_plan`, `script`, `production_bible`, and `production_proposal` and generate all assets. You run the **sample sub-stage first** (always), await human approval, then proceed to full generation.
+You are the Asset Director (base). You receive `scene_plan`, `script`, `production_bible`, and `production_proposal` and generate all assets. You resolve the **Product Reference sub-stage first** when product-visible scenes exist, then run the sample sub-stage, await human approval, and proceed to full generation.
 
 **Always read the mode supplement before generating visual assets:**
 - `EP_STATE.style_mode == "animated"` → read `asset-director-animated.md`
@@ -172,9 +172,38 @@ These are REQUIRED for ALL style modes and ALL ads:
 
 Missing either of these is a CRITICAL failure. Abort and alert the EP.
 
+## Product Reference Sub-Stage (Before Sample)
+
+Run this before any product-visible visual generation, including sample clips.
+
+1. Read `production_proposal.product_reference_strategy`.
+2. Read `scene_plan.scenes[].product_visibility` and `product_reference_required`.
+3. If no scene is product-visible, write `product_identity_reference` with
+   `source_type: "not_applicable"` and `approval_status: "not_required"`.
+4. If `use_provided_reference`, validate the selected
+   `projects/<project>/reference_assets/product_*.png|jpg` path and write it to
+   `product_identity_reference.selected_reference_image_path`.
+5. If `generate_concept_reference`, generate 2-4 concept reference candidates, present
+   file paths only, and wait for explicit approval of one candidate. Do not generate
+   product-visible video until `product_identity_reference.approval_status == "approved"`.
+6. If `risk_accepted`, stop until the user explicitly approves the fidelity-risk waiver.
+   Record `risk_waiver.user_approved: true`.
+
+Log the strategy as a `product_identity_reference_selection` decision. For product-visible
+generated assets:
+
+- Prefer `reference_to_video` when the provider supports identity references.
+- Otherwise create a scene keyframe constrained by the approved Product Identity Reference,
+  then animate it with image-to-video and record `scene_keyframe_to_video`.
+- Use `text_only_waived` only when the approved strategy is `risk_accepted`.
+
+Before sample approval and again before asset review, run
+`product_identity_consistency_check` against `product_identity_reference`, `scene_plan`,
+and `asset_manifest`. A FAIL blocks progress. A WARN must be shown during asset review.
+
 ## Sample Sub-Stage (Always Runs)
 
-The sample sub-stage generates a preview clip from the **first 2–3 scenes** before full asset generation proceeds.
+The sample sub-stage generates a preview clip from the **first 2–3 scenes** before full asset generation proceeds. If any selected sample scene is product-visible, the Product Reference sub-stage must already be approved or waived.
 
 ### Sample Generation Protocol
 

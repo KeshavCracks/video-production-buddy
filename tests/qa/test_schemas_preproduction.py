@@ -39,6 +39,102 @@ def validate(instance: dict, schema: dict) -> None:
 
 
 # ============================================================
+# TestProductIdentityReferenceSchema
+# ============================================================
+
+def _minimal_product_identity_reference() -> dict:
+    return {
+        "version": "1.0",
+        "reference_id": "pir-001",
+        "product_name": "OPPO Find X9 Pro",
+        "source_type": "generated",
+        "approval_status": "approved",
+        "selected_reference_image_path": "reference_assets/product_oppo_reference.png",
+        "candidate_reference_paths": [
+            "assets/images/product_reference_candidate_01.png",
+            "assets/images/product_reference_candidate_02.png",
+        ],
+        "required_visual_features": [
+            "large circular rear camera island",
+            "OPPO wordmark placement",
+        ],
+        "prohibited_variations": [
+            "generic phone silhouette",
+            "different lens count",
+        ],
+        "user_approval": {
+            "approved": True,
+            "approved_by": "user",
+            "approved_at": "2026-05-19T09:00:00Z",
+            "decision_id": "d-001",
+        },
+    }
+
+
+class TestProductIdentityReferenceSchema:
+    def setup_method(self):
+        self.schema = load_schema("product_identity_reference")
+
+    def test_valid_generated_reference(self):
+        validate(_minimal_product_identity_reference(), self.schema)
+
+    def test_user_provided_reference_requires_selected_path(self):
+        instance = _minimal_product_identity_reference()
+        instance["source_type"] = "user_provided"
+        del instance["selected_reference_image_path"]
+        try:
+            validate(instance, self.schema)
+            assert False, "Expected ValidationError for missing selected_reference_image_path"
+        except jsonschema.ValidationError:
+            pass
+
+    def test_risk_accepted_requires_user_approved_waiver(self):
+        instance = {
+            "version": "1.0",
+            "reference_id": "pir-risk",
+            "product_name": "OPPO Find X9 Pro",
+            "source_type": "risk_accepted",
+            "approval_status": "approved",
+            "required_visual_features": [],
+            "prohibited_variations": ["generic phone silhouette"],
+            "risk_waiver": {
+                "reason": "No reference image is available.",
+                "user_approved": True,
+                "approved_by": "user",
+                "approved_at": "2026-05-19T09:00:00Z",
+                "decision_id": "d-002",
+            },
+        }
+        validate(instance, self.schema)
+
+        instance["risk_waiver"]["user_approved"] = False
+        try:
+            validate(instance, self.schema)
+            assert False, "Expected ValidationError because risk waiver is not user-approved"
+        except jsonschema.ValidationError:
+            pass
+
+    def test_not_applicable_requires_not_required_status(self):
+        instance = {
+            "version": "1.0",
+            "reference_id": "pir-none",
+            "product_name": "Acme SaaS",
+            "source_type": "not_applicable",
+            "approval_status": "not_required",
+            "required_visual_features": [],
+            "prohibited_variations": [],
+        }
+        validate(instance, self.schema)
+
+        instance["approval_status"] = "approved"
+        try:
+            validate(instance, self.schema)
+            assert False, "Expected ValidationError for approved status on not_applicable reference"
+        except jsonschema.ValidationError:
+            pass
+
+
+# ============================================================
 # TestEnrichedBriefSchema
 # ============================================================
 

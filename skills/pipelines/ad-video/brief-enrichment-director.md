@@ -103,8 +103,15 @@ Required `creative_requirements` dimensions:
 - `mandatory_marketing` — slogans, claims, legal/compliance wording, must-show elements,
   and banned claims.
 - `cta` — exact final-frame call to action or explicit delegation to recommend one.
-- `product_fidelity_references` — product photos, app screenshots, brand assets, public
-  URLs, or explicit approval to proceed with brand-fidelity risk.
+- `product_fidelity_references` — product photos/app screenshots/brand assets by path,
+  public reference URLs, `generate concept reference`, explicit `risk waiver`, or
+  `not applicable`.
+
+For physical products or any product-visible ad, this worksheet line is the first
+user-facing Product Identity Reference choice. A concept reference is not a diagram; it
+is an approved product identity image used to preserve visual identity across generated
+clips. If no usable product photo exists, default the recommendation to generate concept
+reference candidates and ask the user to approve one before video generation.
 
 Use this message shape:
 
@@ -123,7 +130,7 @@ line you want me to choose as creative director.
 7. Language/voiceover: [prefill or recommendation]
 8. Mandatory marketing: [prefill or recommendation]
 9. CTA: [prefill or recommendation]
-10. Product fidelity references: [prefill, requested asset path, URL option, or documented risk]
+10. Product fidelity references: [provided path/URL, generate concept reference, risk waiver, or not applicable]
 
 Reply with edits, or say APPROVE WORKSHEET. You can also say "RECOMMEND FOR ME: 5, 6, 10".
 ```

@@ -230,7 +230,15 @@ For brands selling physical products with recognizable geometry (smartphones, ve
 
 **Why this matters:** text-to-video models (Wan, Kling, Seedance) cannot render specific product geometry from prose alone — they generate plausible-looking generic objects. Without a reference image, a "Find X9 Pro hero shot" prompt produces a generic premium black phone, not OPPO's specific device. For brand-paying advertisers, this is unacceptable risk; for personal projects, it's acceptable but should be flagged.
 
-The intake-director asks for product photos when the brief is for a physical product and the directory is empty. The asset-director-cinematic refuses to silently text-to-video a hero shot without a reference and surfaces the choice to the user.
+The intake and brief-enrichment directors capture this need through
+`creative_requirements.product_fidelity_references`. The proposal director then locks
+`production_proposal.product_reference_strategy`, and the asset director writes the
+canonical `product_identity_reference` artifact before any product-visible video
+generation. If the user provided product photos, the approved reference points at
+`reference_assets/product_*.png|jpg`. If no usable photo exists, generate 2-4 concept
+reference candidates and wait for explicit approval of one candidate, or stop for a
+user-approved `risk_accepted` waiver. Product-visible scenes must not proceed as
+text-only prompts unless that waiver is recorded.
 
 ### Capture the User Request First (HARD RULE)
 
@@ -600,19 +608,23 @@ Key contract points:
 - `idea` generates execution concepts inside the approved `production_bible`;
   it must not reopen the arc, beats, hook mechanic, or mandatory motifs.
 - `proposal` locks technical production parameters: derivative variants,
-  subtitles, dubbing, `style_mode`, `render_runtime`, budget, CTA verification,
-  voice/audio contract, and visual contract.
+  subtitles, dubbing, `style_mode`, `render_runtime`,
+  `product_reference_strategy`, budget, CTA verification, voice/audio contract,
+  and visual contract.
 - `scene_plan` must keep real-world ad content motion-first. Lifestyle,
   environment, product-interaction, and b-roll scenes need real video clips.
-  Stills are only acceptable for text cards, packshots, and end cards.
+  Stills are only acceptable for text cards, packshots, and end cards. Every
+  scene must declare `product_visibility` and `product_reference_required`.
 - `assets` always runs a sample approval sub-stage before full generation.
   The sample must include at least one product-visible scene when the product is
   visible anywhere in the ad. After the sample is approved, the asset stage still
   requires explicit `asset_review` and `music_review` approvals before compose.
-- Physical-product briefs should use `projects/<project>/reference_assets/`
-  product images for product-visible shots. If no reference image is available,
-  surface the brand-fidelity risk instead of silently text-to-video prompting a
-  generic product.
+- `assets` runs a Product Identity Reference sub-stage before the sample when
+  product-visible scenes exist. It must produce `product_identity_reference`,
+  use `reference_to_video` when supported, otherwise generate a scene keyframe
+  from the approved reference and animate it with image-to-video. Text-only
+  product-visible video is allowed only with a user-approved `risk_accepted`
+  waiver, and generated visual assets must record `product_identity_conditioning`.
 - Runtime and provider substitutions are governance events. If the selected
   `render_runtime`, TTS provider, video provider, image provider, or music path
   becomes unavailable, stop and ask before swapping. Record the decision.
@@ -631,7 +643,7 @@ Each stage produces one canonical artifact that becomes the contract for the nex
 | `proposal` | `*-director.md` | `production_proposal` | User-approved technical plan, runtime, audio, visual, budget, and variants |
 | `script` | `*-director.md` | `script` | Structured sections, valid timing, coherent narration |
 | `scene_plan` | `*-director.md` | `scene_plan` | Ordered scenes, timings, asset requirements |
-| `assets` | `*-director.md` | `asset_manifest` | Provenance, paths, model/tool metadata, scene linkage |
+| `assets` | `*-director.md` | `product_identity_reference` + `asset_manifest` | Product identity approval, provenance, paths, model/tool metadata, scene linkage |
 | `edit` | `*-director.md` | `edit_decisions` | Concrete cuts, overlays, subtitle/music decisions |
 | `compose` | `*-director.md` | `render_report` | Output paths, encoding profile, verification notes |
 | `publish` | `*-director.md` | `publish_log` | Output matrix, metadata, and delivery notes |

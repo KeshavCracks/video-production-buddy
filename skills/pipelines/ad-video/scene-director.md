@@ -25,6 +25,19 @@ Audiences on every platform (TikTok, YouTube, Instagram, LinkedIn, TV) disengage
 
 The only allowed stills are: packshot product lineup, text cards, end cards. Everything else is a video clip.
 
+## Product Identity Reference Fields
+
+Every ad-video scene must declare product visibility explicitly:
+
+| Field | Values | Rule |
+|---|---|---|
+| `product_visibility` | `none`, `background`, `partial`, `hero`, `detail`, `packshot` | Use `none` only when no advertised product, packaging, app UI, or recognizable brand-mandatory element appears. |
+| `product_reference_required` | boolean | Must be `true` whenever `product_visibility` is `background`, `partial`, `hero`, `detail`, or `packshot`. |
+
+This drives the Product Identity Reference contract. Product-visible generated scenes
+cannot proceed as text-only prompts unless `production_proposal.product_reference_strategy`
+is `risk_accepted` and the user-approved waiver is recorded in `product_identity_reference`.
+
 ## Safe Zones
 
 Safe zones depend on `EP_STATE.aspect_ratio_primary` — check this before designing any scene framing.
@@ -98,6 +111,8 @@ Include only the variants that are opted in. If no derivatives: omit `crop_regio
       "beat": "hook",
       "required_assets": [],
       "motion_required": false,
+      "product_visibility": "none",
+      "product_reference_required": false,
       "core": true,
       "crop_regions": {
         "9:16": {"x": 656, "y": 0, "w": 608, "h": 1080}
@@ -119,6 +134,8 @@ After reading this base document:
 
 - [ ] `sum(scene.duration_seconds)` within ±0.5s of script's total `duration_estimate_seconds`
 - [ ] Every scene has `core` field
+- [ ] Every scene has `product_visibility` and `product_reference_required`
+- [ ] Every product-visible scene has `product_reference_required: true`
 - [ ] If derivative_variants non-empty: every scene has `crop_regions` entries for each opted-in variant
 - [ ] No more than 3 consecutive scenes of the same `scene_type`
 - [ ] Scenes with `motion_required: true` are realistic given production plan

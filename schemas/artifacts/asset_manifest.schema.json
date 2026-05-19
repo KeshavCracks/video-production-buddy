@@ -33,7 +33,83 @@
           "generation_summary": { "type": "string", "description": "Brief summary of how the asset was generated or sourced" },
           "provider": { "type": "string", "description": "Provider name (e.g. pixabay, google_imagen)" },
           "license": { "type": "string", "description": "License type (e.g. Pixabay License, CC0)" },
-          "original_url": { "type": "string", "description": "Source URL if downloaded from a stock service" }
+          "original_url": { "type": "string", "description": "Source URL if downloaded from a stock service" },
+          "product_identity_conditioning": {
+            "type": "object",
+            "description": "Required for generated image/video assets linked to product-visible scenes. Records how the product identity reference conditioned generation and what the visual sanity check found.",
+            "required": [
+              "conditioning_mode",
+              "generation_tool",
+              "generation_model",
+              "fidelity_verdict"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "approved_reference_id": {
+                "type": "string",
+                "description": "product_identity_reference.reference_id used for conditioning. Omit only for text_only_waived."
+              },
+              "approved_reference_path": {
+                "type": "string",
+                "description": "Approved reference image path copied from product_identity_reference.selected_reference_image_path. Omit only for text_only_waived."
+              },
+              "conditioning_mode": {
+                "type": "string",
+                "enum": [
+                  "reference_to_video",
+                  "scene_keyframe_to_video",
+                  "text_only_waived"
+                ]
+              },
+              "generation_tool": {
+                "type": "string"
+              },
+              "generation_model": {
+                "type": "string"
+              },
+              "fidelity_verdict": {
+                "type": "string",
+                "enum": ["PASS", "WARN", "FLAG", "NOT_CHECKED"]
+              },
+              "fidelity_notes": {
+                "type": "string"
+              },
+              "keyframe_path": {
+                "type": "string",
+                "description": "Extracted keyframe used for identity sanity check."
+              },
+              "waiver_decision_id": {
+                "type": "string",
+                "description": "decision_log decision id when conditioning_mode=text_only_waived."
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "conditioning_mode": {
+                      "enum": ["reference_to_video", "scene_keyframe_to_video"]
+                    }
+                  },
+                  "required": ["conditioning_mode"]
+                },
+                "then": {
+                  "required": ["approved_reference_id", "approved_reference_path"]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "conditioning_mode": { "const": "text_only_waived" }
+                  },
+                  "required": ["conditioning_mode"]
+                },
+                "then": {
+                  "required": ["waiver_decision_id"]
+                }
+              }
+            ]
+          }
         },
         "additionalProperties": false
       }

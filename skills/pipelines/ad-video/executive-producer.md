@@ -11,6 +11,7 @@ EP_STATE:
   pipeline: ad-video
   style_mode: null            # locked at proposal: "animated" | "cinematic"
   render_runtime: null        # locked at proposal: "remotion" | "hyperframes" | "ffmpeg"
+  product_reference_strategy: null # locked at proposal: not_applicable | use_provided_reference | generate_concept_reference | risk_accepted
   playbook: ad-brand
   target_duration_seconds: null
   budget_total_usd: 5.00
@@ -29,6 +30,7 @@ EP_STATE:
     bible: null        # → production_bible (includes approval flags)
     idea: null
     proposal: null
+    product_identity_reference: null
     script: null
     scene_plan: null
     assets: null
@@ -71,6 +73,7 @@ After bible approval (Round 2a + 2b), extract and store in EP_STATE:
 After proposal approval, extract and store in EP_STATE:
 - `style_mode` from `production_proposal.style_mode` (LOCKED — never changes downstream)
 - `render_runtime` from `production_proposal.render_runtime`
+- `product_reference_strategy` from `production_proposal.product_reference_strategy`
 - `derivative_variants` from `production_proposal.derivatives_added`
 - `aspect_ratio_primary` from `production_bible.deliverables.primary.aspect_ratio`
 - `selected_concept_id` from `idea_options.selected_concept_id` (the user-chosen concept ID)
@@ -129,9 +132,11 @@ CHECK: Approval gate
 - production_proposal artifact produced?
 - production_proposal.style_mode present
 - production_proposal.render_runtime present
+- production_proposal.product_reference_strategy present
 - production_proposal.derivatives_added present (may be empty if no variants chosen)
 - production_bible.visual.render_runtime is optional audit context only; do not require it
 - Store in EP_STATE: style_mode, render_runtime, derivative_variants, approved_budget_usd
+- Store in EP_STATE: product_reference_strategy
 CHECK: Primary aspect ratio
 - production_bible.deliverables.primary.aspect_ratio present? ("16:9" or "9:16")
 - Store in EP_STATE.aspect_ratio_primary (LOCKED — do NOT change downstream)
@@ -171,6 +176,10 @@ CHECK: Core/trimmable tagging
 ### After ASSETS stage
 ```
 CHECK: Sample gate — two-message protocol enforced
+- product_identity_reference_selection decision is logged before any product-visible video generation
+- product_identity_reference exists before sample generation
+- If any scene has product_reference_required=true, product_identity_consistency_check must PASS or WARN before asset review
+- If product_identity_consistency_check FAILs: REVISE assets before sample/full generation continues
 - Was the sample path announced in message 1 WITHOUT a content description?
 - Was the approval request sent in a SEPARATE message 2?
 - sample_approved must be true before full generation proceeds
@@ -262,10 +271,10 @@ Actual: {what was produced}
 |------|------------|----------------|-------------|
 | G-0 | brief_enrichment | Three blockers resolved; creative_requirements complete; user_approved=true | Wait for user |
 | G1 | idea | Brief completeness, style_mode_candidate, ref role annotations | Revise idea |
-| G2 | proposal | User approval, style_mode locked, derivatives locked | Wait for user |
+| G2 | proposal | User approval, style_mode locked, product reference strategy locked, derivatives locked | Wait for user |
 | G3 | script | Word count ±10%, four beats, brand name in CTA | Revise script |
 | G4 | scene_plan | Duration coverage, crop_regions if derivatives, core tagging | Revise scene_plan |
-| G5 | assets | sample_approved, asset_review_approved, music_review_approved, TTS required, budget | Send-back or revise |
+| G5 | assets | product_identity_reference approved/waived, sample_approved, asset_review_approved, music_review_approved, TTS required, budget | Send-back or revise |
 | G6 | edit | Timeline complete, ducking -18 dB, subtitle opt-in captured (not required true) | Revise edit |
 | G7 | compose | Duration ±5%, one file per derivative | Revise compose |
 | G8 | publish | output_file_matrix non-empty, metadata complete | Revise publish |

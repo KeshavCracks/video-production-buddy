@@ -25,38 +25,39 @@ Output: `assets/scene_{id}_img.jpg`, 1920×1080, JPEG quality 95
 **Brand-fidelity rule:** Wan 2.6 / 2.7 t2v cannot reliably render specific product geometry (lens count, button placement, brand-mark colors) from prose alone. For ANY scene where the advertised product or brand-mandatory element is visible, branch:
 
 ```python
-from pathlib import Path
+scene_shows_product = scene.get("product_reference_required") is True
+product_ref = product_identity_reference  # loaded from artifacts/product_identity_reference.json
 
-reference_dir = Path(f"projects/{project_id}/reference_assets")
-product_refs = list(reference_dir.glob("product_*.png")) + list(reference_dir.glob("product_*.jpg")) if reference_dir.exists() else []
-
-scene_shows_product = (
-    scene.get("scene_type") in {"hero_shot", "detail_close", "lifestyle_moment"}
-    and "product" in scene.get("description", "").lower()
-) or scene.get("hero_moment", False)
-
-if scene_shows_product and product_refs:
-    # PREFERRED: image-to-video with the brand's actual product reference image.
-    # Use wan2.7-i2v or wan2.6-i2v-flash via wan_video_api with operation="image_to_video".
+if scene_shows_product and product_ref["source_type"] in {"user_provided", "generated", "external_url"}:
+    if product_ref["approval_status"] != "approved":
+        raise RuntimeError(
+            f"Scene {scene['id']} is product-visible, but product_identity_reference "
+            "is not approved. Stop before generation and request user approval."
+        )
+    # PREFERRED: provider identity/reference-to-video if supported. Otherwise
+    # generate a scene keyframe constrained by product_ref, then animate it via
+    # image_to_video and record conditioning_mode=scene_keyframe_to_video.
     operation = "image_to_video"
-    image_path = str(product_refs[0])
-elif scene_shows_product and not product_refs:
-    # NO REFERENCE: text-to-video will produce a generic-looking object.
-    # Surface to user — do NOT silently produce a hero shot of a generic phone.
-    raise RuntimeError(
-        f"Scene {scene['id']} requires the advertised product to be visible, "
-        f"but reference_assets/ contains no product_*.png|jpg. "
-        f"Wan t2v cannot reliably render specific product geometry from prose. "
-        f"Options: (a) drop a product photo into projects/{project_id}/reference_assets/, "
-        f"(b) approve text-to-video with the documented brand-fidelity risk, "
-        f"(c) skip this scene and let scene-director redesign without product visibility."
-    )
+    image_path = product_ref.get("selected_reference_image_path") or product_ref.get("selected_reference_url")
+elif scene_shows_product and product_ref["source_type"] == "risk_accepted":
+    if not product_ref.get("risk_waiver", {}).get("user_approved"):
+        raise RuntimeError(
+            f"Scene {scene['id']} is product-visible, but the fidelity-risk waiver "
+            "is not user-approved. Stop before text-only generation."
+        )
+    # Text-only is allowed only under this explicit waiver. Record
+    # conditioning_mode=text_only_waived in asset_manifest.
+    operation = "text_to_video"
 else:
     # No product in frame — text-to-video is fine for environmental / lifestyle-only scenes.
     operation = "text_to_video"
 ```
 
-**Rationale:** without a real product reference, the agent is gambling that Wan happens to generate a phone shape similar to the actual product. For brand-paying advertisers, this is unacceptable risk. The `reference_assets/` convention lets the user provide the brand's own product photography (which they always have) as a control image.
+After each product-visible generated asset, record
+`asset_manifest.assets[].product_identity_conditioning` with the approved reference id/path,
+conditioning mode, generation tool/model, and fidelity verdict from the visual sanity check.
+
+**Rationale:** without an approved Product Identity Reference, the agent is gambling that Wan happens to generate a phone shape similar to the actual product. For brand-paying advertisers, this is unacceptable risk. The `reference_assets/` convention remains the preferred source when the user has real product photography, but the approved `product_identity_reference` artifact is the contract downstream stages inspect.
 
 ### Video Generation (lifestyle_moment, environment_wide)
 

@@ -21,6 +21,7 @@ ARTIFACT_NAMES = [
     "production_bible",
     "idea_options",
     "production_proposal",
+    "product_identity_reference",
     "script",
     "character_design",
     "rig_plan",
