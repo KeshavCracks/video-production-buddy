@@ -20,8 +20,9 @@ It handles video clips (via `<OffthreadVideo>`), still images, animated scenes,
 component types, transitions, and mixed content — all in a single React-based
 render pass.
 
-FFmpeg is the **fallback** — used only when Remotion is unavailable, or for
-simple standalone operations that don't benefit from React rendering.
+FFmpeg is the **explicit alternate runtime** for simple standalone operations
+that don't benefit from React rendering. It is not an automatic downgrade after
+`render_runtime` has been locked to `remotion`.
 
 | Use Case | Backend | Why |
 |----------|---------|-----|
@@ -35,13 +36,16 @@ simple standalone operations that don't benefit from React rendering.
 | Simple trim, concat (no composition) | FFmpeg | Instant, no Node dependency |
 | Subtitle burn-in (standalone, post-hoc) | FFmpeg | Only for adding subs to an already-rendered video without re-rendering |
 | Face enhance, color grade | FFmpeg | Filter-based, deterministic |
-| Remotion unavailable | FFmpeg | Automatic fallback |
+| Remotion unavailable before runtime lock | FFmpeg can be proposed | Surface as an option before approval |
+| Remotion unavailable after `render_runtime: remotion` is locked | Blocker | Fix Remotion or get user-approved runtime change |
 
-**Note:** The `render` operation auto-routes to Remotion by default. FFmpeg is
-only selected when Remotion is not installed or the agent explicitly calls
-`operation='compose'` for standalone operations. The agent can also write custom
-Remotion compositions on the fly via the capability-extension protocol when no
-existing composition covers the layout (e.g., custom PiP, split-screen).
+**Note:** The `render` operation honors `edit_decisions.render_runtime`. If it
+is `remotion`, unavailable Remotion is a governance blocker, not a silent FFmpeg
+fallback. FFmpeg is selected only when `render_runtime: ffmpeg` is explicitly
+approved, or when the agent calls `operation='compose'` for standalone FFmpeg
+operations. The agent can also write custom Remotion compositions on the fly via
+the capability-extension protocol when no existing composition covers the layout
+(e.g., custom PiP, split-screen).
 
 ## Supported Scene Types (Cut Types)
 

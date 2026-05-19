@@ -27,6 +27,7 @@ ALL_KNOWN_STAGES = frozenset([
 # New code should use get_pipeline_stages(pipeline_type) instead.
 STAGES = ["research", "proposal", "idea", "script", "scene_plan",
           "assets", "edit", "compose", "publish"]
+LEGACY_PIPELINE_TYPE = "unknown"
 
 CANONICAL_STAGE_ARTIFACTS = {
     "research": "research_brief",
@@ -60,6 +61,19 @@ def _canonical_artifact_for_stage(stage: str, pipeline_type: str | None) -> str:
     """Return the canonical artifact name for a stage in its pipeline context."""
     if pipeline_type == "ad-video":
         return AD_VIDEO_CANONICAL_STAGE_ARTIFACTS[stage]
+
+    if pipeline_type not in (None, LEGACY_PIPELINE_TYPE):
+        from lib.pipeline_loader import load_pipeline
+
+        manifest = load_pipeline(pipeline_type)
+        for stage_def in manifest.get("stages", []):
+            if stage_def.get("name") != stage:
+                continue
+            for artifact_name in stage_def.get("produces", []):
+                if artifact_name in ARTIFACT_NAMES:
+                    return artifact_name
+            break
+
     return CANONICAL_STAGE_ARTIFACTS[stage]
 
 # Additional artifacts that may be produced alongside canonical ones.
@@ -74,28 +88,26 @@ SUPPLEMENTARY_ARTIFACTS = {
 def get_pipeline_stages(pipeline_type: str | None) -> list[str]:
     """Return the ordered stage list for a specific pipeline.
 
-    Falls back to STAGES (deterministic canonical order) when pipeline_type
-    is not provided or the manifest cannot be loaded.
+    Falls back to STAGES (deterministic canonical order) only when pipeline_type
+    is not provided or uses the legacy "unknown" sentinel.
 
     Previous versions used a set intersection here, which produced
-    nondeterministic ordering. The fallback now uses a stable list.
+    nondeterministic ordering. The fallback now uses a stable list. Explicit
+    pipeline names must load successfully; typos should fail fast instead of
+    resuming the wrong stage order.
     """
-    if pipeline_type is None:
+    if pipeline_type in (None, LEGACY_PIPELINE_TYPE):
         # Deterministic canonical fallback — sorted to ensure stable ordering
         import logging
         logging.getLogger(__name__).warning(
-            "get_pipeline_stages called without pipeline_type — "
+            "get_pipeline_stages called without a concrete pipeline_type — "
             "using canonical fallback order. Pass pipeline_type for correctness."
         )
         return list(STAGES)
 
-    try:
-        from lib.pipeline_loader import load_pipeline, get_stage_order
-        manifest = load_pipeline(pipeline_type)
-        return get_stage_order(manifest)
-    except (FileNotFoundError, Exception):
-        # Graceful fallback: return all known stages in canonical order
-        return list(STAGES)
+    from lib.pipeline_loader import load_pipeline, get_stage_order
+    manifest = load_pipeline(pipeline_type)
+    return get_stage_order(manifest)
 
 CHECKPOINT_SCHEMA_PATH = (
     Path(__file__).resolve().parent.parent
@@ -250,7 +262,7 @@ def write_checkpoint(
     checkpoint = {
         "version": "1.0",
         "project_id": project_id,
-        "pipeline_type": pipeline_type or "unknown",
+        "pipeline_type": pipeline_type or LEGACY_PIPELINE_TYPE,
         "stage": stage,
         "status": status,
         "timestamp": datetime.now(timezone.utc).isoformat(),

@@ -1,6 +1,6 @@
 # OpenMontage Architecture
 
-> Last updated: 2026-03-28 | Derived from code exploration, not prior documentation.
+> Last updated: 2026-05-19 | Derived from code exploration, not prior documentation.
 
 OpenMontage is an **agent-orchestrated video production platform**. An LLM coding assistant (Claude Code, Cursor, Copilot, etc.) acts as the orchestrator — reading pipeline manifests, following skill instructions, calling Python tools, and checkpointing state. There is no runtime Python orchestrator; the agent _is_ the control plane.
 
@@ -40,7 +40,7 @@ OpenMontage/
 │   ├── env_loader.py       # .env variable management
 │   └── providers/          # (Reserved for future provider abstractions)
 │
-├── tools/                  # 57+ Python tool implementations
+├── tools/                  # 91+ Python tool implementations
 │   ├── base_tool.py        # Abstract base class — the tool contract
 │   ├── tool_registry.py    # Auto-discovery singleton registry
 │   ├── cost_tracker.py     # Budget governance (estimate → reserve → reconcile)
@@ -55,7 +55,7 @@ OpenMontage/
 │
 ├── pipeline_defs/          # YAML pipeline manifests
 ├── schemas/                # JSON Schema definitions for validation
-│   ├── artifacts/          # 11 artifact schemas (brief → publish_log)
+│   ├── artifacts/          # 28 artifact schemas (brief -> publish_log plus governance artifacts)
 │   ├── checkpoints/        # Checkpoint state schema
 │   ├── pipelines/          # Pipeline manifest schema
 │   ├── styles/             # Style playbook schema
@@ -204,18 +204,20 @@ stages:
 
 | Pipeline | Category | Description |
 |----------|----------|-------------|
+| `ad-video` | custom | Ad/commercial pipeline with intake, strategic brief enrichment, product identity governance, sample approval, hallucination checks, and publish packaging |
 | `animated-explainer` | generated | AI-produced explainer with research, narration, visuals, music |
 | `animation` | animation | Motion graphics, kinetic typography |
 | `avatar-spokesperson` | talking_head | Avatar-driven presenter videos |
 | `character-animation` | animation | Local rigged cartoon characters with SVG rigs, pose libraries, GSAP timelines, and HyperFrames rendering |
 | `cinematic` | cinematic | Trailer, teaser, mood-driven edits |
 | `clip-factory` | custom | Batch short-form clips from long source |
+| `documentary-montage` | documentary | Documentary-style montage from source media and supporting assets |
+| `framework-smoke` | custom | Minimal smoke test for framework validation |
 | `hybrid` | hybrid | Source footage + AI-generated support visuals |
 | `localization-dub` | custom | Subtitle, dub, and translate existing video |
 | `podcast-repurpose` | hybrid | Podcast highlights to video |
 | `screen-demo` | screen_recording | Software screen recordings and walkthroughs |
 | `talking-head` | talking_head | Footage-led speaker videos |
-| `framework-smoke` | custom | Minimal smoke test for framework validation |
 
 ### Standard Stage Progression
 
@@ -233,9 +235,11 @@ Each stage:
 5. Can require **human approval** before proceeding
 
 Specialized pipelines may insert domain-specific stages. For example,
-`character-animation` adds `character_design` and `rig_plan` before
-`scene_plan`, then emits a HyperFrames workspace and final deliverable at
-`projects/<project-name>/renders/final.mp4`.
+`ad-video` begins with `intake -> brief_enrichment -> intelligence -> bible`
+before the creative stages, while `character-animation` adds
+`character_design` and `rig_plan` before `scene_plan`. The manifest in
+`pipeline_defs/<pipeline>.yaml` is the source of truth for stage order and
+canonical stage artifacts.
 
 ---
 
@@ -268,7 +272,7 @@ Checkpoints persist pipeline state as JSON in the project's `projects/` director
 
 **Functions:** `write_checkpoint()`, `read_checkpoint()`, `get_latest_checkpoint()`, `get_completed_stages()`, `get_next_stage()`
 
-### Canonical Artifacts (11 types, all JSON-schema validated)
+### Artifact Schemas (28 types, all JSON-schema validated)
 
 | Artifact | Stage | Contains |
 |----------|-------|----------|
@@ -283,6 +287,23 @@ Checkpoints persist pipeline state as JSON in the project's `projects/` director
 | `publish_log` | publish | Platform publication entries with status |
 | `review` | (any) | Reviewer feedback and approval records |
 | `cost_log` | (any) | Budget tracking entries |
+| `decision_log` | (any) | Governance decisions such as approved runtime/provider substitutions |
+| `user_request` | intake | Original user request captured for project provenance |
+| `intake_brief` | intake | Research-direction fields for ad/commercial workflows |
+| `enriched_brief` | brief_enrichment | Structured worksheet expanding sparse ad briefs before strategy |
+| `intelligence_brief` | intelligence | Category, audience, and competitive insight for ad strategy |
+| `production_bible` | bible | Approved ad strategy, truth contract, motif, audio, and compliance contract |
+| `idea_options` | idea | Execution concepts constrained by an approved production bible |
+| `production_proposal` | proposal | Ad technical plan, runtime, audio, visual, budget, and variants |
+| `product_identity_reference` | assets | Approved visual reference strategy for product-visible ads |
+| `character_design` | character_design | Character specifications for local rigged animation |
+| `rig_plan` | rig_plan | SVG rig structure, parts, pivots, and animation constraints |
+| `pose_library` | rig_plan | Reusable poses/action cycles for character animation |
+| `action_timeline` | scene_plan/assets | Timed character actions compiled from scene intent |
+| `source_media_review` | preplanning | Source-media suitability and constraints before planning |
+| `final_review` | compose | Final self-review before presenting a render |
+| `character_qa_report` | compose | Character-animation schema, rig, pose, and timeline QA |
+| `video_analysis_brief` | reference input | External/reference video analysis carried into planning |
 
 ---
 

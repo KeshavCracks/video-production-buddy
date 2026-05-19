@@ -804,17 +804,18 @@ class VideoCompose(BaseTool):
         component types, transitions, and mixed content — all in a single
         React-based render pass.
 
-        Returns False (i.e. use FFmpeg) only when Remotion is not
-        available. For `operation="render"` the governance default is
-        Remotion-first: the renderer family was chosen earlier, and the
-        tool should preserve that decision instead of silently
-        downgrading to FFmpeg.
+        For `operation="render"` the governance default is Remotion-first:
+        the renderer family was chosen earlier, and the tool should preserve
+        that decision instead of silently downgrading to FFmpeg. Availability
+        is checked by `_render` before calling this method for locked Remotion
+        renders.
 
         This "Remotion-first" policy means mixed content (video clips +
         animated stills + text cards) is always composed in Remotion, which
         can embed <OffthreadVideo> alongside React components natively.
         """
-        # If Remotion isn't installed, fall back to FFmpeg
+        # Preserve the legacy probe result for direct callers. Locked render
+        # paths check availability before this point and block instead.
         if not self._remotion_available():
             return False
 
@@ -1051,6 +1052,18 @@ class VideoCompose(BaseTool):
             )
 
         # --- Explicit Remotion path (render_runtime == 'remotion') ---
+        if not self._remotion_available():
+            return ToolResult(
+                success=False,
+                error=(
+                    "render_runtime='remotion' is locked in edit_decisions, "
+                    "but the Remotion runtime is not available. Per governance, "
+                    "the tool must not silently downgrade to FFmpeg. Fix the "
+                    "Remotion setup or record a user-approved render_runtime "
+                    "decision before rerouting."
+                ),
+            )
+
         if self._needs_remotion(resolved_cuts):
             remotion_inputs: dict[str, Any] = {
                 "edit_decisions": dict(edit_decisions, cuts=resolved_cuts),
