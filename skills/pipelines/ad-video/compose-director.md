@@ -263,7 +263,12 @@ If any check fails: ABORT. Alert EP with the mismatch. Do not proceed to derivat
 
 For each variant in `EP_STATE.derivative_variants`:
 
-**Before each derivative render:** verify `crop_regions` for that variant are present in `scene_plan.metadata.ad_video_scenes`. If any scene is missing `crop_regions`: ABORT. Send back to scene_plan director. **This check is NOT skipped for subsequent derivatives.**
+**Before each aspect-ratio derivative render:** verify `crop_regions` for that
+aspect ratio are present on every scene. If any scene is missing the required
+aspect-ratio crop: ABORT. Send back to scene_plan director. Duration-only
+variants (`15s`, `15s_short`) do not require crop regions unless combined with
+an aspect-ratio derivative. **This check is NOT skipped for subsequent
+aspect-ratio derivatives.**
 
 Call `audio_mixer` once per variant to produce a variant-appropriate mix (15s variants use shorter music trim). Then call `video_compose` with variant-specific parameters:
 

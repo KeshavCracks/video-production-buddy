@@ -758,8 +758,8 @@ def test_ad_video_scene_plan_schema_requires_scene_governance_fields() -> None:
         validate_artifact("scene_plan", scene_plan)
 
 
-def test_ad_video_scene_plan_schema_requires_crop_regions_for_derivatives() -> None:
-    """Derivative variants are not renderable unless every scene has crop regions."""
+def test_ad_video_scene_plan_schema_requires_crop_regions_for_aspect_ratio_derivatives() -> None:
+    """Aspect-ratio derivatives are not renderable unless every scene has crop regions."""
     scene_plan = {
         "version": "1.0",
         "style_mode": "cinematic",
@@ -797,6 +797,48 @@ def test_ad_video_scene_plan_schema_requires_crop_regions_for_derivatives() -> N
     scene_plan["scenes"][0]["product_visibility"] = "none"
     scene_plan["scenes"][0]["product_reference_required"] = False
     validate_artifact("scene_plan", scene_plan)
+
+
+def test_ad_video_scene_plan_schema_does_not_require_crop_regions_for_duration_only_derivatives() -> None:
+    """Duration cuts are handled by core-scene filtering, not crop rectangles."""
+    scene_plan = {
+        "version": "1.0",
+        "style_mode": "cinematic",
+        "total_duration_seconds": 15,
+        "derivative_variants": ["15s_short"],
+        "scenes": [
+            {
+                "id": "scene-1",
+                "type": "generated",
+                "description": "A moving lifestyle scene kept in the short cut.",
+                "start_seconds": 0,
+                "end_seconds": 5,
+                "core": True,
+                "motion_required": True,
+                "product_visibility": "none",
+                "product_reference_required": False,
+            }
+        ],
+    }
+
+    validate_artifact("scene_plan", scene_plan)
+
+    with_aspect_ratio = deepcopy(scene_plan)
+    with_aspect_ratio["derivative_variants"] = ["15s_short", "9:16"]
+    with pytest.raises(Exception):
+        validate_artifact("scene_plan", with_aspect_ratio)
+
+    with_aspect_ratio["scenes"][0]["crop_regions"] = {
+        "9:16": {"x": 656, "y": 0, "w": 608, "h": 1080}
+    }
+    validate_artifact("scene_plan", with_aspect_ratio)
+
+    duration_key_as_crop = deepcopy(scene_plan)
+    duration_key_as_crop["scenes"][0]["crop_regions"] = {
+        "15s_short": {"x": 0, "y": 0, "w": 1920, "h": 1080}
+    }
+    with pytest.raises(Exception):
+        validate_artifact("scene_plan", duration_key_as_crop)
 
 
 def test_production_bible_schema_allows_runtime_deferral_until_proposal() -> None:
@@ -964,6 +1006,48 @@ def test_kvm_coverage_reads_visual_key_visual_moments() -> None:
     assert report["summary"]["kvms_checked"] == 1
     assert report["ok"] is False
     assert report["issues"][0]["kvm_id"] == "KVM-1"
+
+
+def test_kvm_coverage_requires_fulfilling_scenes_to_carry_required_motion_primitives() -> None:
+    bible = {
+        "visual": {
+            "key_visual_moments": [
+                {
+                    "moment_id": "KVM-1",
+                    "description": "Product reveal lands at the emotional peak.",
+                    "maps_to_beat": "B3",
+                    "mandatory": True,
+                    "required_motion_primitives": [
+                        "camera_push",
+                        "product_reveal",
+                    ],
+                }
+            ]
+        }
+    }
+    scene_plan = {
+        "scenes": [
+            {
+                "id": "scene-1",
+                "fulfills_kvm": ["KVM-1"],
+                "motion_specs": ["camera_push"],
+            }
+        ]
+    }
+
+    report = check_kvm_coverage(bible, scene_plan)
+
+    assert report["ok"] is False
+    assert report["issues"][0]["kind"] == "missing_required_motion_primitives"
+    assert report["issues"][0]["scene_id"] == "scene-1"
+    assert report["issues"][0]["kvm_id"] == "KVM-1"
+    assert report["issues"][0]["missing_motion_primitives"] == ["product_reveal"]
+
+    scene_plan["scenes"][0]["motion_specs"].append("product_reveal")
+    report = check_kvm_coverage(bible, scene_plan)
+
+    assert report["ok"] is True
+    assert report["issues"] == []
 
 
 def test_runtime_consistency_accepts_user_approved_decision_log_swap() -> None:

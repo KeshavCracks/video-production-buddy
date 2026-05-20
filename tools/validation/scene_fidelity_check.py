@@ -139,7 +139,7 @@ def check_plan(plan: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]
 def check_kvm_coverage(
     bible: dict[str, Any], scene_plan: dict[str, Any]
 ) -> dict[str, Any]:
-    """Verify every mandatory KVM in production_bible has at least one fulfilling scene."""
+    """Verify mandatory KVM coverage and required motion primitive fulfillment."""
     visual = bible.get("visual") or {}
     kvms = (
         visual.get("key_visual_moments")
@@ -150,16 +150,57 @@ def check_kvm_coverage(
     if not kvms:
         return {"ok": True, "issues": [], "summary": {"kvms_checked": 0}}
 
+    kvm_by_id = {
+        kvm_id: kvm
+        for kvm in kvms
+        if (kvm_id := (kvm.get("moment_id") or kvm.get("kvm_id") or kvm.get("id")))
+    }
     coverage: dict[str, list[str]] = {}
-    for scene in scene_plan.get("scenes", []) or scene_plan.get("cuts", []):
-        for kvm_id in scene.get("fulfills_kvm", []) or []:
-            coverage.setdefault(kvm_id, []).append(scene.get("id", "?"))
-
     issues = []
+    motion_primitive_gaps = 0
+    for scene in scene_plan.get("scenes", []) or scene_plan.get("cuts", []):
+        scene_id = scene.get("id", "?")
+        scene_motion_specs = set(scene.get("motion_specs", []) or [])
+        for kvm_id in scene.get("fulfills_kvm", []) or []:
+            coverage.setdefault(kvm_id, []).append(scene_id)
+            kvm = kvm_by_id.get(kvm_id)
+            if not kvm:
+                continue
+
+            required_motion_primitives = [
+                primitive
+                for primitive in (kvm.get("required_motion_primitives") or [])
+                if primitive
+            ]
+            missing_motion_primitives = [
+                primitive
+                for primitive in required_motion_primitives
+                if primitive not in scene_motion_specs
+            ]
+            if missing_motion_primitives:
+                motion_primitive_gaps += 1
+                issues.append(
+                    {
+                        "severity": "critical",
+                        "scene_id": scene_id,
+                        "kvm_id": kvm_id,
+                        "kind": "missing_required_motion_primitives",
+                        "required_motion_primitives": required_motion_primitives,
+                        "missing_motion_primitives": missing_motion_primitives,
+                        "detail": (
+                            f"Scene {scene_id!r} fulfills KVM {kvm_id!r} but omits "
+                            f"required motion primitives {missing_motion_primitives} "
+                            "from `motion_specs`."
+                        ),
+                    }
+                )
+
+    uncovered = 0
     for kvm in kvms:
         kvm_id = kvm.get("moment_id") or kvm.get("kvm_id") or kvm.get("id")
         mandatory = kvm.get("mandatory", True)
         if mandatory and kvm_id not in coverage:
+            uncovered += 1
             issues.append(
                 {
                     "severity": "critical",
@@ -178,7 +219,8 @@ def check_kvm_coverage(
         "issues": issues,
         "summary": {
             "kvms_checked": len(kvms),
-            "kvms_uncovered": len(issues),
+            "kvms_uncovered": uncovered,
+            "kvm_motion_primitive_gaps": motion_primitive_gaps,
             "coverage": coverage,
         },
     }

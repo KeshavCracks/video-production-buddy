@@ -105,8 +105,9 @@ Rules for core tagging:
 
 ## Crop Regions
 
-When `derivative_variants` is non-empty, every scene must declare `crop_regions`
-with one entry for each opted-in variant:
+When `derivative_variants` includes an aspect-ratio variant (`"9:16"` or
+`"1:1"`), every scene must declare `crop_regions` with one entry for each
+opted-in aspect ratio:
 
 ```json
 "crop_regions": {
@@ -115,7 +116,9 @@ with one entry for each opted-in variant:
 }
 ```
 
-Include only the variants that are opted in. If no derivatives: omit `crop_regions`.
+Include only opted-in aspect-ratio variants. Duration-only variants (`"15s"` /
+`"15s_short"`) use `core: true` scene filtering and do not get crop rectangles.
+If no aspect-ratio derivatives are opted in, omit `crop_regions`.
 
 ## Scene Plan Artifact Format
 
@@ -174,7 +177,7 @@ After reading this base document:
 - [ ] Every scene has `product_visibility` and `product_reference_required`
 - [ ] Every product-visible scene has `product_reference_required: true`
 - [ ] Every high-risk generated scene has `hallucination_checks[]`
-- [ ] If derivative_variants non-empty: every scene has `crop_regions` entries for each opted-in variant
+- [ ] If `derivative_variants` includes `"9:16"` or `"1:1"`: every scene has `crop_regions` entries for each opted-in aspect ratio
 - [ ] No more than 3 consecutive scenes of the same `scene_type`
 - [ ] Scenes with `motion_required: true` are realistic given production plan
 - [ ] CTA scene is center-weighted and brand name visible in all crop regions
