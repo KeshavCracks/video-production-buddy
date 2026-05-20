@@ -32,27 +32,9 @@ def playbook_schema() -> dict:
     return json.loads(PLAYBOOK_SCHEMA.read_text())
 
 
-# Playbooks with known schema-vocabulary divergences. Each entry should be
-# removed once the corresponding schema fields are added (or the playbook
-# is normalized) — until then, xfail keeps the suite green without losing
-# the signal.
-KNOWN_DIVERGENT_PLAYBOOKS: dict[str, str] = {
-    # anime-ghibli adds asset_generation extension fields specific to its
-    # animation pipeline (default_particle_color, default_particles,
-    # default_vignette, image_variation_guidance, images_per_scene,
-    # multi_image_per_scene, scene_type). Schema needs these added or
-    # asset_generation.additionalProperties relaxed. Tracked separately.
-    "anime-ghibli": "asset_generation extension fields not yet declared in schema",
-}
-
-
 @pytest.mark.parametrize("playbook_path", _all_playbooks(), ids=lambda p: p.stem)
 def test_playbook_validates(playbook_path: Path, playbook_schema: dict) -> None:
     """Every playbook YAML must validate against playbook.schema.json."""
-    if playbook_path.stem in KNOWN_DIVERGENT_PLAYBOOKS:
-        pytest.xfail(
-            f"{playbook_path.stem}: {KNOWN_DIVERGENT_PLAYBOOKS[playbook_path.stem]}"
-        )
     payload = yaml.safe_load(playbook_path.read_text())
     try:
         jsonschema.validate(instance=payload, schema=playbook_schema)

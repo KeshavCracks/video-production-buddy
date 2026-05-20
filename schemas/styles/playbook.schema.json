@@ -13,12 +13,12 @@
         "name": { "type": "string" },
         "category": {
           "type": "string",
-          "enum": ["motion-graphics", "whiteboard", "cinematic", "minimalist", "retro", "custom"]
+          "enum": ["motion-graphics", "whiteboard", "cinematic", "minimalist", "retro", "anime-illustration", "custom"]
         },
         "mood": { "type": "string" },
         "pace": {
           "type": "string",
-          "enum": ["slow", "deliberate", "moderate", "fast", "rapid"]
+          "enum": ["slow", "gentle", "deliberate", "moderate", "fast", "rapid"]
         },
         "best_for": { "type": "string" }
       },
@@ -36,7 +36,9 @@
             "accent": { "type": "array", "items": { "type": "string" } },
             "background": { "type": "string" },
             "text": { "type": "string" },
-            "muted": { "type": "string" }
+            "muted": { "type": "string" },
+            "spirit_glow": { "type": "string" },
+            "golden_hour": { "type": "string" }
           },
           "additionalProperties": false
         },
@@ -137,6 +139,37 @@
         "image_prompt_prefix": { "type": "string" },
         "image_negative_prompt": { "type": "string" },
         "diagram_style": { "type": "string" },
+        "scene_type": {
+          "type": "string",
+          "description": "Default composition scene type for generated visual scenes, e.g. anime_scene."
+        },
+        "default_particles": {
+          "type": "string",
+          "description": "Default particle overlay preset for scene types that support particles."
+        },
+        "default_particle_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "description": "Default particle overlay color."
+        },
+        "default_vignette": {
+          "type": "boolean",
+          "description": "Whether generated image scenes should default to a vignette treatment."
+        },
+        "multi_image_per_scene": {
+          "type": "boolean",
+          "description": "Whether each visual scene may generate multiple stills for in-scene crossfades."
+        },
+        "images_per_scene": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4,
+          "description": "Default number of generated images per scene when multi_image_per_scene is enabled."
+        },
+        "image_variation_guidance": {
+          "type": "string",
+          "description": "Prompting guidance for generating coherent per-scene image variations."
+        },
         "consistency_anchors": {
           "type": "array",
           "items": { "type": "string" },
@@ -233,6 +266,7 @@
         "bg": { "type": "string" },
         "border": { "type": "string" },
         "text": { "type": "string" },
+        "accent": { "type": "string" },
         "radius": { "type": "number" },
         "shadow": { "type": "string" },
         "highlight": { "type": "string" }
