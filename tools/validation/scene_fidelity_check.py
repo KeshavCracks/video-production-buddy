@@ -4,6 +4,8 @@ Reads scene_type_registry.json and validates that every scene/cut:
   - uses a scene_type that exists in the registry (closed enum check)
   - uses a Remotion component the registry knows about
   - lists only motion_specs that the chosen component actually supports
+  - includes any registry-required props, including cut-only props that are
+    resolved after the asset stage (for example approved productImage paths)
 
 Used by:
   - asset-director-animated.md before any asset is generated
@@ -107,7 +109,9 @@ def check_plan(plan: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]
             )
             failing_ids.add(scene_id)
 
-        required = type_def.get("required_props", []) or []
+        required = list(type_def.get("required_props", []) or [])
+        if kind == "cut":
+            required.extend(type_def.get("required_cut_props", []) or [])
         missing = [p for p in required if scene.get(p) in (None, "")]
         if missing:
             issues.append(

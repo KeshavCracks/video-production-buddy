@@ -10,6 +10,7 @@ Common ad-video scene types (see registry for full prop schema and supported `mo
 |---|---|---|---|
 | `notification_scene` | NotificationScene | B1 hook | icon_spring_in, badge_counter_roll, banner_cascade |
 | `badge_freeze_scene` | BadgeFreezeScene | B1 hook (recognition trigger) | counter_roll, thumb_silhouette_swipe, freeze_pulse |
+| `creator_workflow_scene` | CreatorWorkflowScene | B1 hook, B2 build, B4 reveal for premium hardware / creator workflow ads with an approved product reference | product_scale_reveal, timeline_playhead_sweep, workflow_chip_orbit, panel_cascade, progress_bar_race, connection_line_draw |
 | `browser_tabs_scene` | BrowserTabsScene | B2 build (multi-tool overload) | tab_overflow, cursor_blink, keyboard_pill |
 | `terminal_scene` | TerminalScene | B2 build (developer audience) | cmd_type, output_print |
 | `text_card` | TextCard | B2 / B3 flash | text_entrance_fade |
@@ -83,12 +84,13 @@ For each beat of the four-beat structure, recommend scene types:
 | `text_card` | None (generated from script text + playbook) |
 | `stat_card` / `stat_roll_scene` | None (generated from stat data) |
 | `notification_scene` | Optional brand/product icon set |
+| `creator_workflow_scene` | Required `productImage` from the approved product identity reference; do not substitute generic hardware |
 | `badge_freeze_scene` | None unless the badge must use a real product icon |
 | `browser_tabs_scene` | None |
 | `comparison` | Optional before/after image or UI references |
 | `dashboard_scene` | Product UI screenshot/reference if the product interface must be accurate |
 | `line_connection_scene` | Optional UI labels/data-flow labels |
-| `brand_card` | Brand logo file when available; otherwise render wordmark text |
+| `brand_card` | Brand logo file when available; otherwise render wordmark text. Keep text-only unless an approved `productImage` is provided or the user explicitly approved `hardwareTreatment: "synthetic_laptop"`. |
 
 ## Example Scene Plan (60s animated ad)
 

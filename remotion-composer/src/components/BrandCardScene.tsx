@@ -5,12 +5,16 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
+import { MacbookMotionRig } from "./MacbookMotionRig";
+import { ProductImageMotion } from "./ProductImageMotion";
 import { StyleLayerStack, type StyleLayerConfig } from "./StyleLayers";
 
 export interface BrandCardSceneProps {
   brandName?: string;
   tagline?: string;
   ctaText?: string;
+  productImage?: string;
+  hardwareTreatment?: "synthetic_laptop";
   accentColor?: string;
   backgroundColor?: string;
   sceneDurationSeconds?: number;
@@ -21,6 +25,8 @@ export const BrandCardScene: React.FC<BrandCardSceneProps> = ({
   brandName = "FOCAL",
   tagline = "One screen. Zero chaos.",
   ctaText = "Find your focus at focal.app",
+  productImage,
+  hardwareTreatment,
   accentColor = "#34D399",
   backgroundColor = "#000000",
   sceneDurationSeconds,
@@ -33,6 +39,9 @@ export const BrandCardScene: React.FC<BrandCardSceneProps> = ({
     ? Math.round(sceneDurationSeconds * fps)
     : durationInFrames;
   void effectiveDuration;
+
+  const hasProductImage = Boolean(productImage?.trim());
+  const showSyntheticHardware = !hasProductImage && hardwareTreatment === "synthetic_laptop";
 
   const letters = brandName.split("");
 
@@ -79,11 +88,26 @@ export const BrandCardScene: React.FC<BrandCardSceneProps> = ({
       }}
     >
       <StyleLayerStack layers={styleLayers} />
+      {(hasProductImage || showSyntheticHardware) && (
+        <div style={{ position: "relative", width: 820, height: 262, marginBottom: 30 }}>
+          {hasProductImage && productImage ? (
+            <ProductImageMotion
+              src={productImage}
+              variant="brand"
+              accentColor={accentColor}
+              scale={0.95}
+              y={4}
+            />
+          ) : (
+            <MacbookMotionRig variant="hero" accentColor={accentColor} scale={0.52} y={-18} />
+          )}
+        </div>
+      )}
       {/* Wordmark */}
       <div
         style={{
           display: "flex",
-          letterSpacing: "0.15em",
+          letterSpacing: 0,
           transform: `scale(${wordmarkScale})`,
           marginBottom: 8,
           willChange: "transform",
@@ -107,6 +131,8 @@ export const BrandCardScene: React.FC<BrandCardSceneProps> = ({
                 transform: `translateY(${interpolate(letterSpring, [0, 1], [40, 0])}px)`,
                 display: "inline-block",
                 willChange: "transform, opacity",
+                whiteSpace: char === " " ? "pre" : undefined,
+                minWidth: char === " " ? "0.28em" : undefined,
               }}
             >
               {char}
@@ -137,7 +163,7 @@ export const BrandCardScene: React.FC<BrandCardSceneProps> = ({
           opacity: taglineSpring,
           transform: `translateY(${interpolate(taglineSpring, [0, 1], [20, 0])}px)`,
           marginBottom: 40,
-          letterSpacing: "0.02em",
+          letterSpacing: 0,
           willChange: "transform, opacity",
         }}
       >
@@ -153,7 +179,7 @@ export const BrandCardScene: React.FC<BrandCardSceneProps> = ({
           fontFamily: "Inter, system-ui, sans-serif",
           opacity: ctaSpring,
           transform: `translateY(${interpolate(ctaSpring, [0, 1], [16, 0])}px)`,
-          letterSpacing: "0.01em",
+          letterSpacing: 0,
           willChange: "transform, opacity",
         }}
       >

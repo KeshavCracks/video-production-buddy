@@ -208,6 +208,15 @@ generated assets:
 - Otherwise create a scene keyframe constrained by the approved Product Identity Reference,
   then animate it with image-to-video and record `scene_keyframe_to_video`.
 - Use `text_only_waived` only when the approved strategy is `risk_accepted`.
+- Treat the approved reference as identity/geometry guidance, not production
+  footage. Do not paste the reference bitmap directly into the sample or final
+  video as the visible product unless the user explicitly approved a static
+  packshot treatment for that exact shot.
+- Deterministic Remotion product scenes are the exception only when the scene
+  contract explicitly carries `productImage` (for example
+  `creator_workflow_scene` or a product-visible `brand_card`). In that case,
+  pass the approved reference path through; do not substitute synthetic generic
+  hardware.
 
 Before sample approval and again before asset review, run:
 - `product_identity_consistency_check` against `product_identity_reference`, `scene_plan`,

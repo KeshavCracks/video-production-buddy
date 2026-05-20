@@ -54,6 +54,7 @@ import { BrowserTabsScene } from "./components/BrowserTabsScene";
 import { BadgeFreezeScene } from "./components/BadgeFreezeScene";
 import { LineConnectionScene } from "./components/LineConnectionScene";
 import { StatRollScene } from "./components/StatRollScene";
+import { CreatorWorkflowScene } from "./components/CreatorWorkflowScene";
 import type { StyleLayerConfig } from "./components/StyleLayers";
 import type { ParticleType } from "./components/ParticleOverlay";
 import { resolveTheme, type ThemeConfig, DEFAULT_THEME } from "./Root";
@@ -287,6 +288,8 @@ interface Cut {
   brandName?: string;
   tagline?: string;
   ctaText?: string;
+  productImage?: string;
+  hardwareTreatment?: "synthetic_laptop";
   // CheckmarkScene props (type: "checkmark_scene")
   label?: string;
   // BrowserTabsScene props (type: "browser_tabs_scene")
@@ -766,6 +769,24 @@ const SceneRenderer: React.FC<{ cut: Cut; theme: ThemeConfig }> = ({ cut, theme 
     );
   }
 
+  if (cut.type === "creator_workflow_scene") {
+    return (
+      <CreatorWorkflowScene
+        mode={cut.animation === "workflow" ? "workflow" : "opening"}
+        productImage={cut.productImage}
+        hardwareTreatment={cut.hardwareTreatment}
+        title={cut.text || cut.title}
+        subtitle={cut.subtitle || cut.tagline}
+        labels={cut.banners}
+        workflowItems={cut.sidebarItems}
+        accentColor={cut.accentColor}
+        backgroundColor={cut.backgroundColor}
+        sceneDurationSeconds={cut.out_seconds - cut.in_seconds}
+        styleLayers={cut.styleLayers}
+      />
+    );
+  }
+
   if (cut.type === "dashboard_scene") {
     return (
       <DashboardScene
@@ -787,6 +808,8 @@ const SceneRenderer: React.FC<{ cut: Cut; theme: ThemeConfig }> = ({ cut, theme 
         brandName={cut.brandName || cut.text}
         tagline={cut.tagline || cut.heroSubtitle || cut.subtitle}
         ctaText={cut.ctaText}
+        productImage={cut.productImage}
+        hardwareTreatment={cut.hardwareTreatment}
         accentColor={cut.accentColor}
         backgroundColor={cut.backgroundColor}
         sceneDurationSeconds={cut.out_seconds - cut.in_seconds}

@@ -52,7 +52,13 @@ If `scene.product_reference_required == true`, load the approved
 `reference_to_video` when supported, otherwise generate a reference-constrained scene
 keyframe and animate it with image-to-video. Do not use text-only product-demo prompts
 unless `product_identity_reference.source_type == "risk_accepted"` and the waiver is
-user-approved. Record the result in
+user-approved. The approved reference is an identity constraint, not a reusable
+shot; do not place the reference bitmap directly in the moving ad unless the
+user explicitly approved a static packshot for that shot. Deterministic
+Remotion product scenes are the exception only when the scene contract
+explicitly carries `productImage` (for example `creator_workflow_scene` or a
+product-visible `brand_card`); pass the approved reference path through and do
+not substitute synthetic generic hardware. Record the result in
 `asset_manifest.assets[].product_identity_conditioning`.
 
 After generation, record `asset_manifest.assets[].hallucination_review` from

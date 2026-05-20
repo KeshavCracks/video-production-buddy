@@ -117,6 +117,59 @@
             "type": "string",
             "description": "Optional fine-grained subtype used by ad-video animated/cinematic supplements (e.g. anime_scene, stat_card, text_card, callout). Free-form because the supplements add new types over time. Coexists with the coarse top-level `type` enum, which remains required."
           },
+          "text": {
+            "type": "string",
+            "description": "Registry prop for text_card / hero_title scenes."
+          },
+          "brandName": {
+            "type": "string",
+            "description": "Registry prop for brand_card scenes."
+          },
+          "tagline": {
+            "type": "string",
+            "description": "Registry prop for brand_card scenes."
+          },
+          "ctaText": {
+            "type": "string",
+            "description": "Registry prop for brand_card scenes."
+          },
+          "productImage": {
+            "type": "string",
+            "description": "Approved product reference image for product-visible Remotion scenes such as creator_workflow_scene and brand_card."
+          },
+          "hardwareTreatment": {
+            "type": "string",
+            "enum": ["synthetic_laptop"],
+            "description": "Explicit opt-in for synthetic hardware treatment. Omit unless the user approved a generic laptop packshot; productImage always takes precedence."
+          },
+          "leftLabel": {
+            "type": "string",
+            "description": "Registry prop for line_connection_scene / comparison scenes."
+          },
+          "rightLabel": {
+            "type": "string",
+            "description": "Registry prop for line_connection_scene / comparison scenes."
+          },
+          "leftSubLabel": {
+            "type": "string",
+            "description": "Registry prop for line_connection_scene scenes."
+          },
+          "rightSubLabel": {
+            "type": "string",
+            "description": "Registry prop for line_connection_scene scenes."
+          },
+          "targetValue": {
+            "type": "number",
+            "description": "Registry prop for stat_roll_scene scenes."
+          },
+          "unitLabel": {
+            "type": "string",
+            "description": "Registry prop for stat_roll_scene scenes."
+          },
+          "subtitle": {
+            "type": "string",
+            "description": "Registry prop for stat_card / stat_roll_scene scenes."
+          },
           "fulfills_kvm": {
             "type": "array",
             "items": { "type": "string" },

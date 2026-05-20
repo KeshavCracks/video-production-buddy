@@ -110,8 +110,9 @@ For each scene in `scene_plan.scenes[]`:
 2. Set `in_seconds` to the cumulative offset from scene durations.
 3. Set `out_seconds` to `in_seconds + scene.duration_seconds`.
 4. Set `source` to an asset ID/path from `asset_manifest`, or `remotion:<component>` for generated component scenes.
-5. Put narration timing under `audio.narration.segments[]` using asset IDs from `asset_manifest`.
-6. Verify: each narration segment duration is ≤ its scene duration.
+5. Copy registry props from the scene into the cut (`text`, `subtitle`, `brandName`, `ctaText`, `productImage`, `hardwareTreatment`, `banners`, `sidebarItems`, etc.). For `creator_workflow_scene`, `productImage` must be the approved `product_identity_reference.selected_reference_image_path`; do not leave it blank and do not substitute generic laptop hardware.
+6. Put narration timing under `audio.narration.segments[]` using asset IDs from `asset_manifest`.
+7. Verify: each narration segment duration is ≤ its scene duration.
 
 ## Edit Decisions Artifact Format
 

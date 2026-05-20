@@ -195,7 +195,10 @@ class VideoCompose(BaseTool):
     # Remotion scene types that trigger React-based rendering
     _REMOTION_COMPONENTS = [
         "text_card", "stat_card", "callout", "comparison",
-        "progress", "chart", "bar_chart", "line_chart", "pie_chart", "kpi_grid",
+        "progress", "progress_bar", "chart", "bar_chart", "line_chart", "pie_chart", "kpi_grid",
+        "anime_scene", "notification_scene", "creator_workflow_scene", "dashboard_scene",
+        "brand_card", "terminal_scene", "screenshot_scene", "checkmark_scene",
+        "browser_tabs_scene", "badge_freeze_scene", "line_connection_scene", "stat_roll_scene",
     ]
 
     best_for = [
@@ -654,7 +657,11 @@ class VideoCompose(BaseTool):
                     pass
 
     _REMOTION_SCENE_TYPES = {
-        "text_card", "stat_card", "callout", "comparison", "progress", "chart",
+        "text_card", "stat_card", "callout", "comparison",
+        "progress", "progress_bar", "chart", "bar_chart", "line_chart", "pie_chart", "kpi_grid",
+        "anime_scene", "notification_scene", "creator_workflow_scene", "dashboard_scene",
+        "brand_card", "terminal_scene", "screenshot_scene", "checkmark_scene",
+        "browser_tabs_scene", "badge_freeze_scene", "line_connection_scene", "stat_roll_scene",
     }
 
     # Maps renderer_family (set at proposal stage) to Remotion composition ID.
@@ -1412,6 +1419,8 @@ class VideoCompose(BaseTool):
                 cut["backgroundImage"] = _to_remotion_src(cut["backgroundImage"])
             if cut.get("backgroundVideo"):
                 cut["backgroundVideo"] = _to_remotion_src(cut["backgroundVideo"])
+            if cut.get("productImage"):
+                cut["productImage"] = _to_remotion_src(cut["productImage"])
 
         # Apply to scenes[] (CinematicRenderer path) — previously unhandled
         for scene in props.get("scenes", []):

@@ -21,6 +21,8 @@ export { BrowserTabsScene } from "./BrowserTabsScene";
 export { BadgeFreezeScene } from "./BadgeFreezeScene";
 export { LineConnectionScene } from "./LineConnectionScene";
 export { StatRollScene } from "./StatRollScene";
+export { CreatorWorkflowScene } from "./CreatorWorkflowScene";
+export { ProductImageMotion } from "./ProductImageMotion";
 export {
   GrainOverlay,
   VignetteOverlay,
@@ -40,6 +42,8 @@ export type { BrowserTabsSceneProps } from "./BrowserTabsScene";
 export type { BadgeFreezeSceneProps } from "./BadgeFreezeScene";
 export type { LineConnectionSceneProps } from "./LineConnectionScene";
 export type { StatRollSceneProps } from "./StatRollScene";
+export type { CreatorWorkflowSceneProps } from "./CreatorWorkflowScene";
+export type { ProductImageMotionProps, ProductImageMotionVariant } from "./ProductImageMotion";
 export type {
   StyleLayerConfig,
   GrainConfig,

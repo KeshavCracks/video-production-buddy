@@ -16,7 +16,7 @@ from tools.validation.product_identity_consistency_check import (
     check_product_identity_consistency,
 )
 from tools.validation.runtime_consistency_check import check_runtime_consistency
-from tools.validation.scene_fidelity_check import check_kvm_coverage
+from tools.validation.scene_fidelity_check import check_kvm_coverage, check_plan
 from tools.video.video_compose import VideoCompose
 
 
@@ -31,6 +31,12 @@ def _read_skill(name: str) -> str:
 
 def _load_ad_video_manifest() -> dict:
     return yaml.safe_load(AD_VIDEO_MANIFEST.read_text(encoding="utf-8"))
+
+
+def _load_scene_type_registry() -> dict:
+    return json.loads(
+        (ROOT / "remotion-composer" / "scene_type_registry.json").read_text(encoding="utf-8")
+    )
 
 
 def _json_fences(markdown: str) -> list[str]:
@@ -1370,6 +1376,65 @@ def test_ad_video_contract_mentions_product_identity_reference_flow() -> None:
     assert "product_identity_reference_selection" in proposal
     assert "product_identity_reference_selection" in ep
     assert "`product_identity_reference` + `asset_manifest`" in guide
+
+
+def test_product_visible_remotion_scene_registry_requires_approved_product_image() -> None:
+    registry = _load_scene_type_registry()
+    scene_types = registry["scene_types"]
+
+    creator = scene_types["creator_workflow_scene"]
+    assert "productImage" in creator["required_cut_props"]
+    assert "generic hardware" in creator["description"]
+
+    brand = scene_types["brand_card"]
+    assert "productImage" in brand["optional_props"]
+    assert "hardwareTreatment" in brand["optional_props"]
+    assert "Text-only by default" in brand["description"]
+    assert "creator_workflow_scene" in VideoCompose._REMOTION_COMPONENTS
+    assert "brand_card" in VideoCompose._REMOTION_COMPONENTS
+
+
+def test_scene_fidelity_rejects_creator_workflow_without_product_image() -> None:
+    registry = _load_scene_type_registry()
+    missing_product = {
+        "cuts": [
+            {
+                "id": "scene-1",
+                "type": "creator_workflow_scene",
+                "source": "remotion:creator_workflow_scene",
+                "in_seconds": 0,
+                "out_seconds": 4,
+                "motion_specs": ["product_scale_reveal"],
+            }
+        ]
+    }
+
+    report = check_plan(missing_product, registry)
+
+    assert report["ok"] is False
+    assert any(issue["kind"] == "missing_required_props" for issue in report["issues"])
+
+    with_product = deepcopy(missing_product)
+    with_product["cuts"][0]["productImage"] = "reference_assets/product.png"
+
+    assert check_plan(with_product, registry)["ok"] is True
+
+
+def test_remotion_product_components_do_not_render_synthetic_hardware_by_default() -> None:
+    brand_source = (
+        ROOT / "remotion-composer" / "src" / "components" / "BrandCardScene.tsx"
+    ).read_text(encoding="utf-8")
+    workflow_source = (
+        ROOT / "remotion-composer" / "src" / "components" / "CreatorWorkflowScene.tsx"
+    ).read_text(encoding="utf-8")
+
+    for source in (brand_source, workflow_source):
+        assert "<ProductImageMotion" in source
+        assert 'hardwareTreatment === "synthetic_laptop"' in source
+        assert "void productImage" not in source
+
+    assert "hasProductImage || showSyntheticHardware" in brand_source
+    assert "hasProductImage && productImage" in workflow_source
 
 
 def test_ad_video_contract_mentions_hallucination_flow() -> None:
