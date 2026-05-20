@@ -1,8 +1,10 @@
-from pathlib import Path
+import json
+import re
 import socket
 import time
 import urllib.error
 import urllib.request
+from pathlib import Path
 
 import pytest
 
@@ -83,6 +85,46 @@ def test_write_form_bundle_materializes_config_html_and_response_path(tmp_path: 
     assert "&lt;script&gt;alert(&#x27;unsafe&#x27;)&lt;/script&gt;" in html
 
 
+def test_write_form_bundle_removes_stale_response_for_regenerated_config(tmp_path: Path):
+    from lib.genui import write_form_bundle
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    first_bundle = write_form_bundle(project_dir, _sample_config())
+    first_bundle.response_path.write_text('{"action":"approve"}\n')
+
+    regenerated_bundle = write_form_bundle(project_dir, _sample_config())
+
+    assert regenerated_bundle.response_path == first_bundle.response_path
+    assert not regenerated_bundle.response_path.exists()
+
+
+def test_render_form_html_does_not_submit_info_card_fields():
+    from lib.genui import render_form_html
+
+    config = _sample_config()
+    config["sections"][0]["fields"].insert(
+        0,
+        {
+            "id": "context_note",
+            "label": "Context",
+            "type": "info_card",
+            "help_text": "Read this before approving.",
+        },
+    )
+
+    html = render_form_html(config)
+    fields_match = re.search(r"const GENUI_FIELDS = (.*?);", html)
+    assert fields_match is not None
+    submitted_fields = json.loads(fields_match.group(1))
+
+    assert "info-card" in html
+    assert submitted_fields == [
+        {"id": "product_model", "type": "text"},
+        {"id": "visual_approach", "type": "radio"},
+        {"id": "derivatives", "type": "multiselect"},
+    ]
+
+
 def test_project_path_containment_rejects_parent_escape(tmp_path: Path):
     from lib.genui import resolve_project_path
 
@@ -111,6 +153,37 @@ def test_response_payload_rejects_missing_required_value():
             _sample_config(),
             {"action": "approve", "values": {"product_model": ""}},
         )
+
+
+def test_response_payload_allows_abort_with_missing_required_values():
+    from lib.genui import response_payload_from_submission
+
+    config = _sample_config()
+    config["sections"][0]["fields"].append(
+        {
+            "id": "final_approval",
+            "label": "Final approval",
+            "type": "approval",
+            "required": True,
+        }
+    )
+    config["submit_actions"].append({"id": "abort", "label": "Abort", "kind": "abort"})
+
+    response = response_payload_from_submission(
+        config,
+        {
+            "action": "abort",
+            "values": {
+                "product_model": "",
+                "visual_approach": "",
+                "derivatives": [],
+                "final_approval": False,
+            },
+        },
+    )
+
+    assert response["action"] == "abort"
+    assert response["values"]["final_approval"] is False
 
 
 def test_response_payload_rejects_unconfigured_values():

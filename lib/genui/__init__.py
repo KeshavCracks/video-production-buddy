@@ -175,6 +175,7 @@ def render_form_html(config: dict[str, Any], *, submit_url: str = "/submit") -> 
         {"id": field["id"], "type": field["type"]}
         for section in config["sections"]
         for field in section.get("fields", [])
+        if field.get("type") != "info_card"
     ]
     fields_json = json.dumps(fields).replace("</", "<\\/")
     title = escape(str(config["title"]))
@@ -339,7 +340,7 @@ def _validate_submission_values(config: dict[str, Any], submission: dict[str, An
             continue
 
         value = values.get(field_id)
-        if field.get("required") and _is_empty(value):
+        if action != "abort" and field.get("required") and _is_empty(value):
             raise ValueError(f"Required GenUI field {field_id!r} is missing")
 
         choices = field.get("choices") or []
@@ -411,6 +412,11 @@ def write_form_bundle(project_dir: Path | str, config: dict[str, Any]) -> FormBu
     html_path = base / "form.html"
     response_path = base / "response.json"
     state_path = base / "server.json"
+
+    if response_path.exists():
+        response_path.unlink()
+    if state_path.exists():
+        state_path.unlink()
 
     _dump_json(config_path, config)
     html_path.parent.mkdir(parents=True, exist_ok=True)
