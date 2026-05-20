@@ -350,6 +350,35 @@ def test_scene_plan_schema_requires_product_visibility_metadata_for_ad_video() -
         validate_artifact("scene_plan", scene_plan)
 
 
+def test_ad_video_scene_plan_requires_product_metadata_without_style_mode() -> None:
+    """Pipeline context, not optional style_mode, must trigger ad-video product metadata."""
+    scene_plan = {
+        "version": "1.0",
+        "total_duration_seconds": 5,
+        "scenes": [
+            {
+                "id": "scene-1",
+                "type": "generated",
+                "description": "Macro hero shot of the product camera module.",
+                "start_seconds": 0,
+                "end_seconds": 5,
+            }
+        ],
+    }
+
+    validate_artifact("scene_plan", scene_plan)
+
+    with pytest.raises(Exception, match="product_visibility"):
+        validate_artifact("scene_plan", scene_plan, pipeline_type="ad-video")
+
+    scene_plan["scenes"][0]["product_visibility"] = "none"
+    with pytest.raises(Exception, match="product_reference_required"):
+        validate_artifact("scene_plan", scene_plan, pipeline_type="ad-video")
+
+    scene_plan["scenes"][0]["product_reference_required"] = False
+    validate_artifact("scene_plan", scene_plan, pipeline_type="ad-video")
+
+
 def test_asset_manifest_schema_accepts_product_identity_conditioning_metadata() -> None:
     """Product-visible generated assets must be able to record conditioning metadata."""
     manifest = {
@@ -1239,6 +1268,17 @@ def _product_visible_scene_plan() -> dict:
     }
 
 
+def _two_product_visible_scene_plan() -> dict:
+    scene_plan = _product_visible_scene_plan()
+    later_scene = deepcopy(scene_plan["scenes"][0])
+    later_scene["id"] = "scene-2"
+    later_scene["description"] = "Later packshot of OPPO Find X9 Pro in hand."
+    later_scene["start_seconds"] = 5
+    later_scene["end_seconds"] = 10
+    scene_plan["scenes"].append(later_scene)
+    return scene_plan
+
+
 def _conditioned_asset_manifest(conditioning_mode: str = "reference_to_video") -> dict:
     return {
         "version": "1.0",
@@ -1294,6 +1334,33 @@ def test_product_identity_consistency_accepts_approved_generated_reference_and_c
     assert verdict["status"] == "PASS"
     assert verdict["summary"]["product_visible_scenes"] == 1
     assert verdict["summary"]["conditioned_assets_checked"] == 1
+
+
+def test_product_identity_consistency_sample_scope_ignores_unselected_future_scenes() -> None:
+    """Sample approval must not require visual assets for product scenes outside the sample."""
+    verdict = check_product_identity_consistency(
+        _approved_product_identity_reference(),
+        _two_product_visible_scene_plan(),
+        _conditioned_asset_manifest(),
+        generated_scene_ids=["scene-1"],
+    )
+
+    assert verdict["status"] == "PASS"
+    assert verdict["summary"]["product_visible_scenes"] == 2
+    assert verdict["summary"]["asset_required_product_visible_scenes"] == 1
+    assert verdict["summary"]["conditioned_assets_checked"] == 1
+
+
+def test_product_identity_consistency_full_scope_rejects_missing_future_scene_asset() -> None:
+    """Full asset review still requires assets for every product-visible scene."""
+    verdict = check_product_identity_consistency(
+        _approved_product_identity_reference(),
+        _two_product_visible_scene_plan(),
+        _conditioned_asset_manifest(),
+    )
+
+    assert verdict["status"] == "FAIL"
+    assert any("scene-2" in issue for issue in verdict["issues"])
 
 
 def test_product_identity_consistency_rejects_risk_waiver_without_user_approval() -> None:
@@ -1455,6 +1522,7 @@ def test_ad_video_contract_mentions_product_identity_reference_flow() -> None:
     assert "`product_visibility`" in scene
     assert "`product_reference_required`" in scene
     assert "product_identity_consistency_check" in asset
+    assert "generated_scene_ids" in asset
     assert asset.index("## Product Reference Sub-Stage") < asset.index("## Sample Sub-Stage")
     assert "sample sub-stage first" not in asset
     assert "product_identity_reference_selection" in proposal

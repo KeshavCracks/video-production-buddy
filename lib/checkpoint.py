@@ -82,6 +82,11 @@ SUPPLEMENTARY_ARTIFACTS = {
     "source_media_review",  # Required before first planning stage when user media exists
     "final_review",         # Required by compose stage before presenting to user
     "video_analysis_brief", # Reference-video grounding artifact carried alongside stages
+    "product_identity_reference",  # Required alongside ad-video asset manifests
+}
+
+REQUIRED_SUPPLEMENTARY_STAGE_ARTIFACTS = {
+    ("ad-video", "assets"): ("product_identity_reference",),
 }
 
 
@@ -134,10 +139,19 @@ def _validate_artifacts_for_stage(
     pipeline_type: str | None = None,
 ) -> None:
     required_artifact = _canonical_artifact_for_stage(stage, pipeline_type)
-    if status in {"completed", "awaiting_human"} and required_artifact not in artifacts:
+    required_artifacts = [required_artifact]
+    required_artifacts.extend(
+        REQUIRED_SUPPLEMENTARY_STAGE_ARTIFACTS.get((pipeline_type or "", stage), ())
+    )
+    missing_artifacts = [
+        artifact_name
+        for artifact_name in dict.fromkeys(required_artifacts)
+        if artifact_name not in artifacts
+    ]
+    if status in {"completed", "awaiting_human"} and missing_artifacts:
         raise CheckpointValidationError(
             f"Stage {stage!r} with status {status!r} must include "
-            f"canonical artifact {required_artifact!r}"
+            f"required artifact(s) {missing_artifacts!r}"
         )
 
     for artifact_name, artifact_data in artifacts.items():

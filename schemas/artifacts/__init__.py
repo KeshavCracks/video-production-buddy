@@ -90,6 +90,22 @@ def _validate_ad_video_script(data: dict[str, Any]) -> None:
             )
 
 
+def _validate_ad_video_scene_plan(data: dict[str, Any]) -> None:
+    """Enforce ad-video scene metadata that needs pipeline context."""
+    for idx, scene in enumerate(data.get("scenes", []) or []):
+        scene_id = scene.get("id", f"scene-{idx}")
+        if "product_visibility" not in scene:
+            raise jsonschema.ValidationError(
+                "ad-video scene_plan scene "
+                f"{scene_id!r} must include product_visibility"
+            )
+        if "product_reference_required" not in scene:
+            raise jsonschema.ValidationError(
+                "ad-video scene_plan scene "
+                f"{scene_id!r} must include product_reference_required"
+            )
+
+
 def _is_ad_video_script(data: dict[str, Any], pipeline_type: str | None) -> bool:
     if pipeline_type == "ad-video":
         return True
@@ -103,6 +119,10 @@ def _is_ad_video_script(data: dict[str, Any], pipeline_type: str | None) -> bool
     return data.get("style_mode") in {"animated", "cinematic"}
 
 
+def _is_ad_video_scene_plan(pipeline_type: str | None) -> bool:
+    return pipeline_type == "ad-video"
+
+
 def validate_artifact(
     name: str,
     data: dict[str, Any],
@@ -114,6 +134,8 @@ def validate_artifact(
     jsonschema.validate(instance=data, schema=schema)
     if name == "script" and _is_ad_video_script(data, pipeline_type):
         _validate_ad_video_script(data)
+    if name == "scene_plan" and _is_ad_video_scene_plan(pipeline_type):
+        _validate_ad_video_scene_plan(data)
 
 
 def list_schemas() -> list[str]:

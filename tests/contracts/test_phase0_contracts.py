@@ -463,6 +463,41 @@ class TestCheckpoint:
                 pipeline_type="ad-video",
             )
 
+    def test_ad_video_assets_checkpoint_requires_product_identity_reference(self, tmp_path):
+        with pytest.raises(CheckpointValidationError, match="product_identity_reference"):
+            write_checkpoint(
+                tmp_path,
+                "proj",
+                "assets",
+                "completed",
+                {"asset_manifest": sample_artifact("asset_manifest")},
+                pipeline_type="ad-video",
+            )
+
+        product_identity_reference = {
+            "version": "1.0",
+            "reference_id": "pir-none",
+            "product_name": "Acme SaaS",
+            "source_type": "not_applicable",
+            "approval_status": "not_required",
+            "required_visual_features": [],
+            "prohibited_variations": [],
+        }
+
+        path = write_checkpoint(
+            tmp_path,
+            "proj",
+            "assets",
+            "completed",
+            {
+                "product_identity_reference": product_identity_reference,
+                "asset_manifest": sample_artifact("asset_manifest"),
+            },
+            pipeline_type="ad-video",
+        )
+
+        assert path.exists()
+
     def test_ad_video_script_checkpoint_requires_voice_cues(self, tmp_path):
         with pytest.raises(CheckpointValidationError, match="speaker_directions"):
             write_checkpoint(

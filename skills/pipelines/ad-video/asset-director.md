@@ -224,6 +224,13 @@ Before sample approval and again before asset review, run:
 - `hallucination_contract_check` against `production_bible`, `scene_plan`,
   `asset_manifest`, and `decision_log`
 
+For the sample approval gate, pass the selected sample scene ids as
+`generated_scene_ids` to `product_identity_consistency_check`. The sample
+`asset_manifest` intentionally contains only selected/generated scene assets, so
+missing visual assets for later product-visible scenes are deferred to the full
+asset review. For full asset review, omit `generated_scene_ids` so every
+product-visible scene must have a generated visual asset.
+
 A FAIL blocks progress. A WARN must be shown during asset review.
 
 ## Sample Sub-Stage (Always Runs)

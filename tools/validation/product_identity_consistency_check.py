@@ -145,29 +145,57 @@ def check_product_identity_consistency(
     scene_plan: dict[str, Any],
     asset_manifest: dict[str, Any],
     decision_log: dict[str, Any] | None = None,
+    generated_scene_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Validate product-visible scene conditioning against an approved reference.
 
     The optional decision_log is accepted for caller convenience; the executable
     gate uses the canonical product_identity_reference artifact as the source of
     truth for approval metadata.
+
+    When generated_scene_ids is provided, missing-asset checks are scoped to
+    those selected/generated scene ids. This is used by the sample approval gate,
+    where asset_manifest intentionally contains only sample assets while
+    scene_plan still contains the full ad.
     """
     del decision_log
 
     issues: list[str] = []
     warnings: list[str] = []
     product_visible_scenes = _product_visible_scenes(scene_plan)
+    asset_required_scenes = product_visible_scenes
+    asset_scope = "full"
+    if generated_scene_ids is not None:
+        asset_scope = "generated_scene_ids"
+        generated_scene_id_set = set(generated_scene_ids)
+        scene_ids_in_plan = {
+            scene.get("id")
+            for scene in scene_plan.get("scenes", []) or []
+            if scene.get("id")
+        }
+        missing_scene_ids = sorted(generated_scene_id_set - scene_ids_in_plan)
+        for scene_id in missing_scene_ids:
+            issues.append(
+                f"Generated scene id {scene_id!r} was not found in scene_plan.scenes[]."
+            )
+        asset_required_scenes = [
+            scene
+            for scene in product_visible_scenes
+            if scene.get("id") in generated_scene_id_set
+        ]
     conditioned_assets_checked = 0
 
     if not product_visible_scenes:
         if product_identity_reference.get("source_type") == "not_applicable":
             return {
-                "status": "PASS",
-                "issues": [],
+                "status": "FAIL" if issues else "PASS",
+                "issues": issues,
                 "warnings": [],
                 "summary": {
                     "product_visible_scenes": 0,
+                    "asset_required_product_visible_scenes": 0,
                     "conditioned_assets_checked": 0,
+                    "asset_scope": asset_scope,
                 },
             }
         warnings.append(
@@ -176,12 +204,14 @@ def check_product_identity_consistency(
             "scene_plan product_visibility annotations are intentional."
         )
         return {
-            "status": "WARN",
-            "issues": [],
+            "status": "FAIL" if issues else "WARN",
+            "issues": issues,
             "warnings": warnings,
             "summary": {
                 "product_visible_scenes": 0,
+                "asset_required_product_visible_scenes": 0,
                 "conditioned_assets_checked": 0,
+                "asset_scope": asset_scope,
             },
         }
 
@@ -206,7 +236,7 @@ def check_product_identity_consistency(
     else:
         issues.append(f"Unknown product_identity_reference.source_type={source_type!r}.")
 
-    for scene in product_visible_scenes:
+    for scene in asset_required_scenes:
         scene_id = scene.get("id", "<unknown>")
         visual_assets = _visual_assets_for_scene(asset_manifest, scene_id)
         if not visual_assets:
@@ -244,12 +274,17 @@ def check_product_identity_consistency(
         "warnings": warnings,
         "summary": {
             "product_visible_scenes": len(product_visible_scenes),
+            "asset_required_product_visible_scenes": len(asset_required_scenes),
             "conditioned_assets_checked": conditioned_assets_checked,
+            "asset_scope": asset_scope,
         },
     }
 
 
-def check_project(project_dir: Path) -> dict[str, Any]:
+def check_project(
+    project_dir: Path,
+    generated_scene_ids: list[str] | None = None,
+) -> dict[str, Any]:
     reference = _load_artifact(project_dir, "product_identity_reference.json")
     scene_plan = _load_artifact(project_dir, "scene_plan.json")
     asset_manifest = _load_artifact(project_dir, "asset_manifest.json")
@@ -263,14 +298,15 @@ def check_project(project_dir: Path) -> dict[str, Any]:
         scene_plan,
         asset_manifest,
         decision_log,
+        generated_scene_ids=generated_scene_ids,
     )
 
 
 def _cli(argv: list[str]) -> int:
-    if len(argv) != 2:
+    if len(argv) < 2:
         print(
             "usage: python -m tools.validation.product_identity_consistency_check "
-            "<project-dir>",
+            "<project-dir> [generated_scene_id ...]",
             file=sys.stderr,
         )
         return 2
@@ -278,7 +314,8 @@ def _cli(argv: list[str]) -> int:
     if not project_dir.exists():
         print(f"error: project dir not found: {project_dir}", file=sys.stderr)
         return 2
-    verdict = check_project(project_dir)
+    generated_scene_ids = argv[2:] or None
+    verdict = check_project(project_dir, generated_scene_ids)
     print(json.dumps(verdict, indent=2))
     return 0 if verdict["status"] != "FAIL" else 1
 
