@@ -23,6 +23,8 @@ import sys
 import traceback
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 try:
@@ -186,6 +188,34 @@ PRODUCTION_BIBLE_VALID = {
         ],
     },
     "intelligence": {
+        "trend_alignment": {
+            "selected_trend_ids": ["trend-tiktok-lofi-hook"],
+            "alignments": [
+                {
+                    "trend_id": "trend-tiktok-lofi-hook",
+                    "signal": "lo-fi aesthetic +34% on TikTok",
+                    "source": "Sprout Social 2026",
+                    "sentiment": "positive",
+                    "brand_safety": "safe",
+                    "trend_type": "visual_style",
+                    "application_targets": ["hook", "build", "scene_plan", "visual"],
+                    "target_beat": "hook",
+                    "script_usage": {
+                        "required_section_ids": ["hook", "build"],
+                        "source_ref": "trend_alignment:trend-tiktok-lofi-hook",
+                        "usage_note": "Thread the calm native hook pattern through the hook and build without making a topical reference.",
+                    },
+                    "scene_usage": {
+                        "required": True,
+                        "required_scene_count": 1,
+                        "visual_or_pacing_instruction": "Use warm lo-fi visual pacing and native overlay text while avoiding source imitation.",
+                    },
+                    "do_not_imitate": [
+                        "Do not copy source captions, audio, creator identity, choreography, or exact shot sequence.",
+                    ],
+                }
+            ],
+        },
         "trending_signals": [
             {"signal": "lo-fi aesthetic +34% on TikTok", "source": "Sprout Social 2026", "applied_to": "visual.color_direction"},
         ],
@@ -433,6 +463,31 @@ def test_intelligence_brief_accepts_typed_trend_record_fields():
         "engagement_proxy": {"views": 1_200_000, "likes": 45_000, "shares": 3_200},
     })
     validate(brief, load_schema("intelligence_brief"))
+
+
+def test_intelligence_brief_accepts_trend_alignment_metadata_fields():
+    """Trend records can carry typed sentiment, safety, and usage targets.
+
+    The fields are optional for legacy briefs, but new ad-video intelligence
+    runs use them so bible-director can select only brand-safe positive/neutral
+    trend signals for production_bible.intelligence.trend_alignment.
+    """
+    brief = deep_copy(INTELLIGENCE_BRIEF_VALID)
+    brief["platform_trends"][0].update({
+        "trend_id": "trend-tiktok-text-hooks",
+        "sentiment": "positive",
+        "trend_type": "visual_style",
+        "brand_safety": "safe",
+        "application_targets": ["hook", "scene_plan", "visual"],
+    })
+    validate(brief, load_schema("intelligence_brief"))
+
+
+def test_intelligence_brief_rejects_invalid_trend_sentiment():
+    bad = deep_copy(INTELLIGENCE_BRIEF_VALID)
+    bad["platform_trends"][0]["sentiment"] = "controversial"
+    with pytest.raises(Exception):
+        validate(bad, load_schema("intelligence_brief"))
 
 
 def test_intelligence_brief_rejects_bad_observed_at_type():
@@ -855,6 +910,7 @@ def test_production_bible_accepts_intelligence_with_only_declared_keys():
     provenance_demotions, rhythm_warnings, classification_aggregate."""
     bible = deep_copy(PRODUCTION_BIBLE_VALID)
     bible["intelligence"] = {
+        "trend_alignment": {"selected_trend_ids": [], "alignments": []},
         "trending_signals": [],
         "reference_ads_analyzed": [],
         "rejected_approaches": [{"approach": "x", "reason": "y"}],

@@ -110,6 +110,32 @@ REALISTIC_BIBLE = {
         ],
     },
     "intelligence": {
+        "trend_alignment": {
+            "selected_trend_ids": ["trend-tiktok-lofi-hook"],
+            "alignments": [
+                {
+                    "trend_id": "trend-tiktok-lofi-hook",
+                    "signal": "lo-fi aesthetic +34% on TikTok",
+                    "source": "Sprout Social 2026",
+                    "sentiment": "positive",
+                    "brand_safety": "safe",
+                    "trend_type": "visual_style",
+                    "application_targets": ["hook", "build", "scene_plan", "visual"],
+                    "target_beat": "hook",
+                    "script_usage": {
+                        "required_section_ids": ["hook", "build"],
+                        "source_ref": "trend_alignment:trend-tiktok-lofi-hook",
+                        "usage_note": "Carry the native calm hook pattern into hook/build.",
+                    },
+                    "scene_usage": {
+                        "required": True,
+                        "required_scene_count": 1,
+                        "visual_or_pacing_instruction": "Use warm lo-fi pacing and overlay text without source imitation.",
+                    },
+                    "do_not_imitate": ["Do not copy captions, audio, creator identity, or shot sequence."],
+                }
+            ],
+        },
         "trending_signals": [
             {"signal": "lo-fi aesthetic +34% on TikTok", "source": "Sprout Social 2026", "applied_to": "visual.color_direction"},
         ],

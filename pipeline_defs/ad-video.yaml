@@ -80,11 +80,13 @@ stages:
   human_approval_default: false
   review_focus:
     - All recommendations carry a confidence tier
+    - platform_trends entries for new runs include sentiment, trend_type, brand_safety, and application_targets
+    - brand_safety distinguishes safe trend signals from caution/unsafe research context
     - rejected_approaches is non-empty (empty = insufficient research)
     - audience_psychographics are specific and research-cited, not generic
     - At least 3 hit ads analyzed
   success_criteria:
-    - Schema-valid intelligence_brief with recommendations
+    - Schema-valid intelligence_brief with recommendations and typed platform_trends metadata
 
 - name: bible
   skill: pipelines/ad-video/bible-director
@@ -103,10 +105,13 @@ stages:
     - default-heuristic checkpoints use failure_action=flag only
     - deliverables.primary aspect_ratio matches platform default
     - rejected_approaches present in intelligence section
+    - production_bible.intelligence.trend_alignment selects only fresh, deduped, positive/neutral, brand_safety=safe trends
+    - trend_alignment entries include script_usage.source_ref, scene_usage, target_beat, and do_not_imitate notes
     - cta is non-null (must be set before execution_approved=true)
     - truth_contract contains objective_facts, physical_constraints, product_geometry_rules, motion_coherence_rules, and values_guardrails
   success_criteria:
     - Schema-valid production_bible with both approval flags true
+    - production_bible.intelligence.trend_alignment is present, even if no safe trend is selected
     - production_bible.truth_contract is populated with source-backed requirements
 
 - name: idea
@@ -169,6 +174,7 @@ stages:
   review_focus:
   - 'Four beats present: hook, build, reveal, cta_brand'
   - Word count within ±10% of target_duration_seconds × production_proposal.audio_contract.target_speed_wps
+  - hook/build sections include source_ref or source_refs values from production_bible.intelligence.trend_alignment when selected trend script_usage requires them
   - Mode annotations present on lines where animated/cinematic treatment differs
   - speaker_directions and voice_performance present on every section
   - CTA section ends with brand name — non-negotiable
@@ -177,6 +183,7 @@ stages:
   - script artifact produced with sections array
   - total_words within ±10% of target_duration_seconds × production_proposal.audio_contract.target_speed_wps
   - every script section has delivery instructions compatible with production_proposal.audio_contract.voice_performance
+  - check_script_trend_alignment passes when production_bible.intelligence.trend_alignment has selected entries
   - script.user_approved == true (user explicitly approved the narration text)
 - name: scene_plan
   skill: pipelines/ad-video/scene-director
@@ -196,6 +203,7 @@ stages:
   - product_visibility and product_reference_required present on every scene
   - Product-visible generated scenes set product_reference_required=true
   - High-risk generated scenes include hallucination_checks derived from production_bible.truth_contract
+  - Visual/pacing trend_alignment entries have at least one scene with trend_alignment_refs and trend_alignment_notes
   - Total scene duration covers script duration (±0.5s)
   - crop_regions present on every scene with entries for every opted-in derivative variant
   - core field present on every scene
@@ -205,6 +213,7 @@ stages:
   - scene_plan artifact produced
   - sum(scene.duration) within ±0.5s of total script duration
   - Product-visible scenes declare product_visibility != none and product_reference_required=true
+  - check_scene_plan_trend_alignment passes for selected visual or pacing trends
   - Generated high-risk scenes declare hallucination_checks with check_id, category, requirement, prohibited_failure, severity, and evidence_source
   - 'If derivative_variants non-empty: all scenes have crop_regions entries for every selected variant'
 - name: assets

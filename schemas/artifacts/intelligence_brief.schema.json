@@ -22,9 +22,39 @@
         "type": "object",
         "required": ["signal", "source", "relevance"],
         "properties": {
+          "trend_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stable id used when production_bible.intelligence.trend_alignment selects this trend."
+          },
           "signal": { "type": "string" },
           "source": { "type": "string" },
           "relevance": { "type": "string" },
+          "sentiment": {
+            "type": "string",
+            "enum": ["positive", "neutral", "negative", "mixed", "unknown"],
+            "description": "Brand-facing sentiment of the engagement signal. New ad-video runs should set this so bible-director can avoid controversy-driven trends."
+          },
+          "trend_type": {
+            "type": "string",
+            "enum": ["engagement_signal", "visual_style", "audio_pattern", "editing_pacing", "hook_format", "platform_format_norm", "cultural_moment", "topic_signal"],
+            "description": "How this record should be interpreted. platform_format_norm marks a platform convention rather than a positive engagement trend."
+          },
+          "brand_safety": {
+            "type": "string",
+            "enum": ["safe", "caution", "unsafe", "unknown"],
+            "description": "Whether this trend can safely guide a brand ad. Only safe trends may be selected into production_bible.intelligence.trend_alignment."
+          },
+          "application_targets": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": ["hook", "build", "reveal", "cta_brand", "script", "scene_plan", "visual", "pacing", "audio", "format"]
+            },
+            "description": "Where this trend may safely influence the production."
+          },
           "observed_at": {
             "type": "string",
             "format": "date",

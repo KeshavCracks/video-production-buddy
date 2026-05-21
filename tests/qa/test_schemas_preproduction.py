@@ -658,6 +658,10 @@ MINIMAL_BIBLE = {
         ],
     },
     "intelligence": {
+        "trend_alignment": {
+            "selected_trend_ids": [],
+            "alignments": [],
+        },
         "rejected_approaches": [
             {"approach": "Celebrity endorsement", "reason": "Budget out of scope"}
         ]

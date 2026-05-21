@@ -634,6 +634,9 @@ Key contract points:
   rejected approaches. It also owns `truth_contract`: objective facts, physical
   constraints, product geometry rules, motion-coherence rules, and values/safety
   guardrails used to block hallucinated assets before final render.
+  It also owns `intelligence.trend_alignment`: selected fresh, deduped,
+  brand-safe positive/neutral trend applications that script and scene_plan must
+  reference explicitly without imitating viral source content.
 - `idea` generates execution concepts inside the approved `production_bible`;
   it must not reopen the arc, beats, hook mechanic, or mandatory motifs.
 - `proposal` locks technical production parameters: derivative variants,

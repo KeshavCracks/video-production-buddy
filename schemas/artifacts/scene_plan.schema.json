@@ -196,6 +196,20 @@
             "type": "string",
             "description": "Optional ad-video beat label (e.g. 'hook', 'build', 'reveal', 'cta'). Maps the scene to its production_bible.narrative.emotional_beat_sequence position."
           },
+          "trend_alignment_refs": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^(trend_alignment:[A-Za-z0-9._:-]+|[A-Za-z0-9._:-]+)$"
+            },
+            "description": "Selected production_bible.intelligence.trend_alignment refs applied by this scene."
+          },
+          "trend_alignment_notes": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Visual or pacing instruction showing how the selected trend is adapted without copying source content."
+          },
           "core": {
             "type": "boolean",
             "default": false,

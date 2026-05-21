@@ -269,30 +269,98 @@ preference being contradicted.
     `remotion-composer/scene_type_registry.json#style_layers`
     — `grain`, `vignette`, `ambient_glow`, `particle_field`, `light_rays`.
 
-### Step 4 — Build audio contract
+### Step 4 — Build trend alignment
+
+Create the required `production_bible.intelligence.trend_alignment` block from
+`intelligence_brief.platform_trends`. This block is the only trend source
+downstream script and scene_plan stages may treat as selected creative guidance.
+Research can still retain stale, negative, cautionary, or unsafe trends for
+context, but they must not appear in `trend_alignment`.
+
+Use the deterministic selector before writing the block:
+
+```python
+from datetime import date
+from lib.trend_alignment import select_trends_for_alignment
+
+today = date.today()
+selected_trends = select_trends_for_alignment(
+    intelligence_brief["platform_trends"],
+    now=today,
+    max_items=3,
+)
+```
+
+Selection rules:
+- fresh according to `observed_at` / `decay_window_days` unless `is_evergreen`
+  is true
+- deduped by normalized `signal`
+- `sentiment` is `positive` or `neutral`
+- `brand_safety` is `safe`
+- `trend_type == "platform_format_norm"` means platform convention only; use it
+  for format or pacing guidance, not as a claim that the creative topic is viral
+
+For each selected trend, write an alignment entry:
+
+```json
+{
+  "trend_id": "trend-tiktok-text-hooks",
+  "signal": "Mute-friendly text-first hooks dominating TikTok ads",
+  "source": "https://tiktokcreativecenter.com/insights/2026-q1-report",
+  "sentiment": "positive",
+  "brand_safety": "safe",
+  "trend_type": "hook_format",
+  "application_targets": ["hook", "build", "script", "scene_plan", "visual"],
+  "target_beat": "hook",
+  "script_usage": {
+    "required_section_ids": ["hook", "build"],
+    "source_ref": "trend_alignment:trend-tiktok-text-hooks",
+    "usage_note": "Use the mute-friendly text-first pattern to make the hook readable before audio is understood."
+  },
+  "scene_usage": {
+    "required": true,
+    "required_scene_count": 1,
+    "visual_or_pacing_instruction": "Add native overlay text and rapid visual confirmation without copying source captions, audio, or shot order."
+  },
+  "do_not_imitate": [
+    "Do not copy creator identity, captions, audio, choreography, or the source shot sequence."
+  ]
+}
+```
+
+If no trend is safe enough to select, still write:
+
+```json
+"trend_alignment": {
+  "selected_trend_ids": [],
+  "alignments": []
+}
+```
+
+Do not force topical references. Trend alignment should guide hook structure,
+visual pacing, audio/mute friendliness, or scene grammar. It must not make the
+ad feel dated, opportunistic, or copied from a viral source.
+
+### Step 5 — Build audio contract
 
 - `voice_character.tone`: from identity.tone + emotional_profile; include concrete delivery adjectives, not generic brand tone.
 - `voice_character.pacing`: measured / energetic / conversational, chosen from the narrative pacing model and platform.
 - `voice_character.persona`: include narrator role and any required perceived gender/register/age when the brief implies one. Proposal-director will reject voice candidates that conflict with this persona.
 - `music_direction.arc`: derived from intensity curve
-- `music_direction.tempo` + `genre_direction`: from platform_trends + pacing_model.
-  Filter and dedupe trends before consuming so stale or duplicate signals
-  don't drive the choice:
+- `music_direction.tempo` + `genre_direction`: from the selected
+  `production_bible.intelligence.trend_alignment.alignments` when audio or
+  pacing targets are present, plus pacing_model. Do not use raw stale/unsafe
+  platform_trends to choose music.
 
 ```python
-from datetime import date
-from lib.trend_recency import dedupe_trends, filter_stale_trends
-
-today = date.today()
-fresh_trends = dedupe_trends(
-    filter_stale_trends(intelligence_brief["platform_trends"], now=today)
-)
-# Use fresh_trends (not the raw intelligence_brief["platform_trends"]) when
-# deriving music_direction.tempo / genre_direction. Trends without
-# observed_at are treated as current; evergreen trends bypass decay.
+safe_audio_trends = [
+    entry for entry in trend_alignment["alignments"]
+    if "audio" in entry.get("application_targets", [])
+       or "pacing" in entry.get("application_targets", [])
+]
 ```
 
-### Step 5 — Build deliverables
+### Step 6 — Build deliverables
 
 Primary aspect ratio from platform:
 - tiktok / instagram → `"9:16"`
@@ -300,12 +368,12 @@ Primary aspect ratio from platform:
 
 Set `deliverables.primary`. Leave `deliverables.derivatives = []` — proposal fills this.
 
-### Step 6 — Build brand constraints
+### Step 7 — Build brand constraints
 
 - `brand_name_in_final_frame`: always `true`
 - `mandatory_elements`, `prohibited_elements`, `tone_guardrails`: from intake_brief
 
-### Step 7 — Generate compliance manifest
+### Step 8 — Generate compliance manifest
 
 Evaluation method assignment:
 ```

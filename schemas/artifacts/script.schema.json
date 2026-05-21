@@ -131,7 +131,14 @@
           },
           "source_ref": {
             "type": "string",
-            "description": "Reference to the research_brief data point or URL that supports this claim. Every factual claim should be traceable."
+            "description": "Reference to the research_brief data point, URL, or production_bible.intelligence.trend_alignment source_ref that supports this claim or creative application. Every factual claim and selected trend use should be traceable."
+          },
+          "source_refs": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Multiple references supporting this section. Use when one hook/build section carries several production_bible.intelligence.trend_alignment source_ref values."
           },
           "tts_directive": {
             "type": "object",

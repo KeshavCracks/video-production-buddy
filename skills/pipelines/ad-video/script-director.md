@@ -124,6 +124,41 @@ Every ad-video script section must include both:
 
 Derive these from `production_bible.audio.voice_character`, `production_proposal.audio_contract.voice_performance`, and the section's emotional beat. Keep the locked voice persona consistent across all sections, but vary emotion, intonation, rhythm, and pauses by scene. If the section directions would require a different perceived gender/register/persona from `production_proposal.audio_contract.voice_gender` or `voice_persona`, stop and return to proposal instead of papering over the mismatch.
 
+## Trend Source Refs
+
+When `production_bible.intelligence.trend_alignment.alignments[]` contains
+selected entries, the script must carry those refs into the sections named in
+each entry's `script_usage.required_section_ids`. At minimum, selected hook/build
+trend alignments should make the `hook` and `build` sections include a
+`source_ref` exactly matching `script_usage.source_ref`, for example
+`"trend_alignment:trend-tiktok-text-hooks"`.
+
+If more than one selected trend applies to the same script section, do not split
+the narration into duplicate sections just to satisfy refs. Keep the natural
+one-section-per-beat structure and add `source_refs` with every selected
+`script_usage.source_ref` value:
+
+```json
+"source_refs": [
+  "trend_alignment:trend-tiktok-text-hooks",
+  "trend_alignment:trend-mute-friendly-format"
+]
+```
+
+Use the trend to shape structure or pacing, not to name-drop the trend. The
+copy should still sound like the brand's ad, not a topical commentary on a
+platform trend.
+
+Before submitting, run the deterministic propagation check:
+
+```python
+from lib.trend_alignment import check_script_trend_alignment
+
+report = check_script_trend_alignment(production_bible, script)
+if not report["ok"]:
+    raise RuntimeError(report["issues"])
+```
+
 ## Script Artifact Format
 
 ```json
@@ -144,6 +179,7 @@ Derive these from `production_bible.audio.voice_character`, `production_proposal
       "start_seconds": 0,
       "end_seconds": 5,
       "duration_estimate_seconds": 5,
+      "source_ref": "trend_alignment:trend-tiktok-lofi-hook",
       "tts_directive": {"speed_mult": 0.98},
       "speaker_directions": "Warm urgency, conversational rather than announcer-like; slight pause after '45 minutes'.",
       "voice_performance": {
@@ -166,6 +202,7 @@ Derive these from `production_bible.audio.voice_character`, `production_proposal
       "start_seconds": 5,
       "end_seconds": 11,
       "duration_estimate_seconds": 6,
+      "source_ref": "trend_alignment:trend-tiktok-lofi-hook",
       "speaker_directions": "Tighter, lightly clipped delivery; make each pain point land as a separate beat.",
       "voice_performance": {
         "emotion": "contained frustration",

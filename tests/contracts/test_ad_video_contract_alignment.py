@@ -465,6 +465,223 @@ def test_production_bible_schema_requires_truth_contract() -> None:
         validate_artifact("production_bible", bad)
 
 
+def _trend_alignment_block() -> dict:
+    return {
+        "selected_trend_ids": ["trend-tiktok-text-hooks"],
+        "alignments": [
+            {
+                "trend_id": "trend-tiktok-text-hooks",
+                "signal": "Native text-first hooks are lifting completion rates.",
+                "source": "https://example.com/current-hook",
+                "sentiment": "positive",
+                "brand_safety": "safe",
+                "trend_type": "visual_style",
+                "application_targets": ["hook", "build", "scene_plan", "visual"],
+                "target_beat": "hook",
+                "script_usage": {
+                    "required_section_ids": ["hook", "build"],
+                    "source_ref": "trend_alignment:trend-tiktok-text-hooks",
+                    "usage_note": "Let the hook/build borrow the native text-first pacing pattern.",
+                },
+                "scene_usage": {
+                    "required": True,
+                    "required_scene_count": 1,
+                    "visual_or_pacing_instruction": "Use native overlay text and rapid visual confirmation without copying a viral layout.",
+                },
+                "do_not_imitate": [
+                    "Do not copy creator identity, captions, audio, choreography, or shot sequence from the source.",
+                ],
+            }
+        ],
+    }
+
+
+def test_production_bible_schema_requires_trend_alignment_block() -> None:
+    """The bible must make selected trend usage observable to downstream stages."""
+    from tests.qa.test_artifact_chain import PRODUCTION_BIBLE_VALID
+
+    bible = deepcopy(PRODUCTION_BIBLE_VALID)
+    bible["intelligence"]["trend_alignment"] = _trend_alignment_block()
+    validate_artifact("production_bible", bible)
+
+    bad = deepcopy(bible)
+    del bad["intelligence"]["trend_alignment"]
+    with pytest.raises(Exception):
+        validate_artifact("production_bible", bad)
+
+    unsafe = deepcopy(bible)
+    unsafe["intelligence"]["trend_alignment"]["alignments"][0]["brand_safety"] = "unsafe"
+    with pytest.raises(Exception):
+        validate_artifact("production_bible", unsafe)
+
+
+def test_script_trend_alignment_requires_hook_build_source_refs() -> None:
+    """Selected bible trend_alignment refs must reach hook/build script sections."""
+    from lib.trend_alignment import check_script_trend_alignment
+
+    bible = {"intelligence": {"trend_alignment": _trend_alignment_block()}}
+    script = {
+        "sections": [
+            {"id": "hook", "beat": "hook", "text": "Three seconds decide the scroll."},
+            {
+                "id": "build",
+                "beat": "build",
+                "text": "Then prove it before the viewer asks why.",
+                "source_ref": "trend_alignment:trend-tiktok-text-hooks",
+            },
+        ]
+    }
+
+    report = check_script_trend_alignment(bible, script)
+
+    assert report["ok"] is False
+    assert any(issue["beat"] == "hook" for issue in report["issues"])
+
+    script["sections"][0]["source_ref"] = "trend_alignment:trend-tiktok-text-hooks"
+    assert check_script_trend_alignment(bible, script)["ok"] is True
+
+
+def test_script_schema_accepts_multiple_source_refs_per_section() -> None:
+    """A shared hook/build section may carry multiple trend-alignment refs."""
+    voice_performance = {
+        "emotion": "intrigue",
+        "intonation": "soft rise, clean resolve",
+        "rhythm": "short phrase, breath, proof phrase",
+        "pace": "measured",
+        "pause_after_seconds": 0.25,
+    }
+    script = {
+        "version": "1.0",
+        "title": "Multi Trend Script",
+        "total_duration_seconds": 6,
+        "sections": [
+            {
+                "id": "hook",
+                "beat": "hook",
+                "text": "Three seconds decide the scroll.",
+                "start_seconds": 0,
+                "end_seconds": 3,
+                "source_refs": [
+                    "trend_alignment:trend-tiktok-text-hooks",
+                    "trend_alignment:trend-mute-friendly-format",
+                ],
+                "speaker_directions": "Measured and immediate.",
+                "voice_performance": voice_performance,
+            }
+        ],
+    }
+
+    validate_artifact("script", script, pipeline_type="ad-video")
+
+
+def test_script_trend_alignment_allows_multiple_refs_on_shared_sections() -> None:
+    """Multiple selected hook/build trends should not require duplicate sections."""
+    from lib.trend_alignment import check_script_trend_alignment
+
+    trend_alignment = _trend_alignment_block()
+    second = deepcopy(trend_alignment["alignments"][0])
+    second["trend_id"] = "trend-mute-friendly-format"
+    second["signal"] = "Mute-friendly captions are a platform baseline."
+    second["trend_type"] = "platform_format_norm"
+    second["script_usage"]["source_ref"] = "trend_alignment:trend-mute-friendly-format"
+    second["script_usage"]["usage_note"] = "Keep the hook understandable without audio."
+    trend_alignment["selected_trend_ids"].append("trend-mute-friendly-format")
+    trend_alignment["alignments"].append(second)
+    bible = {"intelligence": {"trend_alignment": trend_alignment}}
+    script = {
+        "sections": [
+            {
+                "id": "hook",
+                "beat": "hook",
+                "text": "Three seconds decide the scroll.",
+                "source_refs": [
+                    "trend_alignment:trend-tiktok-text-hooks",
+                    "trend_alignment:trend-mute-friendly-format",
+                ],
+            },
+            {
+                "id": "build",
+                "beat": "build",
+                "text": "Then prove it before the viewer asks why.",
+                "source_refs": [
+                    "trend_alignment:trend-tiktok-text-hooks",
+                    "trend_alignment:trend-mute-friendly-format",
+                ],
+            },
+        ]
+    }
+
+    report = check_script_trend_alignment(bible, script)
+
+    assert report["ok"] is True
+    assert report["issues"] == []
+
+
+def test_scene_plan_trend_alignment_requires_scene_for_visual_trend() -> None:
+    """Each selected visual trend must have at least one scene carrying its ref."""
+    from lib.trend_alignment import check_scene_plan_trend_alignment
+
+    bible = {"intelligence": {"trend_alignment": _trend_alignment_block()}}
+    scene_plan = {
+        "scenes": [
+            {
+                "id": "scene-1",
+                "beat": "hook",
+                "description": "Product UI reveal without trend-specific pacing.",
+            }
+        ]
+    }
+
+    report = check_scene_plan_trend_alignment(bible, scene_plan)
+
+    assert report["ok"] is False
+    assert any(issue["trend_id"] == "trend-tiktok-text-hooks" for issue in report["issues"])
+
+    scene_plan["scenes"][0]["trend_alignment_refs"] = ["trend_alignment:trend-tiktok-text-hooks"]
+    scene_plan["scenes"][0]["trend_alignment_notes"] = (
+        "Native overlay text lands on the first visual beat; no viral layout copied."
+    )
+    assert check_scene_plan_trend_alignment(bible, scene_plan)["ok"] is True
+
+
+def test_ad_video_contract_mentions_trend_alignment_flow() -> None:
+    """Manifest and director skills must expose selected-trend propagation."""
+    manifest = _load_ad_video_manifest()
+    intelligence = _read_skill("intelligence-director.md")
+    bible = _read_skill("bible-director.md")
+    script = _read_skill("script-director.md")
+    scene = _read_skill("scene-director.md")
+
+    intelligence_stage = next(stage for stage in manifest["stages"] if stage["name"] == "intelligence")
+    bible_stage = next(stage for stage in manifest["stages"] if stage["name"] == "bible")
+    script_stage = next(stage for stage in manifest["stages"] if stage["name"] == "script")
+    scene_stage = next(stage for stage in manifest["stages"] if stage["name"] == "scene_plan")
+    contract_text = "\n".join(
+        intelligence_stage.get("review_focus", [])
+        + bible_stage.get("review_focus", [])
+        + bible_stage.get("success_criteria", [])
+        + script_stage.get("review_focus", [])
+        + script_stage.get("success_criteria", [])
+        + scene_stage.get("review_focus", [])
+        + scene_stage.get("success_criteria", [])
+    )
+
+    assert "sentiment" in contract_text
+    assert "brand_safety" in contract_text
+    assert "trend_alignment" in contract_text
+    assert "source_ref" in contract_text
+    assert "trend_alignment_refs" in contract_text
+
+    assert "`sentiment`" in intelligence
+    assert "`brand_safety`" in intelligence
+    assert "select_trends_for_alignment" in bible
+    assert "`production_bible.intelligence.trend_alignment`" in bible
+    assert "`source_ref`" in script
+    assert "check_script_trend_alignment" in script
+    assert "`trend_alignment_refs`" in scene
+    assert "check_scene_plan_trend_alignment" in scene
+
+
 def _hallucination_check(check_id: str = "HC-PRODUCT-GEOMETRY") -> dict:
     return {
         "check_id": check_id,

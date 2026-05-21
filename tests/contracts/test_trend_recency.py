@@ -29,6 +29,7 @@ from lib.trend_recency import (
     filter_stale_trends,
     score_trend_recency,
 )
+from lib.trend_alignment import select_trends_for_alignment
 
 
 # ── score_trend_recency ────────────────────────────────────────────────────
@@ -222,3 +223,116 @@ def test_filter_then_dedupe_typical_pipeline():
     final = dedupe_trends(fresh)
     signals = [t["signal"] for t in final]
     assert signals == ["fast cuts", "evergreen brand-led storytelling"]
+
+
+def test_alignment_selection_excludes_stale_negative_and_unsafe_trends():
+    """Bible-director trend_alignment must only consume fresh brand-safe,
+    positive/neutral trends. Risky research can remain in intelligence_brief,
+    but cannot become selected creative guidance."""
+    now = date(2026, 5, 21)
+    trends = [
+        {
+            "trend_id": "trend-safe-hook",
+            "signal": "native text-first hooks are lifting completion rates",
+            "source": "https://example.com/current-hook",
+            "relevance": "Matches the first two ad beats.",
+            "observed_at": "2026-05-01",
+            "decay_window_days": 90,
+            "sentiment": "positive",
+            "brand_safety": "safe",
+            "trend_type": "visual_style",
+            "application_targets": ["hook", "build", "scene_plan", "visual"],
+        },
+        {
+            "trend_id": "trend-safe-hook-duplicate",
+            "signal": " Native text-first hooks are lifting completion rates ",
+            "source": "https://example.com/duplicate",
+            "relevance": "Duplicate signal.",
+            "observed_at": "2026-05-02",
+            "sentiment": "positive",
+            "brand_safety": "safe",
+        },
+        {
+            "trend_id": "trend-stale",
+            "signal": "2020 synthwave comeback",
+            "source": "https://example.com/old",
+            "relevance": "Outdated.",
+            "observed_at": "2020-01-01",
+            "decay_window_days": 90,
+            "sentiment": "positive",
+            "brand_safety": "safe",
+        },
+        {
+            "trend_id": "trend-negative",
+            "signal": "complaint stitch format spiking",
+            "source": "https://example.com/negative",
+            "relevance": "Engagement is controversy-driven.",
+            "observed_at": "2026-05-01",
+            "sentiment": "negative",
+            "brand_safety": "safe",
+        },
+        {
+            "trend_id": "trend-unsafe",
+            "signal": "danger prank format",
+            "source": "https://example.com/unsafe",
+            "relevance": "High views but unsafe for brand.",
+            "observed_at": "2026-05-01",
+            "sentiment": "neutral",
+            "brand_safety": "unsafe",
+        },
+    ]
+
+    selected = select_trends_for_alignment(trends, now=now)
+
+    assert [trend["trend_id"] for trend in selected] == ["trend-safe-hook"]
+
+
+def test_alignment_selection_allows_safe_platform_format_norm_without_sentiment():
+    """A platform-format norm is not a positive engagement trend, but can still
+    guide format when it is explicitly marked safe."""
+    now = date(2026, 5, 21)
+    trends = [
+        {
+            "trend_id": "trend-safe-format",
+            "signal": "9:16 mute-friendly captions are platform baseline",
+            "source": "https://example.com/platform-format",
+            "relevance": "Guides format and accessibility rather than trend-chasing.",
+            "observed_at": "2026-05-01",
+            "sentiment": "unknown",
+            "brand_safety": "safe",
+            "trend_type": "platform_format_norm",
+            "application_targets": ["format", "scene_plan"],
+        }
+    ]
+
+    selected = select_trends_for_alignment(trends, now=now)
+
+    assert [trend["trend_id"] for trend in selected] == ["trend-safe-format"]
+
+
+def test_alignment_selection_does_not_let_unsafe_duplicate_shadow_safe_source():
+    now = date(2026, 5, 21)
+    trends = [
+        {
+            "trend_id": "trend-unsafe-source",
+            "signal": "text-first hooks",
+            "source": "https://example.com/unsafe",
+            "relevance": "Same surface pattern but unsafe execution.",
+            "observed_at": "2026-05-01",
+            "sentiment": "neutral",
+            "brand_safety": "unsafe",
+        },
+        {
+            "trend_id": "trend-safe-source",
+            "signal": "Text-First Hooks",
+            "source": "https://example.com/safe",
+            "relevance": "Same pattern, brand-safe application.",
+            "observed_at": "2026-05-02",
+            "sentiment": "neutral",
+            "brand_safety": "safe",
+        },
+    ]
+
+    selected = select_trends_for_alignment(trends, now=now)
+
+    assert [trend["trend_id"] for trend in selected] == ["trend-safe-source"]

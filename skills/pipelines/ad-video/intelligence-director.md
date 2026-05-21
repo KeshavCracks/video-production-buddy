@@ -94,15 +94,32 @@ site:reddit.com "{product_category}" (finally|love|changed my life|best decision
 "{platform} creative best practices {year}"
 ```
 
-For each trend, capture the typed record fields so downstream stages can
-filter stale entries and dedupe duplicates. Bible-director Step 4 invokes
-`lib.trend_recency.filter_stale_trends` and `dedupe_trends` before consuming
-this list — entries without `observed_at` are treated as current, but
-emitting the metadata is strongly preferred.
+For each trend, capture typed record fields so downstream stages can filter
+stale entries, dedupe duplicates, and select only brand-safe positive/neutral
+signals for `production_bible.intelligence.trend_alignment`. Bible-director
+uses `lib.trend_alignment.select_trends_for_alignment`, which wraps
+`lib.trend_recency.filter_stale_trends` and `dedupe_trends`, before consuming
+this list.
 
 **Required per trend:** `signal`, `source` (URL), `relevance` (one-sentence hypothesis).
 
-**Recommended per trend (typed metadata):**
+**Required for new ad-video runs (typed metadata):**
+- `trend_id` — stable id, e.g. `trend-tiktok-text-hooks`. This is the id the
+  bible selects into `trend_alignment`.
+- `sentiment` — `positive`, `neutral`, `negative`, `mixed`, or `unknown`.
+  Positive/neutral means brand-safe positive or neutral engagement, not
+  controversy-driven reach.
+- `trend_type` — one of `engagement_signal`, `visual_style`, `audio_pattern`,
+  `editing_pacing`, `hook_format`, `platform_format_norm`, `cultural_moment`,
+  or `topic_signal`. Use `platform_format_norm` only when the record is a
+  platform convention, not an engagement trend.
+- `brand_safety` — `safe`, `caution`, `unsafe`, or `unknown`. Only `safe`
+  records may be selected into the bible's trend alignment.
+- `application_targets` — where the trend can safely apply:
+  `hook`, `build`, `reveal`, `cta_brand`, `script`, `scene_plan`, `visual`,
+  `pacing`, `audio`, or `format`.
+
+**Recommended per trend (freshness / audit metadata):**
 - `observed_at` — ISO 8601 date (`YYYY-MM-DD`) of the source article / post / report.
   Use the publication date from the search result. If the result is undated,
   omit the field rather than guessing.
@@ -120,9 +137,14 @@ emitting the metadata is strongly preferred.
 ```json
 // Example typed trend record
 {
+  "trend_id": "trend-tiktok-text-hooks",
   "signal": "Mute-friendly text-first hooks dominating TikTok ads",
   "source": "https://tiktokcreativecenter.com/insights/2026-q1-report",
   "relevance": "Aligns with our 9:16 launch deliverable; hooks must read silently",
+  "sentiment": "positive",
+  "trend_type": "hook_format",
+  "brand_safety": "safe",
+  "application_targets": ["hook", "build", "script", "scene_plan", "visual"],
   "observed_at": "2026-03-12",
   "retrieved_at": "2026-04-26",
   "decay_window_days": 90,

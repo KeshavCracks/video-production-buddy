@@ -120,6 +120,33 @@ Include only opted-in aspect-ratio variants. Duration-only variants (`"15s"` /
 `"15s_short"`) use `core: true` scene filtering and do not get crop rectangles.
 If no aspect-ratio derivatives are opted in, omit `crop_regions`.
 
+## Trend-Aligned Scene Instructions
+
+Read `production_bible.intelligence.trend_alignment.alignments[]` before
+drafting scenes. For every selected entry whose `application_targets` include
+`scene_plan`, `visual`, or `pacing`, or whose `scene_usage.required == true`,
+include at least `scene_usage.required_scene_count` scenes with:
+
+- `trend_alignment_refs`: an array containing the exact
+  `script_usage.source_ref` value, e.g. `trend_alignment:trend-tiktok-text-hooks`
+- `trend_alignment_notes`: a concrete visual or pacing instruction showing how
+  the trend is adapted without copying source content
+
+Use the trend as grammar, not imitation. Do not copy the source creator, layout,
+caption wording, audio, choreography, or shot sequence. If the only way to use a
+trend would be literal imitation, leave it unselected in the bible rather than
+threading it into the scene plan.
+
+Before submitting, run:
+
+```python
+from lib.trend_alignment import check_scene_plan_trend_alignment
+
+report = check_scene_plan_trend_alignment(production_bible, scene_plan)
+if not report["ok"]:
+    raise RuntimeError(report["issues"])
+```
+
 ## Scene Plan Artifact Format
 
 ```json
@@ -139,6 +166,8 @@ If no aspect-ratio derivatives are opted in, omit `crop_regions`.
       "duration_seconds": 5,
       "script_section_id": "hook",
       "beat": "hook",
+      "trend_alignment_refs": ["trend_alignment:trend-tiktok-lofi-hook"],
+      "trend_alignment_notes": "Native overlay text lands with the first visual beat; pacing is adapted without copying a source layout.",
       "required_assets": [],
       "motion_required": false,
       "product_visibility": "none",
@@ -177,6 +206,7 @@ After reading this base document:
 - [ ] Every scene has `product_visibility` and `product_reference_required`
 - [ ] Every product-visible scene has `product_reference_required: true`
 - [ ] Every high-risk generated scene has `hallucination_checks[]`
+- [ ] Selected visual/pacing trend alignments have `trend_alignment_refs` and `trend_alignment_notes` on enough scenes
 - [ ] If `derivative_variants` includes `"9:16"` or `"1:1"`: every scene has `crop_regions` entries for each opted-in aspect ratio
 - [ ] No more than 3 consecutive scenes of the same `scene_type`
 - [ ] Scenes with `motion_required: true` are realistic given production plan
