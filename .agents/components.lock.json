@@ -1,0 +1,3196 @@
+{
+  "components": {
+    "acestep": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:3b645adb13f4a1c8f6ed6f0410c406ce278ae6a6b02c594b381cb2d20e62c56f"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/acestep",
+      "treeSha256": "sha256:cbd5035a905050eaa1d6483d0e2e474855f3697fdc9d5c99380850cecce11bdd",
+      "type": "local"
+    },
+    "agents": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:e763c739e8a87f5cf06a06d3e962d9c09c94d30db7c8ba00df98c4ef5c7c997c"
+        },
+        {
+          "mode": "100644",
+          "path": "references/agent-configuration.md",
+          "sha256": "sha256:719a8f7f0ad13202beaed916b478fe845af47301b721d47822059cc4ac1f259b"
+        },
+        {
+          "mode": "100644",
+          "path": "references/client-tools.md",
+          "sha256": "sha256:8e6729e102480c53e8e19a6a3735907dc0ed4931893024edd1b6aa2995f89124"
+        },
+        {
+          "mode": "100644",
+          "path": "references/installation.md",
+          "sha256": "sha256:a2f825e2de7eafd9b096d464a785c813f6e83354c5cb4f5fae6c69c26b73a61c"
+        },
+        {
+          "mode": "100644",
+          "path": "references/outbound-calls.md",
+          "sha256": "sha256:6e2fd02c2ea1e6a0e337a0a650daddd5935f39ce41eed506020244fb81c5fcac"
+        },
+        {
+          "mode": "100644",
+          "path": "references/widget-embedding.md",
+          "sha256": "sha256:71ec62473d6677841ec74bf603f64d043bf285ad27feb4c688c23bb820d07901"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/agents",
+      "treeSha256": "sha256:629c6fa5c0c85398f4252728616216b105cc81f31e4efc8a079c53fc12e3d9d4",
+      "type": "local"
+    },
+    "ai-video-gen": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:bb98190ddc8080a8e6f72c45f6636b4fb4a22ed6712361b13380ccb0a941e940"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/ai-video-gen",
+      "treeSha256": "sha256:8fb74dccb79a39ef4e53bd3eca079bfc82f38edae32837f8be2b977ac7e3a1f5",
+      "type": "local"
+    },
+    "avatar-video": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:2bba4e8d4e67aac672c608f7e33272883deacb4bd6a0d677077e4eaf23c394b2"
+        },
+        {
+          "mode": "100644",
+          "path": "references/assets.md",
+          "sha256": "sha256:b12eaed620e03ae9751e3411cf60742349abbe58ec0d80a8081c9e3b44e65078"
+        },
+        {
+          "mode": "100644",
+          "path": "references/avatars.md",
+          "sha256": "sha256:ce78920642b16b1623add740443206f4ffb54f85deb2d82660a13e27401ea968"
+        },
+        {
+          "mode": "100644",
+          "path": "references/backgrounds.md",
+          "sha256": "sha256:3e02f0dd2dc683e41abe5481ad36b7809ac0852ade76fbf9c92dd7c2a56f470d"
+        },
+        {
+          "mode": "100644",
+          "path": "references/captions.md",
+          "sha256": "sha256:a303f98d9600f04a2bf343ac149a75b5c0db26d5f9e0a0bff421e30615bcb2f2"
+        },
+        {
+          "mode": "100644",
+          "path": "references/dimensions.md",
+          "sha256": "sha256:c0c9bcf23e8663957030e8335f26640c8c34809eca92e81306b0e2eb6c0812aa"
+        },
+        {
+          "mode": "100644",
+          "path": "references/photo-avatars.md",
+          "sha256": "sha256:5126d1ef73ac1da8a5924481fc52c13716dc921838de1f0e764a28d6bf6f3a02"
+        },
+        {
+          "mode": "100644",
+          "path": "references/quota.md",
+          "sha256": "sha256:157271d5e42465df49ffe706a63d6db3ee9187c753c42137a16bc505aa7f2348"
+        },
+        {
+          "mode": "100644",
+          "path": "references/remotion-integration.md",
+          "sha256": "sha256:94746a0244b37aaf44fc2fc4e199fe0924b8552e256b2e611037c1b843df08a9"
+        },
+        {
+          "mode": "100644",
+          "path": "references/scripts.md",
+          "sha256": "sha256:8515690bd2185e933f53f1e5984aad07a1a3729b41aa9a892a7726419d6db4d4"
+        },
+        {
+          "mode": "100644",
+          "path": "references/templates.md",
+          "sha256": "sha256:bb927e37ec7d1a71287fa06a673d35be0751bd248fe89f47f47449aeb65c63ed"
+        },
+        {
+          "mode": "100644",
+          "path": "references/text-overlays.md",
+          "sha256": "sha256:7f948d59f711c58903cf86666a87221c2bc7c0e69cbdc14bd3c32cfb3d59e10f"
+        },
+        {
+          "mode": "100644",
+          "path": "references/video-generation.md",
+          "sha256": "sha256:a266b5908c666bb8378ad65bba6a1d85b7a358e04a30ecb39dbd2c9903b62c2b"
+        },
+        {
+          "mode": "100644",
+          "path": "references/video-status.md",
+          "sha256": "sha256:f61025f20734eaec3e2a8c9bbd23a7fc6dba5edc0443867913b9711eb823f009"
+        },
+        {
+          "mode": "100644",
+          "path": "references/voices.md",
+          "sha256": "sha256:d3d82cb38a44f4f355533db4b8e62b444b14ddeaa11c3e528225f9e69a48e39b"
+        },
+        {
+          "mode": "100644",
+          "path": "references/webhooks.md",
+          "sha256": "sha256:6bc9c4ce68dc8303e25b013aff6066d80ead6148d055e87278499095e17fb2d2"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/avatar-video",
+      "treeSha256": "sha256:2b589bc715b6fa072922ffd7802037d3b99a9b7112dc98ca8e89f6b2caa65639",
+      "type": "local"
+    },
+    "beautiful-mermaid": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:2ea488822ccd006cbbe6a3c4fa52f3224d1f24e96687acbef167bb61e47b1962"
+        },
+        {
+          "mode": "100644",
+          "path": "references/mermaid-syntax.md",
+          "sha256": "sha256:3da67ed36425767add2917f89e1b21d8cdc1401a8f368b2b130ade24d68d4c44"
+        },
+        {
+          "mode": "100755",
+          "path": "scripts/create-html.ts",
+          "sha256": "sha256:d3fa5a9bf73bfc683e177d8acd64cb8c945053383617d4b5a744975cb1693675"
+        },
+        {
+          "mode": "100755",
+          "path": "scripts/render.ts",
+          "sha256": "sha256:764d793b2ee5414c8d13762910c670533d124a6aab498842f8022de2da3e8990"
+        }
+      ],
+      "kind": "skill",
+      "requestedRef": "main",
+      "resolvedCommit": "9b0e00ad1b941165e2506545bbfddafa34cf2cb8",
+      "source": "intellectronica-agent-skills",
+      "sourcePath": "skills/beautiful-mermaid",
+      "treeSha256": "sha256:5828b8f305ae56d24713cdcd03af00357282e5e9de2b1d3db0500759639ad539",
+      "type": "git",
+      "url": "https://github.com/intellectronica/agent-skills.git"
+    },
+    "bfl-api": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:ed1bcfa0a2c8c2649f7e8dab8303ff837d605471b647b50216e5e9b1a68e9e9d"
+        },
+        {
+          "mode": "100644",
+          "path": "metadata.json",
+          "sha256": "sha256:fc0aca1116e6b106ff1be90a3e3ec5e47e7408160fde7baa21294188abb1f82b"
+        },
+        {
+          "mode": "100644",
+          "path": "references/api-key-setup.md",
+          "sha256": "sha256:4a6c83a9883aadb20b37317d39ca4217f9f3f97127c85fbbbf63ecae746edfa6"
+        },
+        {
+          "mode": "100755",
+          "path": "references/code-examples/curl-examples.sh",
+          "sha256": "sha256:f52a93f9db84cb5f4d3ae557eb019d0f7f4a0be4052901c511b5233ad3ea11a3"
+        },
+        {
+          "mode": "100644",
+          "path": "references/code-examples/python-client.py",
+          "sha256": "sha256:a84533db5061b34a1e0f14769216f7114a7dd43958417c027f550d6181edaf60"
+        },
+        {
+          "mode": "100644",
+          "path": "references/code-examples/typescript-client.ts",
+          "sha256": "sha256:fb5995bc9e0a357ddd4d9952a279fb5bd5e785328d3247ad97113edb23719bee"
+        },
+        {
+          "mode": "100644",
+          "path": "references/endpoints.md",
+          "sha256": "sha256:c621b2e410f749a0b63f63e80e1eb5056086c3b1cd707bca1f021e1a2c227fdb"
+        },
+        {
+          "mode": "100644",
+          "path": "references/error-handling.md",
+          "sha256": "sha256:cee39ecbdd9a04b997c196daa92dbc44c68c0f5b1e9c60325bf82e169bd25105"
+        },
+        {
+          "mode": "100644",
+          "path": "references/polling-patterns.md",
+          "sha256": "sha256:7c8a91be10088d6a40651f1cd5f397111e1d5b6efa976fcd87a4ad2075957e42"
+        },
+        {
+          "mode": "100644",
+          "path": "references/rate-limiting.md",
+          "sha256": "sha256:085ab0fa3f604f5bc94e6887836698eb7b24380b7b621c059bab8240b34a4a0f"
+        },
+        {
+          "mode": "100644",
+          "path": "references/webhook-integration.md",
+          "sha256": "sha256:0eef75b39ad0e6315ade96c2070e47facdf246d54038a295199d736f16cb2f3f"
+        }
+      ],
+      "kind": "skill",
+      "requestedRef": "master",
+      "resolvedCommit": "d0793c84262183e8220a95fc1faeb5e2560aa6ef",
+      "source": "black-forest-labs-skills",
+      "sourcePath": "skills/bfl-api",
+      "treeSha256": "sha256:38cbccf855ccae26e082af3b7761402bbf62bef33c8fbc3ee6703aa5cae08f0e",
+      "type": "git",
+      "url": "https://github.com/black-forest-labs/skills.git"
+    },
+    "canvas-procedural-animation": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:d9538853f1e307c494f60c4609e0b076da1695bdfb686e4744ed2689a227a198"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/canvas-procedural-animation",
+      "treeSha256": "sha256:bd0caf3c7188fbb2a5304a6b52e15456ffe6232e1b79ee9592523ff11bc66395",
+      "type": "local"
+    },
+    "character-animation-qa": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:5f53eb7125349c7fb62d30eb450cb887d0c0e0cc4ebdb47cccbca51146c76371"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/character-animation-qa",
+      "treeSha256": "sha256:d37d799e1d913e6b1a9af7d3291cc576c0adcd2e683fb433a06e60576b23f26a",
+      "type": "local"
+    },
+    "character-rigging": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:f853d069af114c8b87a03b843c971e6c51b7d5506c6f396dd477f941ffa611d9"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/character-rigging",
+      "treeSha256": "sha256:3040fb8a7f9a5e9f194d5ca7b845559168bdd83ab50ef5e527f40cd25b1fac1d",
+      "type": "local"
+    },
+    "create-video": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:7018274f6e11127eb6eafaaf3513dc5183e986924e5c32de905170d5817ab14b"
+        },
+        {
+          "mode": "100644",
+          "path": "references/assets.md",
+          "sha256": "sha256:b12eaed620e03ae9751e3411cf60742349abbe58ec0d80a8081c9e3b44e65078"
+        },
+        {
+          "mode": "100644",
+          "path": "references/dimensions.md",
+          "sha256": "sha256:c0c9bcf23e8663957030e8335f26640c8c34809eca92e81306b0e2eb6c0812aa"
+        },
+        {
+          "mode": "100644",
+          "path": "references/prompt-examples.md",
+          "sha256": "sha256:a742bfc8db8ea326b6d63ab9c02571ade3dbf17686f502d6d9a4bacd0c0cc425"
+        },
+        {
+          "mode": "100644",
+          "path": "references/prompt-optimizer.md",
+          "sha256": "sha256:968fec33560cbf5d4abf433fe90c5d4602020629f28d6ae63b7061ca9bfd1a34"
+        },
+        {
+          "mode": "100644",
+          "path": "references/quota.md",
+          "sha256": "sha256:157271d5e42465df49ffe706a63d6db3ee9187c753c42137a16bc505aa7f2348"
+        },
+        {
+          "mode": "100644",
+          "path": "references/video-agent.md",
+          "sha256": "sha256:e181dcf9803d2f34e12ae377a2e1c505302fbd712eb5f412b290e5bd612c4256"
+        },
+        {
+          "mode": "100644",
+          "path": "references/video-status.md",
+          "sha256": "sha256:f61025f20734eaec3e2a8c9bbd23a7fc6dba5edc0443867913b9711eb823f009"
+        },
+        {
+          "mode": "100644",
+          "path": "references/visual-styles.md",
+          "sha256": "sha256:4d2e2473d72d2e7f9a02587c862ae47b80cb88ee35e0dc98035bd00cd3cca2f8"
+        },
+        {
+          "mode": "100644",
+          "path": "references/webhooks.md",
+          "sha256": "sha256:6bc9c4ce68dc8303e25b013aff6066d80ead6148d055e87278499095e17fb2d2"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/create-video",
+      "treeSha256": "sha256:63aa7b9a4bd31482b92f8e8aa47546dbbfde122f5b1a3d740bdcd96600cf7c0c",
+      "type": "local"
+    },
+    "d3-viz": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:4b1f820cd87c55dc6b7c714a76c1320903187967cd43f3b4db9d6eacbcc085b3"
+        },
+        {
+          "mode": "100644",
+          "path": "assets/chart-template.jsx",
+          "sha256": "sha256:3aa2859ee1078ec3b9cc47f666cd02b8f96a3bfab5562aea0c4d9b14d4387c39"
+        },
+        {
+          "mode": "100644",
+          "path": "assets/interactive-template.jsx",
+          "sha256": "sha256:d2a8bb59d33c754ed2b7dfed6fbf38f3463c5486c82704b322e098d1f47d209e"
+        },
+        {
+          "mode": "100644",
+          "path": "assets/sample-data.json",
+          "sha256": "sha256:4d5912eeb26a8faad2aed5679a5f1b1134bb9ffb0b6396cf7158f96b0bdcde0a"
+        },
+        {
+          "mode": "100644",
+          "path": "references/colour-schemes.md",
+          "sha256": "sha256:3db0ecfc0bd489ecd63f5a0ab560215bcd84e2c6bb69cce991a86bca09a00d9d"
+        },
+        {
+          "mode": "100644",
+          "path": "references/d3-patterns.md",
+          "sha256": "sha256:9e3a63dc969180568bd2fb90c7142da1147723ff49ec76dfaae6a6cdec6ad1f3"
+        },
+        {
+          "mode": "100644",
+          "path": "references/scale-reference.md",
+          "sha256": "sha256:89a9bad41f6a4057b7ac0ee29206dfb6e77836247d75f04773679e532b3f3619"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/d3-viz",
+      "treeSha256": "sha256:4b6298523204011a7582158fdaf31648539619bb0a6683a65f345a0b519f96fc",
+      "type": "local"
+    },
+    "doubao-tts": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:cb0743758c9ae9143ffd7f8a1a96d21827624e3e10eb246219046d585eeb6bc4"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/doubao-tts",
+      "treeSha256": "sha256:3c01be2512f99f84ab454147631051f92f642b40a42e6ee8792056054b530eae",
+      "type": "local"
+    },
+    "elevenlabs": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:114d8cfe298cfc4b5c82ee5347d4b5fb1e2f050936e97584140f45dea7ff039b"
+        },
+        {
+          "mode": "100644",
+          "path": "reference.md",
+          "sha256": "sha256:1a4318b434dd8a90352a01126d25a569a90b6e7963a42a8d9f853d765faea0c0"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/elevenlabs",
+      "treeSha256": "sha256:7d96cf2d712446b6719117063cdcf6e5a8cae87e7365f3f187ca361c16fe795e",
+      "type": "local"
+    },
+    "faceswap": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:89f620106773853a0c9f848b9d699a6dcbc75c270d6f5e6ffae1741e4a6fb19b"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/faceswap",
+      "treeSha256": "sha256:de24773ccde53bbaa031f7ca2e21f7d8be1485a094421e4b79fc3167d86e19df",
+      "type": "local"
+    },
+    "ffmpeg": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:20a0c1e35a683a6bdb2ba978cb822b950b3ead5d638e84ef711e021e52711d06"
+        },
+        {
+          "mode": "100644",
+          "path": "reference.md",
+          "sha256": "sha256:2dea49f4aa09cec01504399225bcdb0f6edb5f1099e3f10e27228a8ba32d3ac0"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/ffmpeg",
+      "treeSha256": "sha256:940a2bac10bded87b7546e0d76f476e7e05196d22172c1adef01cc282d7085f3",
+      "type": "local"
+    },
+    "flux-best-practices": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "AGENTS.md",
+          "sha256": "sha256:b2989797b7c2c86d79fd0c4fc8c81b0366d030a9c8c5b9290c0d1d00453836a1"
+        },
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:8918f14742f13059cac41c6740fadcde1ed610bc56be50018883d9f6a11dbf2c"
+        },
+        {
+          "mode": "100644",
+          "path": "metadata.json",
+          "sha256": "sha256:a993cdada15500e293def482efbb8b3a55c4c788703e614852145946fffbc041"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/_sections.md",
+          "sha256": "sha256:671ab85105753f711ee72f0813dfd5aa4d7df83da5a923a3052d79982e9f612c"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/core-principles.md",
+          "sha256": "sha256:1a98fd74e4e1cf64a8a0812ee063ef62046aa6587246a20b9d550965b8b2ee93"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/flux1-models.md",
+          "sha256": "sha256:84af468f51581e963391594f73ea3a230f9936635e1c26cc3a2201ac28b0b46e"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/flux2-models.md",
+          "sha256": "sha256:a25e6d7b40eff9661aabd5d9853ce7b04600c62502a3aadfff8d3fa37352a304"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/hex-color-prompting.md",
+          "sha256": "sha256:263215a3fdf9f27b4c7b18beb096ea367bb0193345b4b27794a3bde9a920b632"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/i2i-prompting.md",
+          "sha256": "sha256:3c43cb97b48261866e0b4d1c250e634183d954d3837401c1a686843d8cd5e1e9"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/json-structured-prompting.md",
+          "sha256": "sha256:49178a356e92f62e6bba6c5b91190971c099783bd5e2aeccba5be4b5cfd6d098"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/model-selection-guide.md",
+          "sha256": "sha256:5af260d9bb0e342d798a197fa82f6210f6f3b45c86801a0c99171928107e076f"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/multi-reference-editing.md",
+          "sha256": "sha256:9f5d8740ec18650eae72a62302093454a95cb496b5bb2f6829c8c45149ab35d1"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/negative-prompt-alternatives.md",
+          "sha256": "sha256:6981b5cee7706f1b7d041bedf47ab78171e4c430789506dc282fa961e13b256e"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/t2i-prompting.md",
+          "sha256": "sha256:3fff7ad25888910fe6e01b7dd0648cd3b72e8f37dac3286865f5688be8810596"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/typography-text.md",
+          "sha256": "sha256:7a27a88d1cd5ef652d5ef7d42f79d91ebc476732f5cc81eade54fc43a882f78a"
+        }
+      ],
+      "kind": "skill",
+      "requestedRef": "master",
+      "resolvedCommit": "d0793c84262183e8220a95fc1faeb5e2560aa6ef",
+      "source": "black-forest-labs-skills",
+      "sourcePath": "skills/flux-best-practices",
+      "treeSha256": "sha256:4b253289a587d8f6285605f203e9b6a9632721cb161eab1ea86044eabb538776",
+      "type": "git",
+      "url": "https://github.com/black-forest-labs/skills.git"
+    },
+    "framer-motion": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:8428007eea0cd4f1bf9564e51ef11dfb398184fd67fd8caaedc885866e42fed1"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/framer-motion",
+      "treeSha256": "sha256:1da2d68c1a0c08b27ebdd79d1557147a9878f1b3630b355721eb9322b1cbfbd7",
+      "type": "local"
+    },
+    "grok-media": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:81ccd537db78eb256065e199d171f65b8a8375b4554a33850d087c79fd234e01"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/grok-media",
+      "treeSha256": "sha256:3481d7f66f0df9e39b3312452c1bfcea266aad7befb679f8eadd1a28a3d98cb1",
+      "type": "local"
+    },
+    "gsap": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "README.md",
+          "sha256": "sha256:f10e0ac6094c2bb0a68b3a9ecec04c3e0981c81c44e099befc8797c038a133df"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/gsap",
+      "treeSha256": "sha256:9c80e917e958e813a8be86dc7a64533913e98393c369915032f1739c01882701",
+      "type": "local"
+    },
+    "gsap-core": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:3887b47e050ab5afbe2a9a820f23d39fa02ab785e06a343be44c6f91d84d12b3"
+        }
+      ],
+      "kind": "skill",
+      "requestedRef": "main",
+      "resolvedCommit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "source": "greensock-gsap-skills",
+      "sourcePath": "skills/gsap-core",
+      "treeSha256": "sha256:7c9e4acf5e3bd359559a66ecf32480c4ff17ac5f9d384baa25abc7ba72b6601d",
+      "type": "git",
+      "url": "https://github.com/greensock/gsap-skills.git"
+    },
+    "gsap-frameworks": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:842d9d3659ec3ddc8abbdc524708f8facf81f468ac25d0577f48c759c4fa31e6"
+        }
+      ],
+      "kind": "skill",
+      "requestedRef": "main",
+      "resolvedCommit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "source": "greensock-gsap-skills",
+      "sourcePath": "skills/gsap-frameworks",
+      "treeSha256": "sha256:7fd68274cc9bb281dac24d6a876c7e7090cc2023dbc037833a0b1db003134dc5",
+      "type": "git",
+      "url": "https://github.com/greensock/gsap-skills.git"
+    },
+    "gsap-performance": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:cb5408d6fba707aabcbfe3320317a14c1f8fca6070074e5261047930f50d441e"
+        }
+      ],
+      "kind": "skill",
+      "requestedRef": "main",
+      "resolvedCommit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "source": "greensock-gsap-skills",
+      "sourcePath": "skills/gsap-performance",
+      "treeSha256": "sha256:97030aab02bbe31f2c69705fb2523bdad1fb62cb5b56e1ed407fa9bac4d94275",
+      "type": "git",
+      "url": "https://github.com/greensock/gsap-skills.git"
+    },
+    "gsap-plugins": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:5838b856c74c07fbc9fa99b6dfd1eee34ea554c3e530c30e0d58014b707d70a4"
+        }
+      ],
+      "kind": "skill",
+      "requestedRef": "main",
+      "resolvedCommit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "source": "greensock-gsap-skills",
+      "sourcePath": "skills/gsap-plugins",
+      "treeSha256": "sha256:ccad92b32a6efadeeb897dc4ac61d0f2ef99a7285980ad45735ef404677098b2",
+      "type": "git",
+      "url": "https://github.com/greensock/gsap-skills.git"
+    },
+    "gsap-react": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:88e2a5312b45e8cc7b3c496637ff5bc9af2ae9c925b555c8b235b34cbc989d74"
+        }
+      ],
+      "kind": "skill",
+      "requestedRef": "main",
+      "resolvedCommit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "source": "greensock-gsap-skills",
+      "sourcePath": "skills/gsap-react",
+      "treeSha256": "sha256:bd23bad2e81aa54ec78120163625b80337ea36d9ec55749341025188ef661535",
+      "type": "git",
+      "url": "https://github.com/greensock/gsap-skills.git"
+    },
+    "gsap-scrolltrigger": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:9351b6666a4749c0740406ea363aaccb99a087ff45cc5e8b99a0f367facf3ef4"
+        }
+      ],
+      "kind": "skill",
+      "requestedRef": "main",
+      "resolvedCommit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "source": "greensock-gsap-skills",
+      "sourcePath": "skills/gsap-scrolltrigger",
+      "treeSha256": "sha256:543b6876af6048bae9d686c10b8e4fcb907b834c9579b580db57dbbb1a8a5ef0",
+      "type": "git",
+      "url": "https://github.com/greensock/gsap-skills.git"
+    },
+    "gsap-timeline": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:1a8b0f39cc4be3ed3d834b89672e4ae2f151b901dc3450bebf10bbc45379fe02"
+        }
+      ],
+      "kind": "skill",
+      "requestedRef": "main",
+      "resolvedCommit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "source": "greensock-gsap-skills",
+      "sourcePath": "skills/gsap-timeline",
+      "treeSha256": "sha256:ba853899458e95785d539a283a1636a7ad779187d299f5a8afa156b84d47339b",
+      "type": "git",
+      "url": "https://github.com/greensock/gsap-skills.git"
+    },
+    "gsap-utils": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:1927bcc4ea95b38203404ad5ea1d060b15c4a886c65ae53e885ff1793aabe0ba"
+        }
+      ],
+      "kind": "skill",
+      "requestedRef": "main",
+      "resolvedCommit": "aed9cfd3277740755f6bfc1155c7aa645403b760",
+      "source": "greensock-gsap-skills",
+      "sourcePath": "skills/gsap-utils",
+      "treeSha256": "sha256:35579748341f634fb198007d58594476795acaf2386fddd5fbdaeeb987f42c7d",
+      "type": "git",
+      "url": "https://github.com/greensock/gsap-skills.git"
+    },
+    "heygen": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:eb5d021c7e0ea1f65aee1aeafd3dab5e75ab39a6c13b0ef55b375a2080ef04eb"
+        },
+        {
+          "mode": "100644",
+          "path": "references/assets.md",
+          "sha256": "sha256:b12eaed620e03ae9751e3411cf60742349abbe58ec0d80a8081c9e3b44e65078"
+        },
+        {
+          "mode": "100644",
+          "path": "references/authentication.md",
+          "sha256": "sha256:80e93f13b5571c960520f9ab9fbfa871d873e71d5183294eaff752d1b37313e2"
+        },
+        {
+          "mode": "100644",
+          "path": "references/avatars.md",
+          "sha256": "sha256:ce78920642b16b1623add740443206f4ffb54f85deb2d82660a13e27401ea968"
+        },
+        {
+          "mode": "100644",
+          "path": "references/backgrounds.md",
+          "sha256": "sha256:3e02f0dd2dc683e41abe5481ad36b7809ac0852ade76fbf9c92dd7c2a56f470d"
+        },
+        {
+          "mode": "100644",
+          "path": "references/captions.md",
+          "sha256": "sha256:4cb7cdd0171e365ea3ce400aa1df83a0e69961c1cd86b3b1510361240c4061c0"
+        },
+        {
+          "mode": "100644",
+          "path": "references/dimensions.md",
+          "sha256": "sha256:c0c9bcf23e8663957030e8335f26640c8c34809eca92e81306b0e2eb6c0812aa"
+        },
+        {
+          "mode": "100644",
+          "path": "references/photo-avatars.md",
+          "sha256": "sha256:5126d1ef73ac1da8a5924481fc52c13716dc921838de1f0e764a28d6bf6f3a02"
+        },
+        {
+          "mode": "100644",
+          "path": "references/prompt-examples.md",
+          "sha256": "sha256:a742bfc8db8ea326b6d63ab9c02571ade3dbf17686f502d6d9a4bacd0c0cc425"
+        },
+        {
+          "mode": "100644",
+          "path": "references/prompt-optimizer.md",
+          "sha256": "sha256:968fec33560cbf5d4abf433fe90c5d4602020629f28d6ae63b7061ca9bfd1a34"
+        },
+        {
+          "mode": "100644",
+          "path": "references/quota.md",
+          "sha256": "sha256:157271d5e42465df49ffe706a63d6db3ee9187c753c42137a16bc505aa7f2348"
+        },
+        {
+          "mode": "100644",
+          "path": "references/remotion-integration.md",
+          "sha256": "sha256:94746a0244b37aaf44fc2fc4e199fe0924b8552e256b2e611037c1b843df08a9"
+        },
+        {
+          "mode": "100644",
+          "path": "references/scripts.md",
+          "sha256": "sha256:8515690bd2185e933f53f1e5984aad07a1a3729b41aa9a892a7726419d6db4d4"
+        },
+        {
+          "mode": "100644",
+          "path": "references/templates.md",
+          "sha256": "sha256:bb927e37ec7d1a71287fa06a673d35be0751bd248fe89f47f47449aeb65c63ed"
+        },
+        {
+          "mode": "100644",
+          "path": "references/text-overlays.md",
+          "sha256": "sha256:7f948d59f711c58903cf86666a87221c2bc7c0e69cbdc14bd3c32cfb3d59e10f"
+        },
+        {
+          "mode": "100644",
+          "path": "references/video-agent.md",
+          "sha256": "sha256:e181dcf9803d2f34e12ae377a2e1c505302fbd712eb5f412b290e5bd612c4256"
+        },
+        {
+          "mode": "100644",
+          "path": "references/video-generation.md",
+          "sha256": "sha256:a266b5908c666bb8378ad65bba6a1d85b7a358e04a30ecb39dbd2c9903b62c2b"
+        },
+        {
+          "mode": "100644",
+          "path": "references/video-status.md",
+          "sha256": "sha256:f61025f20734eaec3e2a8c9bbd23a7fc6dba5edc0443867913b9711eb823f009"
+        },
+        {
+          "mode": "100644",
+          "path": "references/visual-styles.md",
+          "sha256": "sha256:4d2e2473d72d2e7f9a02587c862ae47b80cb88ee35e0dc98035bd00cd3cca2f8"
+        },
+        {
+          "mode": "100644",
+          "path": "references/voices.md",
+          "sha256": "sha256:d3d82cb38a44f4f355533db4b8e62b444b14ddeaa11c3e528225f9e69a48e39b"
+        },
+        {
+          "mode": "100644",
+          "path": "references/webhooks.md",
+          "sha256": "sha256:6bc9c4ce68dc8303e25b013aff6066d80ead6148d055e87278499095e17fb2d2"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/heygen",
+      "treeSha256": "sha256:24b07ec7985c85cbd9c24685b839d71dbcc3688a7696a1b587b2cc9454edfb35",
+      "type": "local"
+    },
+    "hyperframes": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "PROVENANCE.md",
+          "sha256": "sha256:029bcb792a113fa020138e07cf10d15f4a26023c9d3307f84b57c1dc6bcadd96"
+        },
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:c6331e984e08b31269bd7725fdc86f1c267409391c1270ac32ee76c6986f10b1"
+        },
+        {
+          "mode": "100644",
+          "path": "data-in-motion.md",
+          "sha256": "sha256:22084b4460a8f815d923b972a908f937c1e573bbbc7a865f6f2979ec2ae7ff15"
+        },
+        {
+          "mode": "100644",
+          "path": "house-style.md",
+          "sha256": "sha256:e0719895b369d7ee5203850250e605b3a1c15dbe43a367dd54e396f2b439f838"
+        },
+        {
+          "mode": "100644",
+          "path": "palettes/bold-energetic.md",
+          "sha256": "sha256:17bc6b7889302151b4e5c84c0c6a33df676647078011d9decb2b68810e3baa7f"
+        },
+        {
+          "mode": "100644",
+          "path": "palettes/clean-corporate.md",
+          "sha256": "sha256:d0c8c86838abb77985609629afe600d0ca365eccd835820f309959e8a85cba9d"
+        },
+        {
+          "mode": "100644",
+          "path": "palettes/dark-premium.md",
+          "sha256": "sha256:abfecbf7e8dca3b674376590a0467aac3e13b2135022ae4ec519c4b27c2303b1"
+        },
+        {
+          "mode": "100644",
+          "path": "palettes/jewel-rich.md",
+          "sha256": "sha256:17c8f7506469f66bca4e27ef78c19f0bcbf250f88fe840e3043816b7041c4fc5"
+        },
+        {
+          "mode": "100644",
+          "path": "palettes/monochrome.md",
+          "sha256": "sha256:fe8586f6d70707098859063bdef34d68084f02cf7d5aaa436d4c9915a7ae3748"
+        },
+        {
+          "mode": "100644",
+          "path": "palettes/nature-earth.md",
+          "sha256": "sha256:9710549b17487787fef3c7cb459cfd6e4ac28c1593bf471fcf55a3b4e546beed"
+        },
+        {
+          "mode": "100644",
+          "path": "palettes/neon-electric.md",
+          "sha256": "sha256:35225bf8d2cd37223e88e0bc59b0a96bc8adeda7225389b3df97b675cfd33dfb"
+        },
+        {
+          "mode": "100644",
+          "path": "palettes/pastel-soft.md",
+          "sha256": "sha256:ed4e25bb5f4953c002e55a53320249621437e03b5a11d43e3c1bd32c869b6d95"
+        },
+        {
+          "mode": "100644",
+          "path": "palettes/warm-editorial.md",
+          "sha256": "sha256:c467ee3cc0bbf4b2bedccc8106e18293b8a06dbac8f092b10300492da0e0559a"
+        },
+        {
+          "mode": "100644",
+          "path": "patterns.md",
+          "sha256": "sha256:9a31458068668a168ee3f4180e06fb2d5768afe1f84b8878f5c56c72e4ab7253"
+        },
+        {
+          "mode": "100644",
+          "path": "references/audio-reactive.md",
+          "sha256": "sha256:f0d83c24fa40d42a74f972ccf3b5254d7706cb063d16b8b41f87dc668a418f49"
+        },
+        {
+          "mode": "100644",
+          "path": "references/captions.md",
+          "sha256": "sha256:9e35e0d8618e392906a0c542571af9f070350a17007c8449c69ff31384f3b195"
+        },
+        {
+          "mode": "100644",
+          "path": "references/css-patterns.md",
+          "sha256": "sha256:39c4af128cdd3ed9d1be652a88c3e4d01cb0daf744dfde3db7197014cd1a38d8"
+        },
+        {
+          "mode": "100644",
+          "path": "references/dynamic-techniques.md",
+          "sha256": "sha256:f48f666acb270daf2ac57fede5efc96ff3f168fa4f41db611de0310452e6d7e3"
+        },
+        {
+          "mode": "100644",
+          "path": "references/motion-principles.md",
+          "sha256": "sha256:68f4ba410addc4c07347025ed688029d69cf71c37cc2c5da4788600ccd5d756c"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transcript-guide.md",
+          "sha256": "sha256:e52bf99b88d5d75cb715376edc67dc86e824d54ede65815b1aa6f7582a1b166c"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transitions/catalog.md",
+          "sha256": "sha256:557b5b30be7b68f95d8481209b1a2f0a0e1df23f65de9b08f86697d0e6159a54"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transitions/css-3d.md",
+          "sha256": "sha256:e1c3888dd0a2d4b36d25200c1e5ef9038649ae63953865e4b2c4c40fb028d7dd"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transitions/css-blur.md",
+          "sha256": "sha256:fd3eef889a517e1dd985ca816f36f1abfb43420a4b664d4fcc453554cdf561f9"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transitions/css-cover.md",
+          "sha256": "sha256:ba4e5926791c9e6a0a069e20afc91324acb018903f43b4b3f2866d9654f5b7eb"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transitions/css-destruction.md",
+          "sha256": "sha256:7cce7bbd9ebc64176c9ff4fe40ec97273c9c171524d89f853c0651e713949361"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transitions/css-dissolve.md",
+          "sha256": "sha256:47c11ca0a715675c2788aa4a162a652b5dc5f1773b058ea93e9907af56a4eb7c"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transitions/css-distortion.md",
+          "sha256": "sha256:7140650692926959bd5459ca5c478a9b4f137cc76fb92b9138e3b0d353677c06"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transitions/css-grid.md",
+          "sha256": "sha256:c62b17058aa7ba42d34df29436b6b4233e47ff2b72f2c7ce0963c75bdec45144"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transitions/css-light.md",
+          "sha256": "sha256:53f0422d3f6dd2584a30501f84e4f09c9b515f605d51ed264a2061567dda15db"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transitions/css-mechanical.md",
+          "sha256": "sha256:4fed48fa659a4b215a996beeea619d244e6c893700178b1f969c17f2ee0a8612"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transitions/css-other.md",
+          "sha256": "sha256:2156e4fcc3b42cba9e0d9e268944269057fb48ff15fc1983e3ff9386fa2a8cf8"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transitions/css-push.md",
+          "sha256": "sha256:d526a9612483472de4d865ae27061c98842a5155973dd0cec37fac4998dc1b97"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transitions/css-radial.md",
+          "sha256": "sha256:5d8f20de439e3f2c8d45df11c8acbe31dc1b9342e2d54bbe66b451cf81ca0a1b"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transitions/css-scale.md",
+          "sha256": "sha256:3c0cb33d6c844a7265379225f3241d8964afcc908ee757a1ebfb1700a5320ea7"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transitions.md",
+          "sha256": "sha256:302fab350697e210a763ba7e3b2acbde9aadac37bd49cb9814a12e60983294ce"
+        },
+        {
+          "mode": "100644",
+          "path": "references/tts.md",
+          "sha256": "sha256:bb593a862f5599eca6b36ac22b0b76f66fb1fff251e5c5b1865e341681cfcd8a"
+        },
+        {
+          "mode": "100644",
+          "path": "references/typography.md",
+          "sha256": "sha256:d0ef1c5666a5b7a5f2af0c5701d17e63017eafc07499830c6616ccdcb21befc8"
+        },
+        {
+          "mode": "100755",
+          "path": "scripts/animation-map.mjs",
+          "sha256": "sha256:6840bf5c08b8b1eab234dec3e19fe6988abdb53d2ad98560f8da05f4c6cca74f"
+        },
+        {
+          "mode": "100755",
+          "path": "scripts/contrast-report.mjs",
+          "sha256": "sha256:84c9cdec6242845c625af041d8fe94d48fdde89b77ea32ec241af99deda03ad1"
+        },
+        {
+          "mode": "100644",
+          "path": "visual-styles.md",
+          "sha256": "sha256:d173663b4342d830e46c5cc14a1ffafe6dbc6daca0702b0a451db3ce914693cc"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/hyperframes",
+      "treeSha256": "sha256:b7d0a655f5df028cd0f9ff83b48ccb55f4e908b27f4941ea7c189c334d858565",
+      "type": "local"
+    },
+    "hyperframes-cli": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:8861a4ffe75092018f95e4f7c382d22551bc94d7601539b54b01d2ebcc135b91"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/hyperframes-cli",
+      "treeSha256": "sha256:eac7f1592978315b79e3a3321f1d2fd78726f127525cc75817b75aec6322a01a",
+      "type": "local"
+    },
+    "hyperframes-registry": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:0248bfb9968d53ea8f9e4b5f7f5a8eb9e72f21108022580f7eba2fba7e26b234"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/add-block.md",
+          "sha256": "sha256:0e3353755c4ef55e53570d1266a4a43b2c5aef9bbe41276430e38cfa6580b83a"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/add-component.md",
+          "sha256": "sha256:d06992d31eec617a91f5c34630c9274c52dd07898bd24f10a869d0d1cab5af29"
+        },
+        {
+          "mode": "100644",
+          "path": "references/demo-html-pattern.md",
+          "sha256": "sha256:dfc50cd33eff2c2be75437786fc3e851ab0085f7d453fb35b3380ecf9a6e9f04"
+        },
+        {
+          "mode": "100644",
+          "path": "references/discovery.md",
+          "sha256": "sha256:fdc924e4b9103d66880317e75bdc54e842713460ed64a7fd74d891b4b64097d5"
+        },
+        {
+          "mode": "100644",
+          "path": "references/install-locations.md",
+          "sha256": "sha256:83793e7d6aeea9a751755e4bd23ea48182ff9af082287b98a1192343d2571dd1"
+        },
+        {
+          "mode": "100644",
+          "path": "references/wiring-blocks.md",
+          "sha256": "sha256:c2045d3f31772d211bb92668264402a5c21d208870fa64398481212a645c9eb9"
+        },
+        {
+          "mode": "100644",
+          "path": "references/wiring-components.md",
+          "sha256": "sha256:fbde46726debef9d61286ae54b3b2491e0df51e87416c1b059106bb076a346ce"
+        }
+      ],
+      "kind": "skill",
+      "requestedRef": "main",
+      "resolvedCommit": "f5d81cb5a7b1d15cdc08c15bafbc7e3c91123a74",
+      "source": "heygen-hyperframes",
+      "sourcePath": "skills/hyperframes-registry",
+      "treeSha256": "sha256:3593cba2fcd641f3c80458d4ae3b8136b47369de333876a4b25b03c875a259bf",
+      "type": "git",
+      "url": "https://github.com/heygen-com/hyperframes.git"
+    },
+    "lottie-bodymovin": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:bbd7786a3c5fb998e6b2565beb305fed796ce50bcf9fd3a7604b113a9e2bcdda"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/lottie-bodymovin",
+      "treeSha256": "sha256:2db5b4d70524c56fb4a0565a1f7cb323627316ba563c074bd3ebb9f35581b967",
+      "type": "local"
+    },
+    "ltx2": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:f95de1af442ac14d8d15060aee2b687dc6426f75a88340bb3371bb63e4449589"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/ltx2",
+      "treeSha256": "sha256:daccd6c82ad9008e51922f2051d148e193a71cb8a2b8f7f624f4e65966388dcd",
+      "type": "local"
+    },
+    "manim-composer": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:79e7c224fa8912f3e26897aa91252ab30996eddd1208c1128238057a7b89b176"
+        },
+        {
+          "mode": "100644",
+          "path": "references/narrative-patterns.md",
+          "sha256": "sha256:fc77ac5b0224fd79adc5b6dab889a8ab4719ea99c419634bc66759ec49543656"
+        },
+        {
+          "mode": "100644",
+          "path": "references/scene-examples.md",
+          "sha256": "sha256:f147c92b48c6fffac71245f65baa00e92ece2d337d3a56382a8a60e9405d98fe"
+        },
+        {
+          "mode": "100644",
+          "path": "references/visual-techniques.md",
+          "sha256": "sha256:98a493bced91a4aa821b72a059b4d9c3cdde62babccd9de27d50e176caabb052"
+        },
+        {
+          "mode": "100644",
+          "path": "templates/scenes-template.md",
+          "sha256": "sha256:562da30cce06b37061aa0f83e19d7dfe96561bd0011ca90c8248d8b15d1ac7b9"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/manim-composer",
+      "treeSha256": "sha256:4a2ec2a3396d7a2dd6629b0a7e057b06d2cf08a6b0850cee53d2b737a62a0b71",
+      "type": "local"
+    },
+    "manimce-best-practices": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "LICENSE.txt",
+          "sha256": "sha256:c02371d11efe3579c38db2bb73258f939cc74ecd729d69128ad3c65c4138b009"
+        },
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:ae09751ec9e3e9389b85f923f4e34b706a32e01b18e378759163d1d855f90d4e"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/3d_visualization.py",
+          "sha256": "sha256:214dcd11b09b83025405050bc618cfa7d8749691e39f136a0b987de82e47ff95"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/attention/__init__.py",
+          "sha256": "sha256:6c13b542eb4c66701cb349a4c95606a8d9767711eb3155032136e75babe46f7f"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/attention/helpers.py",
+          "sha256": "sha256:82014263adf85db640774467ac6dae00798347b995b02d34d6664e6e917c1409"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/attention/scenes.py",
+          "sha256": "sha256:10aef8fc1d8c65d2043a95215f3b310ff1591f5aaab92139aa48969f50991533"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/basic_animations.py",
+          "sha256": "sha256:d95f075d90d5cb4114923d99a1b7ad167acfaf8343ae808b682adc3c830c7506"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/graph_plotting.py",
+          "sha256": "sha256:32f9c68313daf3b2a42e5e75e85d24b46628ef77872615eef798036840b52b83"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/lorenz_attractor.py",
+          "sha256": "sha256:eee8b2d5d5e6b10c61978c46921e1189c3d7a43b94cb6706f2505724f7e03392"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/math_visualization.py",
+          "sha256": "sha256:e890b6be5fd8322631f708b71ac8da7d9201d639d5676977313a659a1cb87ded"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/updater_patterns.py",
+          "sha256": "sha256:f372ad2991835320a2a2243dae5efb4ad7ddbcf8a82cebfd0f85760220ced635"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/3d.md",
+          "sha256": "sha256:00857a259d770b43877c02aecc276e44adc1a8c69ae6f8a067a30ee9cc35223c"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/animation-groups.md",
+          "sha256": "sha256:9eb1ebfc7bd91690a77b5626de309d4f9d49ba38d21938add04a9787a05db211"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/animations.md",
+          "sha256": "sha256:6ad3596f9d4aa176f25847d97cad073a3cbefb078e28ae998047a8e873a17620"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/axes.md",
+          "sha256": "sha256:5a0acdb55f332f9a7e31821078d088e987754bc252f5faa28bca31a53173f7dd"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/camera.md",
+          "sha256": "sha256:cfa876df13e9b2d26e0bb40e8b210c7bc91359c6d6c1e4036d5eb3c90b6f3b48"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/cli.md",
+          "sha256": "sha256:faee09f0f37f6aa41b94f762a9cdb8ef5536a1e6b1e9e3ac05de1680e576ba6b"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/colors.md",
+          "sha256": "sha256:b8e63c042ab6d652bb3d42a3309e11cc4c62a7e06f3b9811a4bf2f822eda3020"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/config.md",
+          "sha256": "sha256:9ef880d55b7c4d8c4b7aeabd6f095c42164f05cfb770e9a8ba25a184034c0c2a"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/creation-animations.md",
+          "sha256": "sha256:0bdbf8cacf5137e4acd60bb29ae1bb03bf3e059aa08b7cc2faa43f81491d354f"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/graphing.md",
+          "sha256": "sha256:8996cca86e2d3c6d032ddceb119724312ac29a1e462f835b040f931422187354"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/grouping.md",
+          "sha256": "sha256:05330699f1b935eb9dd6cd5237592bd04ef56dbe9a50444983379b81d6e26dce"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/latex.md",
+          "sha256": "sha256:9d244fe31662d734e182fd0d19ce147d9c93b3ee25cb5df137d29c4b186abee1"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/lines.md",
+          "sha256": "sha256:d13858e8a4016a5bd0dca3b121c5679a8350541dc9d0779562d40fba1abe5443"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/mobjects.md",
+          "sha256": "sha256:a96c8eef4c0e2830cbcbb32f3a25cf9eb30c2788cc593be5a8ca1a60b8fc4449"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/positioning.md",
+          "sha256": "sha256:83230968eaf354cc5993c5c6736fb053cbda48cc7bdd110faf8a04dbb71f7106"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/scenes.md",
+          "sha256": "sha256:7dc32c7c8bfd50d9266351f90cbfc59b2b71f610a37ea6a836af9946dc64b3ba"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/shapes.md",
+          "sha256": "sha256:3054d04c9b8d9cb79cb4f8554a39be46e5a6c78d29a24109c7ab367ff6640133"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/styling.md",
+          "sha256": "sha256:740e0bb7dc428db866cefeb0a7272f2c5e16f816e84a87976d146577bf94424e"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/text-animations.md",
+          "sha256": "sha256:4c8478c1921f56e05b17802abe0666dde1c80ef75e66447d1c8a145fc33159c8"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/text.md",
+          "sha256": "sha256:a4caeb70c295ef879ac718f7e722c4dd2b99805d887233bc217a6b91ae7b5c22"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/timing.md",
+          "sha256": "sha256:0534df4e9b694da16a4993a22689e2dab4b7857df008248ee9fe655b97b2ec4e"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/transform-animations.md",
+          "sha256": "sha256:3565293834394ecdcbf080504d8a015b44f85b5d3fc2b3493fd4d1ffd1903774"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/updaters.md",
+          "sha256": "sha256:b0520d45fc72380bd279df76b80028901a9273becfac61039f6c48e0a345c767"
+        },
+        {
+          "mode": "100644",
+          "path": "templates/basic_scene.py",
+          "sha256": "sha256:fd47d30ecfd6b03a8baff4a9fb9e88c4cf023fed9b57cf405366e99cbf84c515"
+        },
+        {
+          "mode": "100644",
+          "path": "templates/camera_scene.py",
+          "sha256": "sha256:51f46e59278a54415bfdf65124d3064ab58f0538716b964b381e69078d711010"
+        },
+        {
+          "mode": "100644",
+          "path": "templates/threed_scene.py",
+          "sha256": "sha256:73ef6dfb132472beb8b239d61c8538b2f1a37dd0e263682e650f9334c10ce023"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/manimce-best-practices",
+      "treeSha256": "sha256:ff0c2cf8f1df781d0cdc69081296cf9882cfe06763f694be477dae71073816e5",
+      "type": "local"
+    },
+    "manimgl-best-practices": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "LICENSE.txt",
+          "sha256": "sha256:7dae59c1beb3447ac69a769834dd4be0de4a5db77c786314379e0f86afa7cdd8"
+        },
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:acb89023c69fca1f16e29992673f12460946d9ce714940f8353b0fb10e9eecc1"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/attention_arcs_animation.py",
+          "sha256": "sha256:3fd01b97a31ce43450bad3733a2d81fe52d51dea61f3e2180d779df64021c849"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/attention_pattern_dots.py",
+          "sha256": "sha256:bfaa13edc6109f0d0bd35f6c39f57728d795d52cb1a6b19d529f9e85fcaa2531"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/attention_scenes.py",
+          "sha256": "sha256:433d5e0ad6061260522f2a0f3d504fcdb66b3f24fe9789f77e7edf7774423397"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/attention_softmax_masking.py",
+          "sha256": "sha256:ec4bd743b1e74704db70735fda88ba644be153fb5d0f31c63135aba918c5f89e"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/autoregressive_flow.py",
+          "sha256": "sha256:3c59804e7f634121ea42bdae8553bf0b5de61e21ab354bafc96eb31e64cd0021"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/basic_multihead.py",
+          "sha256": "sha256:e2e92a55eec139537cf95f203ddad8be102359030e61de05c76adac88174f0bb"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/bloch_sphere_3d.py",
+          "sha256": "sha256:6e983191fe1314798aacb184e299fe343d940b4ab30a1a8fcaef2472999d8957"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/block_collision_basic.py",
+          "sha256": "sha256:78667130adb67293f802ffde3977890194a6f7ab8433b2545c93cb751f6b7904"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/blocks_3d.py",
+          "sha256": "sha256:cbadfa1d54061dbe4014c37043a730688363fa4e43f925a242c86c8a5f7fb059"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/collision_phase_space.py",
+          "sha256": "sha256:b1fa4a09086287f345316d438bdf0102ab8c61dc85ba7f05b430db04fa6ed4fa"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/complex_s_plane.py",
+          "sha256": "sha256:5d2ad93e68b5e7f3331d95fb43482e88f2168027374ccf9ce7cf11d19afcd663"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/cost_function.py",
+          "sha256": "sha256:c5c3eadff2a7bebffd670a431e5d4e3ce88d6501a770d134f7b6db1938adf3c0"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/cube_projection_3d.py",
+          "sha256": "sha256:1e70b2aba80980aec412763520d3706fde4f7352305de39afaa3ed65de68e158"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/damped_solutions_splane.py",
+          "sha256": "sha256:c822a3a2fc407046a3672e136e8863750d816f681de24ce14bcd58d3ef7e467f"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/dot_product_visualization.py",
+          "sha256": "sha256:4d0dbfc050c5e9a5c9b43dec4169df3fea40240b6a987a3093d48ed05d8e48cf"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/double_slit_interference.py",
+          "sha256": "sha256:95d410d4f69398432fc4bc851ecf409f15aca6cc8d78a34f4623917d62768026"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/eigenvalue_equations.py",
+          "sha256": "sha256:91b5f8d1aa32f78486524decdc029b52f89b8657eafb01fe71aed4a01220dc61"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/eigenvector_flow_field.py",
+          "sha256": "sha256:860a4dd974d3e7955301f5ed479dbcce34739b6831c73b6d904d1ff519edbee3"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/eigenvector_matrix_transformation.py",
+          "sha256": "sha256:f6a0930ebf02aa440e7b3e62f7756b300f578d2a83af6c16f87859caa391085e"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/elastic_collision_vectors.py",
+          "sha256": "sha256:cab2741e56d0b9701866f2a0d4c3920c1d36bc01640ff115116b0f45eb102786"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/embedding_matrix.py",
+          "sha256": "sha256:35a4e9db6dfeafd11971950374bf7f11f2b2b6f70fa929f1ea60cb406267957a"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/equation_transforms.py",
+          "sha256": "sha256:e793a4079fe6ff6b86b67d5236164b807abc37d42d34d9a0606fa4ec12001e3e"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/exponential_derivative.py",
+          "sha256": "sha256:7bca6fe509228cc9e39d151aba79e57e9d423e5ea19e6e15bd9f16284482dded"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/fibonacci_eigenvalues.py",
+          "sha256": "sha256:797720a4824b04cf8b71fd7b5c5c08a1d7efedd2b7d7d4a850ecb970e71125e9"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/gradient_descent_basic.py",
+          "sha256": "sha256:f3dbd79de1e5f5fa820c2201c0e405bec9f9ec6223aaabffcaadc750c16b99f8"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/hexagon_cube_correspondence.py",
+          "sha256": "sha256:a2fc7b71e0fb86e3da423889152ccc0c416a1ec6f5038fcc4f53234dc396279d"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/integration_visualization.py",
+          "sha256": "sha256:d9cbe2734dc3eb88714f5219f090d86c00a93b4effb05cb6216aa36e702a5951"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/laplace_integral.py",
+          "sha256": "sha256:620401d33d8134ef3af2bfac960ff90b952a6be0aad5b59b30787f98d06fe896"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/light_polarization.py",
+          "sha256": "sha256:3fed1b885799795e3bafe53cb2bae34575cd8917289a91f629fb229164f4e9af"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/linear_regression.py",
+          "sha256": "sha256:9caafda9037ba6060c5f675ef5a0f58a72efe62f086991a2cfbec2a3dd79d9c0"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/llm_prediction_pipeline.py",
+          "sha256": "sha256:f8e935aa0a615d197f3e038c6c4a006fec33830a48619d5f416df44f250b1c81"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/lorenz_attractor.py",
+          "sha256": "sha256:aa473a3c46f49f9147ecead1ae35104956d132755449ac1c713b8c0e5ac13b95"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/lozenge_tiling.py",
+          "sha256": "sha256:d50fa74e7449e9bd5511cb6501983adab1c7a11386271af376c418b2946462d9"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/max_random_process.py",
+          "sha256": "sha256:bc67f55441b81aad1e05d8565eac0abba74639d03699f5edf49f4b3e557f3ae6"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/mlp_forward_pass.py",
+          "sha256": "sha256:7d117e19a53f043734ab3a6f6b99143c26f9d4daa13bcab313525a9dcd70ab55"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/mlp_network_icon.py",
+          "sha256": "sha256:61f72fae3c2dd6cbaa275482a35d98ae583bcb83b0007ab4299bc31630c31651"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/mlp_neuron_activation.py",
+          "sha256": "sha256:f2a03e8127bd468ca94e082b5e42e12b906a93aabd63953eeacd0e96f4bb03e5"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/mlp_neurons_flow.py",
+          "sha256": "sha256:25fcaf04840b132046deee1c0960df78e37ec40853f85f33122a9d362534f98a"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/mlp_relu_visualization.py",
+          "sha256": "sha256:1db1d8f3408a5d1144d9b7cd7e49548c701176fe603bfc518cd10ce5ea15f0c2"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/mlp_vector_space.py",
+          "sha256": "sha256:603872bd2a1ac84fcc92153b24379667168578782dd1a55a8c3061fa340e7f33"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/mlp_weight_matrix.py",
+          "sha256": "sha256:f9ac59e4b839ac1d717d4d59cfeb66e055c983a914b61c63564537b4bb96b75d"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/multi_head_attention.py",
+          "sha256": "sha256:cc1172e6d520cddac7bf9e9d249b465fea267c2f91cb6731bad4c9ddf11aff94"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/network_block_flow.py",
+          "sha256": "sha256:e58ebf452a7f05a203b645df40f770aa6f9520402554748971fef5f24c60213f"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/neural_network_basic.py",
+          "sha256": "sha256:a3570d13d57331127a0532206b46f0cf1be325d8074b785ec09b694dc68f56a6"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/parallax_starfield.py",
+          "sha256": "sha256:0601e0a748f95b167a24c10f9ccede9c5dcc4abf5194815669d7eac5514d8274"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/probability_distribution.py",
+          "sha256": "sha256:53f8238cf1dd3818034114b6b28b84b9ccfd6614935d3286ec87932a63a1502f"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/probability_output.py",
+          "sha256": "sha256:a4920b3297c1f6beb1bbecc95827adc82a5b027213d16149d1676a9f389e1eda"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/quantum_gates.py",
+          "sha256": "sha256:c53d3bd0d1faa4dbbe38d636cb4680d6fe4921c2057237d322ae8ec645bf2207"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/qubit_state_vector.py",
+          "sha256": "sha256:c2f929a9c86738d1976cc74afb25e87f8b2598f3af70f0e03cd3014fdf0b01f2"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/query_key_dot_products.py",
+          "sha256": "sha256:1c75da37c39bdd404eda50a7ca80851142e32c90c352e15db979114936944d80"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/query_key_space_mapping.py",
+          "sha256": "sha256:b438e7c3d5ff25eb1bd52f0914aa816351a05a25ad6b7d77674838a8bcae54b3"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/radial_wave_visualization.py",
+          "sha256": "sha256:da8507866a64f5f37f326b451291a54297ab2206029706bbcad93fa7e491568e"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/rotating_exponentials.py",
+          "sha256": "sha256:cce3146c990d2d95dc35fe0c5cb375187a38a525b2cfbef671b6ed5d538aa69c"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/semantic_similarity.py",
+          "sha256": "sha256:ffe94b478c3bf83cd447311aa7d7b93971831adc17812319cb741d7dfa347a85"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/simple_test.py",
+          "sha256": "sha256:2342dbf1e49950b07650a86061988646f6fc7dcdd147ef638db48b8a6e4cb665"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/softmax_visualization.py",
+          "sha256": "sha256:43f7c3f6bb253d3d0b6977c3ae13d1dee8c949c61c7b3bceb02a0f1bfc20a7f9"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/solve_damped_ode.py",
+          "sha256": "sha256:a29f7113002b0b6253600f709b590a0c4d8005ba29335bc1a9be1327a1182ab1"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/spring_mass_system.py",
+          "sha256": "sha256:71d9c84172c7033eb8e27ca7930b72e3a772000422180ae32cb29510fb4ef278"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/sqrt_random_process.py",
+          "sha256": "sha256:6e16d9fc5c0dd09d04653f2ac0cf901d566fe084c8856863dc0f575725653fc0"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/superposition_effect.py",
+          "sha256": "sha256:9b87f619bbb033760638ff37df56b2a992f419ccd74b2458d6a7831fd2a57fae"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/three_d_surfaces.py",
+          "sha256": "sha256:6e2f110bb44407a6ad7939227be516d2fb271cd22fad2cc8ea280934b4746488"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/three_d_vector_space.py",
+          "sha256": "sha256:43d74b17c44f0f4379ff5e62b4e2da656be7326b120f3a89eb1f176a70711363"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/token_embeddings_flow.py",
+          "sha256": "sha256:4a10da18b6452310e10944de94d3c0e6ce74ed0bd5d68b8af437fc7114e59790"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/token_probability_distribution.py",
+          "sha256": "sha256:d40db82556585e7d720284be3e7e2df8761871aa3e107bdea176ed631f24ebdb"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/token_sampling.py",
+          "sha256": "sha256:c7ee12d8ea6981f5351686e78ce9f7d7f7100f674d56de7a28082d8c7c370529"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/token_to_embedding.py",
+          "sha256": "sha256:72d6565b721905ed8c006c71dfa99a33646ddd41087c8c4cdcc880c676512995"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/tokenization_demo.py",
+          "sha256": "sha256:5400bf5855e9ee2292aa1878bf1f37167580b50e08f3cf6b04573d9d9f53c27d"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/transit_animation.py",
+          "sha256": "sha256:6c86d9458d391d23bc9545e1acd7ca1d0d6a435a51193c84f2a9826fda7206e1"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/value_matrix_transform.py",
+          "sha256": "sha256:0229fe6cf0d16d4cd4e88de954ce31721ef7917505681dbd98cd28542932b9a8"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/vector_fields.py",
+          "sha256": "sha256:18bb361b9f3536fba6e5270666d6d746fbde6d8ace8a829c099c663c7f9f43f7"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/wave_amplitude_visualization.py",
+          "sha256": "sha256:a38352ffabcdc2c60ffedbd9daeb3d74df41e5af99a4cd61fd0aba84c48ea89e"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/weight_matrix_product.py",
+          "sha256": "sha256:1a446bafc3598c862c15b9086a175b8986212f41e7f2fa86e30f990a45a18635"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/weights_vs_data.py",
+          "sha256": "sha256:b7fb5d5f0f57a5051e96a8adb0e1ab53d57dbbba9005d774b110b7512dbb0dbc"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/word_vector_analogy.py",
+          "sha256": "sha256:392dae18220b205ac463b792bfe1244a834d5236878a714445ab3dce57023abf"
+        },
+        {
+          "mode": "100644",
+          "path": "examples/zone_plate_hologram.py",
+          "sha256": "sha256:932005fe1e1d1c77187d05a2484212fb11198f94c326c0ec2e17570c9605f6cc"
+        },
+        {
+          "mode": "100644",
+          "path": "references/equation_transforms.md",
+          "sha256": "sha256:00b5deaff35185d42ed058732371c4f41b6ed3f40cf13cf01a7e47700bfe64c7"
+        },
+        {
+          "mode": "100644",
+          "path": "references/integration_visualization.md",
+          "sha256": "sha256:f41f485c35d434bc54bfd99699a17b2baa39e00ab8328ed47c86995d5e9275c6"
+        },
+        {
+          "mode": "100644",
+          "path": "references/parallax_starfield.md",
+          "sha256": "sha256:f4cbf2867d1ae9f60d2e2e50c7cf5245e80392858fc524cc91b408b192fb6d12"
+        },
+        {
+          "mode": "100644",
+          "path": "references/rotating_exponentials.md",
+          "sha256": "sha256:949dd1368e5edb3e7a17c787ae62bf35ab1b55083ce8e77715a1b5f3dd323c2f"
+        },
+        {
+          "mode": "100644",
+          "path": "references/spring_mass_system.md",
+          "sha256": "sha256:d6bde9815ba7ca404988af3784086c73658419559816af1de0302cb23ebd5b48"
+        },
+        {
+          "mode": "100644",
+          "path": "references/three_d_surfaces.md",
+          "sha256": "sha256:396eaa6a4fc73eb90d87b5ac1ccd76011a10423df56bcb9b3dd9ea196c7bdabf"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transit_animation.md",
+          "sha256": "sha256:7d5803f0ee1951638f7352d730afaad206ff8fa3a8274995e53cf4ce8f62d507"
+        },
+        {
+          "mode": "100644",
+          "path": "references/vector_fields.md",
+          "sha256": "sha256:db46672e3368ec3061466544c18c50484354cbf0181e96456dc3094305fce69a"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/3d.md",
+          "sha256": "sha256:08e993ba20e55d008b263f4db12c13c0c2079413eac39908e11c92e1c04cde7d"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/animation-groups.md",
+          "sha256": "sha256:0f20aa10e1c5872994a71e9704bbc23a640e624e5831deccd269a5fcb9e1dff5"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/animations.md",
+          "sha256": "sha256:612d8dd19c77a41ac04006ed6f4ecb9c6dbb5fd5990d4e48bfc7e96ec1d9c018"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/camera.md",
+          "sha256": "sha256:9b2dfdf811fb8affb09f1ba7f5d0fd06408304c7d1be356bc2bfd910c98b6a6a"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/cli.md",
+          "sha256": "sha256:b4a9e53d93d9a0dd2f266f23728584c1a1780c5f9a12b536122bd51a7a614b61"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/colors.md",
+          "sha256": "sha256:3f57ad62f8f703c2bf5380e3ccbf2a1706341711e7e9264b9fdb907ba582296c"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/config.md",
+          "sha256": "sha256:5cbbeb0819eb04c07dad4d76b394a1b2d0f31a3589900cbe8693d396211d45d8"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/creation-animations.md",
+          "sha256": "sha256:406fdba98de4a7dc43bfd300223a20f17c6226c669325ae411020df6e8070cfc"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/embedding.md",
+          "sha256": "sha256:7c4c3f3bcb935435842b0bae4edf7d7c84c8d6eb71a44cca628d890dcee7c819"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/frame.md",
+          "sha256": "sha256:34d710ea37e66e9aea662077342edc49f33e13f444e6d8dcda6f3ff6e7191b39"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/interactive.md",
+          "sha256": "sha256:f6c00848e995e6d3dfb6d048918598d3e13f99970c4104e21f36e2318303d156"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/mobjects.md",
+          "sha256": "sha256:76c62f055b09bb8b4c6a08a81c921a8137681927696a3d78839e65fcf0eb346d"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/scenes.md",
+          "sha256": "sha256:af4f98dc732fb9be522b2d53e7727c439258fb217cbaaa3c1360537f5cebc7ed"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/styling.md",
+          "sha256": "sha256:494189ee20c25f2e4f70d600864299cfa791368bed936c781779e78e74d25df6"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/t2c.md",
+          "sha256": "sha256:0603842458dab148ef491e02bca5a8393cf7079bce402f7a7b3fbdbda7b05955"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/tex.md",
+          "sha256": "sha256:5e99916630ac5f0992c258ef6506907db0045c8ba744f81d1f8b5b0400b347a0"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/text.md",
+          "sha256": "sha256:4603a36024b099a3863f267fd565ffcc7a7ea33964fc33c95b9e1dd6063a78af"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/transform-animations.md",
+          "sha256": "sha256:d646dc1512ea72e5bf38908e792ffdb262cfc7f15c91cacb77add16eeb71d2d4"
+        },
+        {
+          "mode": "100644",
+          "path": "templates/3d_scene.py",
+          "sha256": "sha256:e554b36963fe9e6f9efb4280e5531d706683a4ff8046186cef84dd656da96b29"
+        },
+        {
+          "mode": "100644",
+          "path": "templates/basic_scene.py",
+          "sha256": "sha256:f89993486fe247cd810e94d77b0c06c3bb3672700549d476e7e1dcad199f6403"
+        },
+        {
+          "mode": "100644",
+          "path": "templates/interactive_scene.py",
+          "sha256": "sha256:216690ad758dcdd0d4c523201611e77f48df86dc8ee00093410b3f55329da3de"
+        },
+        {
+          "mode": "100644",
+          "path": "templates/math_scene.py",
+          "sha256": "sha256:53e4fae4a66f72074f452fe63b11e27a9e596abcdbb2eb1fb52fb1be3a56caba"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/manimgl-best-practices",
+      "treeSha256": "sha256:71d095a30a1142d7c4b4f57a6a3b72bc65064c0be9f5190a2c5e4d27fa234b45",
+      "type": "local"
+    },
+    "music": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:50d30474d87bb0a1dacd7977ebcfba971e745cea18108140badae4f76845891a"
+        },
+        {
+          "mode": "100644",
+          "path": "references/api_reference.md",
+          "sha256": "sha256:146c669e533f5ee293529ffc85db6ba94698ef934e4c60c48425f9426d16a4cb"
+        },
+        {
+          "mode": "100644",
+          "path": "references/installation.md",
+          "sha256": "sha256:a0765c7af5800268fdae3ff443d7306d54cf66d3461cce839d3ac9d49ff58625"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/music",
+      "treeSha256": "sha256:5f3f90f7de2465d001adf9067970e5b36d8c6af255b1d2bae032001f3d65954c",
+      "type": "local"
+    },
+    "playwright-recording": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:291ab7cda312bd3a36d59dc4ead1673d5d5ef92575ca6a1026661414d6bff227"
+        },
+        {
+          "mode": "100644",
+          "path": "reference.md",
+          "sha256": "sha256:a0e004eadf70d64d0e2707e5f6c89fc60b449c4f4e1f6ef8321de9779bea50b5"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/playwright-recording",
+      "treeSha256": "sha256:cfc208195771f645c1c62579d735220ff49690cddf66fef75519bce74d528743",
+      "type": "local"
+    },
+    "pose-library-design": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:a874aaf1b43f25fa9080b89173e356eaa0608c990538336c725969f69d714a3b"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/pose-library-design",
+      "treeSha256": "sha256:2b854740f9cd921089932681d16aac2bcdcd7e09411d7c9c0bf874ebbb6859e5",
+      "type": "local"
+    },
+    "remotion": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:b37046044b69b305700e740c6439f7081db57da8398ed14969145bcb2b59d7d4"
+        },
+        {
+          "mode": "100644",
+          "path": "reference.md",
+          "sha256": "sha256:25ca8de9422c369f44dd6be75e60cfa2002b25c72b777ad7f32a65f56422e0b1"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/remotion",
+      "treeSha256": "sha256:2d2909f14d3ce8bca69aab8ce4a7dfc3d535d1b24cb74a739d5c5177383d23d9",
+      "type": "local"
+    },
+    "remotion-best-practices": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:2f9be561c1c3659aea1b4c777a9b57733dcd466b6e85231316d2841d947584bf"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/3d.md",
+          "sha256": "sha256:42cef6d68fb4a266ab495d35df0c60e03672b0d85c043f9b567f6aa7ff00dd0d"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/animations.md",
+          "sha256": "sha256:4fbc3c908fa27725534a8bfeaf26c58a58750790bc0e98dc8745e27734a9abb2"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/assets/charts-bar-chart.tsx",
+          "sha256": "sha256:6e5e219c596c8515336570a5bc89c233e32e695d5816dec88eb929e798eeea61"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/assets/text-animations-typewriter.tsx",
+          "sha256": "sha256:92b5f47d6d18387a0aa008ce9dceefd30f673ae5879e16892bd4b4ea97f5dddb"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/assets/text-animations-word-highlight.tsx",
+          "sha256": "sha256:30e707bbc90e3734fcdb0f9e869bdb9fbbaf8ded1d923951d616f5ba402ce03d"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/assets.md",
+          "sha256": "sha256:68b70928aaea682165f33dc8e98278d9dca8512b50e44abc2c884ee5f3ac78de"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/audio-visualization.md",
+          "sha256": "sha256:0f4043de86639b6390e5ab888eaa66a24a10a8bd540f1443327cb88107eae1e9"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/audio.md",
+          "sha256": "sha256:e931664ac23bc4acfa137d8b415702bb4860b4fbabd6caed0042c0902d3bec90"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/calculate-metadata.md",
+          "sha256": "sha256:fc7c3f411a38020686e1295078fdf0ac9e1b889296192b5c7d4a4871edb2b662"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/can-decode.md",
+          "sha256": "sha256:fb3f9933e45103d72530915b72a844b3454c6acc03289db5efe8f4541b088fad"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/charts.md",
+          "sha256": "sha256:c6863bd1122f53f80c2211fbe19bc5e3db8a38a5d43473748da8067af10fcf29"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/compositions.md",
+          "sha256": "sha256:3223ce9326048ef734fe880e5ddbd33e75e12dc4deb7f6043c58d11329d47f31"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/display-captions.md",
+          "sha256": "sha256:20b8898a90536fa427a5a39571fc7deac7bde96c4c7bfdf413eee1ef4ef85530"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/extract-frames.md",
+          "sha256": "sha256:771eb211c58130b2e4533dfec87abe584a2070c1d3dd0a0d6f16d2bb85dd237f"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/ffmpeg.md",
+          "sha256": "sha256:217c513f64caf3b62dc6e50bc8721748d7bbe318ba69eef7e0d3d3283f120e4a"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/fonts.md",
+          "sha256": "sha256:1749e4cf82e8b157d4b0a26f46721152d3ef9e5e9a1686753b8bb6a1be83ddbc"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/get-audio-duration.md",
+          "sha256": "sha256:720a5346ae79555e933498995d5cb04d1bfbeeee7232436d8835c3ec17d46281"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/get-video-dimensions.md",
+          "sha256": "sha256:ed1bb6e0ae742e4bfcb18e7c50af23fc782a9d699b90d367250437c7f6da7304"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/get-video-duration.md",
+          "sha256": "sha256:ed594a0d73a5274483f21c30e612aba57089d5bbc5437041aa32d07a8e789fd9"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/gifs.md",
+          "sha256": "sha256:db5d84bb8da4c52c133cdc9820a5b6995db94a548df5f9838efb8d1224065787"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/images.md",
+          "sha256": "sha256:833e0a038d7c158f58b39f9bca7efafbbc4b944a54b3ae1c95e0d5973345e22c"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/import-srt-captions.md",
+          "sha256": "sha256:ad89cc1834dcd63ff225593f699611a1a20b57eff4ed8e587f429b36516ec82c"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/light-leaks.md",
+          "sha256": "sha256:17d2f136f7bf2f438274a0ade43df017c360ae31175d8367ce476415c222dfca"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/lottie.md",
+          "sha256": "sha256:6dd0a845f5cea9c0f3d2465b5678a16076f5778ad1a628abbf387dba0b929cbb"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/maps.md",
+          "sha256": "sha256:5a531e1c925c58c4aa019c33bf2b6c0412560af3359295ab080f33e063e01d61"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/measuring-dom-nodes.md",
+          "sha256": "sha256:4017103b03f14a041ac433be78c521ec2e9961629fae419c8b196d349637585b"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/measuring-text.md",
+          "sha256": "sha256:5cab1807b9ae9f5be3fc0e1cb0e0513a69451e31e32657d6a665573331db6807"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/parameters.md",
+          "sha256": "sha256:9de38837a07dc406052dfbb759c58ca5298ca331d86d9aa0f4e177b339e288b5"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/sequencing.md",
+          "sha256": "sha256:7c18f2ac36974fd7b85c01efa1135ea06a14e8492dd9fe82ced3bec0b4bb605d"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/sfx.md",
+          "sha256": "sha256:43d8dc8ca9c98328ca300f95c3ec7d50e504873ee78f6198b7439a2e7d1a6893"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/subtitles.md",
+          "sha256": "sha256:9f18ec4a9c88adf35d51b44aaf344442443fd687a4dc948366ebb683fc3ecd30"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/tailwind.md",
+          "sha256": "sha256:6212ce72abe5eaee0eb41822b2cdf944b77ad9b082426909beb2da07151e1788"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/text-animations.md",
+          "sha256": "sha256:40ac6b1bccf1c57d9edd46c74e847ec6e86fe775d3ef4fd14e1338f4a2606171"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/timing.md",
+          "sha256": "sha256:3bc19fff4fea55b16a68003d2723178e12bb60e61d0149c3d1bbb23c7389e8fe"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/transcribe-captions.md",
+          "sha256": "sha256:ad1a62af35fe176b37ac4d98f796451ca66bcc9983207a9710ec3eca6e847738"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/transitions.md",
+          "sha256": "sha256:f6b0ca21322d68ab516345e8d57a2039c48654c98604b673913382c854e79d86"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/transparent-videos.md",
+          "sha256": "sha256:394ccda476e084522d544471fee92d7c65672e2cbaf2201a785c3dd5c74f31a4"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/trimming.md",
+          "sha256": "sha256:ae00948f6a903e384c7c312896adba9b50ed592f24a5a090699b7345849b36b9"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/videos.md",
+          "sha256": "sha256:d9d3032a57f92c759daf0bd60b3282f6810ecc9958e9093a6b828de623b05328"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/voiceover.md",
+          "sha256": "sha256:8dcdcc46792a6a6146169688edebf95453f7ec94d118043cc2e429538732b97a"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/remotion-best-practices",
+      "treeSha256": "sha256:75932b09258cc731cf934491fde60f18ac0bda05c759fdf52b420ea4d8de8c5c",
+      "type": "local"
+    },
+    "seedance-2-0": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:1b344cde0ead4ac5f819707d48c11a43b3117708ee08a5e01b52e171e402a243"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/seedance-2-0",
+      "treeSha256": "sha256:0378276f61e6d009bdf7767828b75d05c016328d05470544dcc35f925572556c",
+      "type": "local"
+    },
+    "setup-api-key": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:92f00a9f71f2812bdbb20308f2795e73134f36cae3fdd05a84fdf8954a2be3c3"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/setup-api-key",
+      "treeSha256": "sha256:63cf59e5ba9d4a337fdf0db13bfe2e96c65ee2e835f1dcaccd74ebe561eefd35",
+      "type": "local"
+    },
+    "sound-effects": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:9da7f48812a55a6569893e900cb43d4088201e21cf38d7b12eda55e63f1dc12a"
+        },
+        {
+          "mode": "100644",
+          "path": "references/installation.md",
+          "sha256": "sha256:7f76781829131f3ccac1e549b960446d8aa3ac370d34a384f425766035266725"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/sound-effects",
+      "treeSha256": "sha256:616aec3da2252e9ab2103470113ac547db11edac1098aa2328329b456977d6fc",
+      "type": "local"
+    },
+    "speech-to-text": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:e8f86292bcd42e1ec57e477fb72fa47afc1792b7448199dacf621192864a3168"
+        },
+        {
+          "mode": "100644",
+          "path": "references/installation.md",
+          "sha256": "sha256:f88c8285e03acdc53f26ff51ba49b8a7d7f4298a1d5456942ace182ed4ab4915"
+        },
+        {
+          "mode": "100644",
+          "path": "references/realtime-client-side.md",
+          "sha256": "sha256:4ee6ac9e9e412c8d0aa9233be1fd03d2480471be6b2c2495f1814f2ff6b3c3c2"
+        },
+        {
+          "mode": "100644",
+          "path": "references/realtime-commit-strategies.md",
+          "sha256": "sha256:b2c3de86609e60850503b034804379239ae21de2569a1803fc3a341978ddfed7"
+        },
+        {
+          "mode": "100644",
+          "path": "references/realtime-events.md",
+          "sha256": "sha256:b9cf26c4c7ed187079e18043791b29fbaeb919afabd1c475a48be6e67fc1035c"
+        },
+        {
+          "mode": "100644",
+          "path": "references/realtime-server-side.md",
+          "sha256": "sha256:01e2a0f305a82daf96b4c7529568dacf468999d5656ea8b1d6c9d0e2f810435b"
+        },
+        {
+          "mode": "100644",
+          "path": "references/transcription-options.md",
+          "sha256": "sha256:2ac067a3401ba4926747e989611e8273f68b9cd6efc8ca80acd2619f092e28ee"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/speech-to-text",
+      "treeSha256": "sha256:77a009e01651bb3df22d905f6b6b36ceea5dcf149aef3df2343bcc32ccd45a83",
+      "type": "local"
+    },
+    "svg-character-animation": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:b6c51f692d0afe547ebdda56c19d4e501664c169f42c96b9245c9d4a0bd95c3c"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/svg-character-animation",
+      "treeSha256": "sha256:0ba55890a17d8a81b7b7f517633d90066d6dcd3775d6961548eab7e39d3bdad6",
+      "type": "local"
+    },
+    "synthetic-screen-recording": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:e4150f5ea156d83268cae7ffc886d538b99054d7b53fcab2c6f0e50597231075"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/synthetic-screen-recording",
+      "treeSha256": "sha256:d6b0a0fee610f6bec8cc9b0aa4f848239f8b30657ec056b5914ec6bbd4657250",
+      "type": "local"
+    },
+    "tailwind-design-system": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:434ed435d76fb6bcbf311d7b120c1a7e28491264beefb9a1a33a76e9807c954f"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/tailwind-design-system",
+      "treeSha256": "sha256:6425a6ecbaba1275decf84ce8bae4e6d40ce9c482a51c985a8afd37388f395ee",
+      "type": "local"
+    },
+    "text-to-speech": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:8f2a9bb10d4c3d29952ce4d8f254f66979e1def80df0ec7c08c3ddb38dc42710"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/text-to-speech",
+      "treeSha256": "sha256:e1ac54805b045b566f61a6afe043241bc8097bffeee4c61e7f4800dde5247fdd",
+      "type": "local"
+    },
+    "threejs-animation": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:b24dc96c7a854ab97fa797a8e20d6bf981f155dfc625fd1ef347042395b7754c"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/threejs-animation",
+      "treeSha256": "sha256:2d7bf399841a88abdaa430ec983f8df0128a86d191a2c33dc0b4759b2d410e71",
+      "type": "local"
+    },
+    "threejs-fundamentals": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:eb66d52f53f489067d602b9b62df507adb391d8220bdd1a8aae6b73e6cee578a"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/threejs-fundamentals",
+      "treeSha256": "sha256:7d929199c8e94896c65867b0e9791bb832c72e7bf7adc0cf56e65331089f89fa",
+      "type": "local"
+    },
+    "threejs-geometry": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:8337bcf86621411f54ef39727b338c84890815e4b3612ce635d593dd9c321a3e"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/threejs-geometry",
+      "treeSha256": "sha256:bff4a6bbcf47d343a3067a9d05b7aaf17a47718b663215a219b21a8965772e83",
+      "type": "local"
+    },
+    "threejs-interaction": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:1bb23f0388d39863432494ff00ea0a96ae7d093c0c6f3149fb223ba1e673fef6"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/threejs-interaction",
+      "treeSha256": "sha256:ae02cbc2a0af27195767cac8d73a6fa29a8f542bef73670015a26908c6db601a",
+      "type": "local"
+    },
+    "threejs-lighting": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:777875f7d6a75219d009ac69310772236231eec7cb57287c0509bb53e994af9d"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/threejs-lighting",
+      "treeSha256": "sha256:7aec846986668ebf32a9622929e59cb08b85e9bae4b2cc6fa6334edd00161281",
+      "type": "local"
+    },
+    "threejs-loaders": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:03e0d7319692bb7eaa13cfada5d27d39840c7520c5ddc3fc8cc07b645dcba2e9"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/threejs-loaders",
+      "treeSha256": "sha256:601c443fd696ae0c8f7c00216b206ac78a01341cf63b35cf9587dd881e8b4bce",
+      "type": "local"
+    },
+    "threejs-materials": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:d5846d1b8254b903eacb3014486efbe331101518604b451098fd31989c3e7fe7"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/threejs-materials",
+      "treeSha256": "sha256:cce62d5724063dfeec6160b96ada258658acca220a50c9348fbd78a4d3b3d628",
+      "type": "local"
+    },
+    "threejs-postprocessing": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:570b86434c30ad9bdc30f4f6d4e8c04124a07dd4ccaa778d4717ecc211dc1d90"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/threejs-postprocessing",
+      "treeSha256": "sha256:835d65dbf450f22d5e6cb52db62037a5c4d0a50da5d5de180f06f81e5645a184",
+      "type": "local"
+    },
+    "threejs-shaders": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:6702267bd3ee70d458b54078211db36b1c3738c3faa0570e88e33dceaf478a4d"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/threejs-shaders",
+      "treeSha256": "sha256:526541fe0a20c2260d04f5ea18312b61c3a8404cdcfd020862830eeacc76246a",
+      "type": "local"
+    },
+    "threejs-textures": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:2a90ce70931e9b172fa5b70c13fd12e7b6f1600482d3ba0c73d95570fe728b65"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/threejs-textures",
+      "treeSha256": "sha256:d91866aff02710a6783cc3a80ae3069e724afb5eefaa7e5e308a097dcf86830a",
+      "type": "local"
+    },
+    "vercel-composition-patterns": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "AGENTS.md",
+          "sha256": "sha256:89e3ddd58fcf99a53a50e25dfd21b8cde1be5f10b7df6bacd3dfa6796932f516"
+        },
+        {
+          "mode": "100644",
+          "path": "README.md",
+          "sha256": "sha256:85915a43a6f0b4efe525e3cf6398dd866166da2025837c4460468a24a940da94"
+        },
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:e38e0eaa609316b10423a9a138ed95e35099accd3f735585295c8a8f165c28a3"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/_sections.md",
+          "sha256": "sha256:a174213b87e6911e2b766995a2cbaf8d1534057076e82fb79fe3f0ecb38047df"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/_template.md",
+          "sha256": "sha256:587f7d16b0660eb61fee4a4d3d7df2b3077d6835de170602c7d6e60bee559131"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/architecture-avoid-boolean-props.md",
+          "sha256": "sha256:007555ebb020f4d552582a2c4db194db71a1fd33094012e5187bcfa4f8c392d5"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/architecture-compound-components.md",
+          "sha256": "sha256:f246af13dc269b521cf20eb8ad99a0cb645beac381c8c9b117262c34612c8457"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/patterns-children-over-render-props.md",
+          "sha256": "sha256:7c45a0d21b3c4126a32cba916ee31adeae195386ad1dbbe6634aedb7457aa0ad"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/patterns-explicit-variants.md",
+          "sha256": "sha256:8c19e596e61807549d01ce8c6954c6358199f97a8511c0c02c625ec0efda8c0e"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/react19-no-forwardref.md",
+          "sha256": "sha256:881830adb7534c4b2d70db426556646ad9837f5478f744f35641f635ada22227"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/state-context-interface.md",
+          "sha256": "sha256:09e73afbf9285fa416679cc864a287b9e8b821d0969272ab784295386d8c9bc3"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/state-decouple-implementation.md",
+          "sha256": "sha256:76a8c1eb29a70d8996ab3f71260345af2f7bc89deab815a421d6c87c6591a9c3"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/state-lift-state.md",
+          "sha256": "sha256:74c54038a6c554c748fe31cec673b80861b5d920b7553cf78cdf10d18b4b759b"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/vercel-composition-patterns",
+      "treeSha256": "sha256:a798b42803a3251709adf4eaaee296eb37af0c417c5d4b8cab0703b45fff475f",
+      "type": "local"
+    },
+    "vercel-react-best-practices": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "AGENTS.md",
+          "sha256": "sha256:2982283d7d6d2617a69c82e447d5be60619fae3bcf92324eb8c63e8847c74d4e"
+        },
+        {
+          "mode": "100644",
+          "path": "README.md",
+          "sha256": "sha256:9eafb2123d3b8b2aef41fba0db2648a3f4f49996f8c7c8bb2c86263befd8b48a"
+        },
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:efe15ae3ac3c84766837f3c97063cba62b2322feca04c7548a5bfabb07d03e50"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/_sections.md",
+          "sha256": "sha256:01c59969e4e867f0708c8f8ef9c6d87fab9a07d0586244f429ff84013db8a115"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/_template.md",
+          "sha256": "sha256:99df2a3ea088c6c22de2484ddc7e964d0e9923846f44c63380343ecc64455442"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/advanced-event-handler-refs.md",
+          "sha256": "sha256:a3097edeecfb2ff6851cd66ed8cdf0617c3c88180504bee824aa6e75a215bbbc"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/advanced-init-once.md",
+          "sha256": "sha256:3e4dc22173eb0e2b6dcf583e3babd862b8696328f8f59aee7c4d746c5bc05f6c"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/advanced-use-latest.md",
+          "sha256": "sha256:8a3f64dfe5a77d1564248faf17fe662ae75b55d497a243cb30b38eb07ccbbf9a"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/async-api-routes.md",
+          "sha256": "sha256:523338540d73427dc14c0cbb19f2741ebccdf8b105a7b2c1b33d2905cf237a42"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/async-defer-await.md",
+          "sha256": "sha256:9b9166c7fc58b436cf039ac4e36dd0d3c4f762b61111f579d93cdb9f2ab2b6f9"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/async-dependencies.md",
+          "sha256": "sha256:16ef469f877e30c6b8e1e1b4bc3e527312fa3c6318cb785a4eca186ea236131a"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/async-parallel.md",
+          "sha256": "sha256:6d2f841896279e976dfcdc1ac89e70771ac188baadfd43c096b5706cb838b961"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/async-suspense-boundaries.md",
+          "sha256": "sha256:de05fedac2eb7ae563b887b5a424464ec3dfaf84e5b7797467ebe2a796ac8afc"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/bundle-barrel-imports.md",
+          "sha256": "sha256:e648f6d54525f07a691357040ca5bff6ea3424788a91ff63812adb29622a671b"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/bundle-conditional.md",
+          "sha256": "sha256:09c8259c3efb04fc0abb8e412ccbda217c222ae8118516283e571c995fe3a7d4"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/bundle-defer-third-party.md",
+          "sha256": "sha256:3719fb47b191e8db4fe22686ec88448ad5af9e6838585425abbe103d0b642e37"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/bundle-dynamic-imports.md",
+          "sha256": "sha256:401817a7369f315fc5a68a1095742ff7d53d0461906880dc9d64a41495ee1986"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/bundle-preload.md",
+          "sha256": "sha256:d1f7cc28da7cd5ab249acd287edc5b761afcfb194e9cb62cd44c5f3543db2de2"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/client-event-listeners.md",
+          "sha256": "sha256:242a873349febc1ce685e85617994784dbab92c2eaa68aed7fed5a83e7680e93"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/client-localstorage-schema.md",
+          "sha256": "sha256:0fb7cdf9dc93fdf22f87e3669f953fb9d4ac9b0be42eec4a29fe9a2560610b88"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/client-passive-event-listeners.md",
+          "sha256": "sha256:1f35016f9053de69e884ee9be00654e37979c2ca85f5e57764dc2626ff7acb4b"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/client-swr-dedup.md",
+          "sha256": "sha256:644652c39c6cc00de8d1c77a7273612e868dc3f7edda30764164c12ec0f764a3"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/js-batch-dom-css.md",
+          "sha256": "sha256:480b891b9eaf96e929dc1e964274a4828e3a78009b7d00ccd965a0d425215959"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/js-cache-function-results.md",
+          "sha256": "sha256:3daaa11d24f4295cb6be8bc6f407f2ce83cc7b5bd1f0e68891ea8ab835721dc7"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/js-cache-property-access.md",
+          "sha256": "sha256:73e47431e74878a927061bf0ddc7cd91a7556cb35d2573f3421e82300d9ae311"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/js-cache-storage.md",
+          "sha256": "sha256:11b826b0433898c1ece2d3547010d8e77db9fb240185748c45db91493de9b6cc"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/js-combine-iterations.md",
+          "sha256": "sha256:71add08aeeb43091d4ff4c0b2842cce8b4bdef8ad3e732cc034bb5a84827e746"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/js-early-exit.md",
+          "sha256": "sha256:925ce5ce87f3347186ca62212f29cc6baa2b8c85a96d2720ad07c3d0abf781c0"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/js-flatmap-filter.md",
+          "sha256": "sha256:9e5b166a41914d975bef7635467f8fb32cd98b5c3126c0bc6f163490812fb5f0"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/js-hoist-regexp.md",
+          "sha256": "sha256:f9e9aef2f7c2307dd7310f283df85dcada45fc43e9bb941b0c3aa414dec21ec4"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/js-index-maps.md",
+          "sha256": "sha256:5df1bdc2cfabb2c98abd55d26762e5c18189535c2e686184f426082e62920391"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/js-length-check-first.md",
+          "sha256": "sha256:8b54a311c826b299272f29187fc58bc55772a04c4a72eeb29456ee96dc9fc624"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/js-min-max-loop.md",
+          "sha256": "sha256:87dfb67e2f39df6ad8bcfb5b78c5fb364d3c07554ad188a202408d99f3763421"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/js-request-idle-callback.md",
+          "sha256": "sha256:ee08f83905b4011abbc33d594033157d77561b5bbd9b36b04f0f409581ffec32"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/js-set-map-lookups.md",
+          "sha256": "sha256:a7fd781a6ba9ad49065961b6f9a90ef486bf6b648390e1a08704025f98e1642b"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/js-tosorted-immutable.md",
+          "sha256": "sha256:d0a5e1b0fec48a0a81397957e2f068e224329f7c42cb5feeed8aae6fa64025e8"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rendering-activity.md",
+          "sha256": "sha256:1e5e7eaf3555e61d6a2e900089c676527d26259501db5594f59544b6c664f85a"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rendering-animate-svg-wrapper.md",
+          "sha256": "sha256:9c6ae0ca7a51434e803887c64cded760956579a1452ccb80a461a03f9c937c77"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rendering-conditional-render.md",
+          "sha256": "sha256:2ec2fa23c4148285144687050c52369adba3da2fbe3d486f8d3e0aad8f06f2bc"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rendering-content-visibility.md",
+          "sha256": "sha256:64eee6d5b916fe74df33363994b27fc7f71bea3bcedc7ee04bda23107ca3e6e4"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rendering-hoist-jsx.md",
+          "sha256": "sha256:93b229560fae92005ed9a2a829064607b39b2e984e92d221d05b2d41df2b7c0e"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rendering-hydration-no-flicker.md",
+          "sha256": "sha256:dc7ab358c67c177bca6e6f360fbc935ebe4efa928c0ba3ebd3f9f3d9e2000ca3"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rendering-hydration-suppress-warning.md",
+          "sha256": "sha256:915bacb934e2927d84b37a3f3d225a47b309ac8f9e494ed2bcb66ce07c5676a2"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rendering-resource-hints.md",
+          "sha256": "sha256:351b1095d641717b930f1b2253282b7120af3023bc74e06c17675168d4286864"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rendering-script-defer-async.md",
+          "sha256": "sha256:4cea07b7875ba7fc2c7465ff23b63a2bb334f90aaf2d9293d38d67b05fdb32ab"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rendering-svg-precision.md",
+          "sha256": "sha256:ed468533f6e95f622859c884b122cf21f9f593ed6bb3d500a54de4b9f9bcb9fb"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rendering-usetransition-loading.md",
+          "sha256": "sha256:3a1249c3f13026b6f54ab5712c388df219d6af01b12aa542749acd99a46f4bc1"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rerender-defer-reads.md",
+          "sha256": "sha256:234050a77faf50cb306be10a9e15bd4421134ab5907e75f13e6d78e2bd262dc9"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rerender-dependencies.md",
+          "sha256": "sha256:17eb5830956fb56486fd3cfc7431f5849d39751730c05ad9e77dd4f0c27169c5"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rerender-derived-state-no-effect.md",
+          "sha256": "sha256:cb11ec76f50aa7b6847269f02d79b120c889a30d9ecd2c1d578f75144419c77a"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rerender-derived-state.md",
+          "sha256": "sha256:1c326bb67b01fb084eb00c8911b0a7cff54681c2315b629f88e49b64eaa6481d"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rerender-functional-setstate.md",
+          "sha256": "sha256:5e68df6b2ae8058e67f476ff1ac67bde159f5a9d18df439e46eabcdeb7b52e58"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rerender-lazy-state-init.md",
+          "sha256": "sha256:4ae844740f266fc8cbf050701230286624a2440ec5be67b9a63d9edc3c580573"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rerender-memo-with-default-value.md",
+          "sha256": "sha256:81c47476564ad8a79fc68fc442734255ca7d6829424359464503fda0a9f9a0dd"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rerender-memo.md",
+          "sha256": "sha256:1f258990c2f27ff6256b3cc5c43300631bb3f0d81f749aed08d07fcdcc131dd1"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rerender-move-effect-to-event.md",
+          "sha256": "sha256:abc2cbf167bee056743023351e96806a411d3398da8802093620aecf0721f029"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rerender-no-inline-components.md",
+          "sha256": "sha256:1cc32907a770272524ba682eef9e7efdd8ad4533b6f89b718a1fcd7d1d0eb6a3"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rerender-simple-expression-in-memo.md",
+          "sha256": "sha256:5bdcf2d1558ba5204e643c887b7b4060f89630969425651eb68e96427d97f800"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rerender-split-combined-hooks.md",
+          "sha256": "sha256:6f45d703343484ef9acef9388397f3642966ae6a5a258899a0cf1f9977cfbf6c"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rerender-transitions.md",
+          "sha256": "sha256:60f4033909a62df5e5b8c601494f9e50a562e2f8c1c2d81eac24f38142265f1c"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rerender-use-deferred-value.md",
+          "sha256": "sha256:8c3579576a61a949884167745dcfaf1d5426ba305cc61fd0a79602d70fda4909"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/rerender-use-ref-transient-values.md",
+          "sha256": "sha256:f1a649af9d1d0b5c762f6c9c4c1c70c90d7df82aa10296ee87aadb78c1b76c54"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/server-after-nonblocking.md",
+          "sha256": "sha256:d0b8d24a3db9f0f65f9e2bddbf230b0e03a5f60e1229d93a4a18f5e7a991c7c2"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/server-auth-actions.md",
+          "sha256": "sha256:a2ca8aa102839251c7971ec784560fab943c20b36fe6f80365d4110c13260c23"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/server-cache-lru.md",
+          "sha256": "sha256:1924b64561841923b88a657085097a0aeba3e0ba2d5470b9f5c15cc10d6ae70f"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/server-cache-react.md",
+          "sha256": "sha256:fddeea6c870bb3da4134b61d54b7d09b83d2603f929b7547cd3dc1dc269edd5c"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/server-dedup-props.md",
+          "sha256": "sha256:c2747424cdac46be62f835f245a0aa887b0090b416d28e2ac8676702645eeb37"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/server-hoist-static-io.md",
+          "sha256": "sha256:f90610d0f0db0fa8da5cf99790ed3369544a5b9b671bc4198347c95ec3325db4"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/server-parallel-fetching.md",
+          "sha256": "sha256:569a2e9fc04f9606686cd75c5894ef8781b502786a7fffe241396846c7733472"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/server-parallel-nested-fetching.md",
+          "sha256": "sha256:ad5d9656984d4a959997a2367bf59cc6632297b4634a1dd13a087939d83f30b3"
+        },
+        {
+          "mode": "100644",
+          "path": "rules/server-serialization.md",
+          "sha256": "sha256:f4c7d68b29c82381baad059c4a7f09e868e71ec9c3115a26ad3ae7d24c0dfe1f"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/vercel-react-best-practices",
+      "treeSha256": "sha256:2ea8a72173e4515d0580afbaf7b2135fb87b0ea35da29034eb5012a2f6c4531b",
+      "type": "local"
+    },
+    "video-download": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:350159d5cd3f36b84e503b40d42ff50be8538102bfd6288f1b318a86d7d89b37"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/video-download",
+      "treeSha256": "sha256:0fe2716db057b0f68ab3a2e78959e54a0492bc2b771577625132d095620b5135",
+      "type": "local"
+    },
+    "video-edit": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:25a8a985c4ecc4ad4c32fe29f51d9122f02f149e641916e1709bee5dfaccb7f0"
+        },
+        {
+          "mode": "100644",
+          "path": "references/operations.md",
+          "sha256": "sha256:2463a5298822520657e9c63d6bb1caaf4c99cf769d479737a0e078cb538e525b"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/video-edit",
+      "treeSha256": "sha256:ad944e9cac8648674d33d907e4ffea2ad47eb74c2c0cd06f156c79560ba9ff97",
+      "type": "local"
+    },
+    "video-translate": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:3114c2b5e23e40e2abef74b2d2a5c854945de856023409f840d7425c4d79b3e9"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/video-translate",
+      "treeSha256": "sha256:897f682609c681e91573daa4c5874e627d096eb02c06fa2bb12ec203eb2bf3ae",
+      "type": "local"
+    },
+    "video-understand": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:3ae2a42d7eaec84b8f80c9b3f4b5a35c6e583c3d462d3cabdda585c55dba97f2"
+        },
+        {
+          "mode": "100644",
+          "path": "references/output-format.md",
+          "sha256": "sha256:f26b12a25fb6e13a13375f57751dae682ecbd88571701b3796bf5242dda1513e"
+        },
+        {
+          "mode": "100755",
+          "path": "scripts/understand_video.py",
+          "sha256": "sha256:af7d389e86af881412730d21d97445c6c34511ad4c1e7364a592ff2818bc62f9"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/video-understand",
+      "treeSha256": "sha256:09bdd2173cb01aeb06d1a16ac37207d39130e400ce8d4f9e87db6ebe8f561004",
+      "type": "local"
+    },
+    "video_toolkit": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:cb9cffe74e3d30c5f3bf1edebf11c8c03f5887a115fc73f8972610e0c6697f3b"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/video_toolkit",
+      "treeSha256": "sha256:c4df0f2537cd3ce6b50307821d1cb55fe9f70dd03152443fc1becc9aa444870d",
+      "type": "local"
+    },
+    "visual-style": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:4d6b51fa9b4e6111dfabc8bfcce8e868645ddad4da30b5a4b8b258f458a32b46"
+        },
+        {
+          "mode": "100644",
+          "path": "references/connectors/figma.md",
+          "sha256": "sha256:5a6d6d97fe3188f6f5418e36c75d2dd22ab75e03f0318d9be7fa864443815cc0"
+        },
+        {
+          "mode": "100644",
+          "path": "references/connectors/heygen-video-agent.md",
+          "sha256": "sha256:4b0a385b1c3930c517c6fff55fcb429fe4030cb49f9281041a57df718a912a4d"
+        },
+        {
+          "mode": "100644",
+          "path": "references/connectors/html-slides.md",
+          "sha256": "sha256:6dc205d9939d507b3f80b020a93ce2f68d015181353421833b074c44b218bc4d"
+        },
+        {
+          "mode": "100644",
+          "path": "references/connectors/paper-design.md",
+          "sha256": "sha256:746b77c37d7db3658bd6a9520b9abc9011aff8311607c2d56d7eb7c50d390ab8"
+        },
+        {
+          "mode": "100644",
+          "path": "references/extractors/from-pdf.md",
+          "sha256": "sha256:9b2ef4001dfd519e720523e13bfe36f0c4281bd0228bf4dbfcb4e148d4427f1f"
+        },
+        {
+          "mode": "100644",
+          "path": "references/extractors/from-video.md",
+          "sha256": "sha256:9e8e0bae3101d872076fc8aebad91a8ad1a4fbe1741d0589dd2023479b31c166"
+        },
+        {
+          "mode": "100644",
+          "path": "references/extractors/from-website.md",
+          "sha256": "sha256:3729dccec055c5fcaab688a1ecbee3a67ca796bd3ee81b3fd99a94b7360ce172"
+        },
+        {
+          "mode": "100644",
+          "path": "references/gallery/game-boy-color.visual-style.md",
+          "sha256": "sha256:a2a1018ca020b798976b6533de1db9ee4466eba8bdfb2b1eb70ed3ad71f9919a"
+        },
+        {
+          "mode": "100644",
+          "path": "references/gallery/heygen-ai-video.visual-style.md",
+          "sha256": "sha256:ddb662572202b5a30b612d72828d2f0907127ad38d0a28a0337fac7819af5bda"
+        },
+        {
+          "mode": "100644",
+          "path": "references/gallery/mueller-brockmann-swiss.visual-style.md",
+          "sha256": "sha256:984484ff9ffb758a4a249405e47a2e78625960f6b0d70365038fe91a4d2fb172"
+        },
+        {
+          "mode": "100644",
+          "path": "references/gallery/neville-brody-industrial.visual-style.md",
+          "sha256": "sha256:2b386345e3588f62cd122f46823584f0e8f3ccdf0d1fbf7da044f4fa5f9726da"
+        },
+        {
+          "mode": "100644",
+          "path": "references/gallery/saul-bass-cinematic.visual-style.md",
+          "sha256": "sha256:bb4a3cc84c084e737f675d6efea26bdee1848796f64e274b2560e58b175bfb26"
+        },
+        {
+          "mode": "100644",
+          "path": "references/spec.md",
+          "sha256": "sha256:c17a24faf0a16dc94d09dc673ea1aef4a492b1b8fed144042930d09dfe8e62e5"
+        },
+        {
+          "mode": "100644",
+          "path": "references/templates/full.visual-style.md",
+          "sha256": "sha256:dfb6d9ac057710b83a8b01fd445ff082c35dff22f164077fb1893e956ed66bbc"
+        },
+        {
+          "mode": "100644",
+          "path": "references/templates/minimal.visual-style.md",
+          "sha256": "sha256:880ee6e18243ca22331c2588116ecf1168e5734d516f485e3fb8c5477002bc10"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/visual-style",
+      "treeSha256": "sha256:2a13bf4426cd7f79ccd8ed2e97d1e33164639d4d2222eaba043bb1ff1cdd9040",
+      "type": "local"
+    },
+    "wanx-best-practices": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:be2bba1a7a01de02698d7376dd9716beaf006484b4c7a614c6a33dc56d716e7a"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/wanx-best-practices",
+      "treeSha256": "sha256:971902bff33f5f715acd5da578ec74fd317b2516be4efd29676e2b48409ed28e",
+      "type": "local"
+    },
+    "web-design-guidelines": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:f4647ca866a3accf763777f83e7682954f0187cd6bea7eea0399796652414e8f"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/web-design-guidelines",
+      "treeSha256": "sha256:d916ab1c93c3f700a1924863afe5c532eb4054824c13939d6de7f216a369b861",
+      "type": "local"
+    },
+    "website-to-hyperframes": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:61ec0a7309f0459d789fb3bc3ec254a52c64e838357d321b594cbde5a8514a12"
+        },
+        {
+          "mode": "100644",
+          "path": "references/step-1-capture.md",
+          "sha256": "sha256:c5581dd136656d6f0767525d505f9789a846b798506373b72bb3eb32678b051f"
+        },
+        {
+          "mode": "100644",
+          "path": "references/step-2-design.md",
+          "sha256": "sha256:94a6a207ddf99583d357f01559ac7337a7199d05bf63aa7373aaaea3f6170ab1"
+        },
+        {
+          "mode": "100644",
+          "path": "references/step-3-script.md",
+          "sha256": "sha256:55cb26d748c68d7136de98d4ca1db74205908a134200f5f061f87afbde6c4496"
+        },
+        {
+          "mode": "100644",
+          "path": "references/step-4-storyboard.md",
+          "sha256": "sha256:415a9552cc17bdae408e9862ab226d49b71cb4402ab90abc5f71c8526d60061d"
+        },
+        {
+          "mode": "100644",
+          "path": "references/step-5-vo.md",
+          "sha256": "sha256:a04d32c4368d6d83e0fa7422bd365bfb15a874980772dde98c0e2ef838e48efb"
+        },
+        {
+          "mode": "100644",
+          "path": "references/step-6-build.md",
+          "sha256": "sha256:8bc833c3f002e1b74aaed8bd161e108fa0c68653b5ef51ad0748735d75e9a4a4"
+        },
+        {
+          "mode": "100644",
+          "path": "references/step-7-validate.md",
+          "sha256": "sha256:2e4c7c83a01c6094a968153976be09e825289520954106a987e170253b2580de"
+        },
+        {
+          "mode": "100644",
+          "path": "references/techniques.md",
+          "sha256": "sha256:7bd2ace20c485e4a8108bc534c517df5cb9aad3dfc536fa850fdf7613548a7f2"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/website-to-hyperframes",
+      "treeSha256": "sha256:294a1c67e0bc01dc727caee5d90c47c2900b2ef3fb7dd917e83c6ccac9ac2f48",
+      "type": "local"
+    }
+  },
+  "lockfileVersion": 1
+}

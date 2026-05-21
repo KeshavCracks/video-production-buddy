@@ -1,0 +1,172 @@
+version: 1
+materialize:
+  agents_dir: .agents/skills
+  claude_dir: .claude/skills
+  default_mode: symlink
+profiles:
+  default:
+    - acestep
+    - agents
+    - ai-video-gen
+    - avatar-video
+    - beautiful-mermaid
+    - bfl-api
+    - canvas-procedural-animation
+    - character-animation-qa
+    - character-rigging
+    - create-video
+    - d3-viz
+    - doubao-tts
+    - elevenlabs
+    - faceswap
+    - ffmpeg
+    - flux-best-practices
+    - framer-motion
+    - grok-media
+    - gsap
+    - gsap-core
+    - gsap-frameworks
+    - gsap-performance
+    - gsap-plugins
+    - gsap-react
+    - gsap-scrolltrigger
+    - gsap-timeline
+    - gsap-utils
+    - heygen
+    - hyperframes
+    - hyperframes-cli
+    - hyperframes-registry
+    - lottie-bodymovin
+    - ltx2
+    - manim-composer
+    - manimce-best-practices
+    - manimgl-best-practices
+    - music
+    - playwright-recording
+    - pose-library-design
+    - remotion
+    - remotion-best-practices
+    - seedance-2-0
+    - setup-api-key
+    - sound-effects
+    - speech-to-text
+    - svg-character-animation
+    - synthetic-screen-recording
+    - tailwind-design-system
+    - text-to-speech
+    - threejs-animation
+    - threejs-fundamentals
+    - threejs-geometry
+    - threejs-interaction
+    - threejs-lighting
+    - threejs-loaders
+    - threejs-materials
+    - threejs-postprocessing
+    - threejs-shaders
+    - threejs-textures
+    - vercel-composition-patterns
+    - vercel-react-best-practices
+    - video-download
+    - video-edit
+    - video-translate
+    - video-understand
+    - video_toolkit
+    - visual-style
+    - wanx-best-practices
+    - web-design-guidelines
+    - website-to-hyperframes
+sources:
+  black-forest-labs-skills:
+    type: git
+    url: https://github.com/black-forest-labs/skills.git
+    ref: master
+    components:
+      bfl-api: {kind: skill, path: skills/bfl-api}
+      flux-best-practices: {kind: skill, path: skills/flux-best-practices}
+  greensock-gsap-skills:
+    type: git
+    url: https://github.com/greensock/gsap-skills.git
+    ref: main
+    components:
+      gsap-core: {kind: skill, path: skills/gsap-core}
+      gsap-frameworks: {kind: skill, path: skills/gsap-frameworks}
+      gsap-performance: {kind: skill, path: skills/gsap-performance}
+      gsap-plugins: {kind: skill, path: skills/gsap-plugins}
+      gsap-react: {kind: skill, path: skills/gsap-react}
+      gsap-scrolltrigger: {kind: skill, path: skills/gsap-scrolltrigger}
+      gsap-timeline: {kind: skill, path: skills/gsap-timeline}
+      gsap-utils: {kind: skill, path: skills/gsap-utils}
+  heygen-hyperframes:
+    type: git
+    url: https://github.com/heygen-com/hyperframes.git
+    ref: main
+    components:
+      hyperframes-registry: {kind: skill, path: skills/hyperframes-registry}
+  intellectronica-agent-skills:
+    type: git
+    url: https://github.com/intellectronica/agent-skills.git
+    ref: main
+    components:
+      beautiful-mermaid: {kind: skill, path: skills/beautiful-mermaid}
+  video-production-buddy-local:
+    type: local
+    root: .agents/local/skills
+    components:
+      acestep: {kind: skill, path: acestep}
+      agents: {kind: skill, path: agents}
+      ai-video-gen: {kind: skill, path: ai-video-gen}
+      avatar-video: {kind: skill, path: avatar-video}
+      canvas-procedural-animation: {kind: skill, path: canvas-procedural-animation}
+      character-animation-qa: {kind: skill, path: character-animation-qa}
+      character-rigging: {kind: skill, path: character-rigging}
+      create-video: {kind: skill, path: create-video}
+      d3-viz: {kind: skill, path: d3-viz}
+      doubao-tts: {kind: skill, path: doubao-tts}
+      elevenlabs: {kind: skill, path: elevenlabs}
+      faceswap: {kind: skill, path: faceswap}
+      ffmpeg: {kind: skill, path: ffmpeg}
+      framer-motion: {kind: skill, path: framer-motion}
+      grok-media: {kind: skill, path: grok-media}
+      gsap: {kind: skill, path: gsap}
+      heygen: {kind: skill, path: heygen}
+      hyperframes: {kind: skill, path: hyperframes}
+      hyperframes-cli: {kind: skill, path: hyperframes-cli}
+      lottie-bodymovin: {kind: skill, path: lottie-bodymovin}
+      ltx2: {kind: skill, path: ltx2}
+      manim-composer: {kind: skill, path: manim-composer}
+      manimce-best-practices: {kind: skill, path: manimce-best-practices}
+      manimgl-best-practices: {kind: skill, path: manimgl-best-practices}
+      music: {kind: skill, path: music}
+      playwright-recording: {kind: skill, path: playwright-recording}
+      pose-library-design: {kind: skill, path: pose-library-design}
+      remotion: {kind: skill, path: remotion}
+      remotion-best-practices: {kind: skill, path: remotion-best-practices}
+      seedance-2-0: {kind: skill, path: seedance-2-0}
+      setup-api-key: {kind: skill, path: setup-api-key}
+      sound-effects: {kind: skill, path: sound-effects}
+      speech-to-text: {kind: skill, path: speech-to-text}
+      svg-character-animation: {kind: skill, path: svg-character-animation}
+      synthetic-screen-recording: {kind: skill, path: synthetic-screen-recording}
+      tailwind-design-system: {kind: skill, path: tailwind-design-system}
+      text-to-speech: {kind: skill, path: text-to-speech}
+      threejs-animation: {kind: skill, path: threejs-animation}
+      threejs-fundamentals: {kind: skill, path: threejs-fundamentals}
+      threejs-geometry: {kind: skill, path: threejs-geometry}
+      threejs-interaction: {kind: skill, path: threejs-interaction}
+      threejs-lighting: {kind: skill, path: threejs-lighting}
+      threejs-loaders: {kind: skill, path: threejs-loaders}
+      threejs-materials: {kind: skill, path: threejs-materials}
+      threejs-postprocessing: {kind: skill, path: threejs-postprocessing}
+      threejs-shaders: {kind: skill, path: threejs-shaders}
+      threejs-textures: {kind: skill, path: threejs-textures}
+      vercel-composition-patterns: {kind: skill, path: vercel-composition-patterns}
+      vercel-react-best-practices: {kind: skill, path: vercel-react-best-practices}
+      video-download: {kind: skill, path: video-download}
+      video-edit: {kind: skill, path: video-edit}
+      video-translate: {kind: skill, path: video-translate}
+      video-understand: {kind: skill, path: video-understand}
+      video_toolkit: {kind: skill, path: video_toolkit}
+      visual-style: {kind: skill, path: visual-style}
+      wanx-best-practices: {kind: skill, path: wanx-best-practices}
+      web-design-guidelines: {kind: skill, path: web-design-guidelines}
+      website-to-hyperframes: {kind: skill, path: website-to-hyperframes}
