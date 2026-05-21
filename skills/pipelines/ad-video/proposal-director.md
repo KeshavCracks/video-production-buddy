@@ -83,8 +83,11 @@ required `decision_log` entries. The GenUI path must not write canonical
 artifacts directly: it must not write `production_proposal`, `decision_log`, or
 checkpoints. The agent performs those writes after validation and review.
 
-CLI fallback: if `genui_form` is unavailable, the browser path fails, or the
-user asks to stay in terminal, present the structured CLI path below.
+CLI fallback: use it only when `genui_form` execution fails or the user
+explicitly declines the browser path. A returned localhost URL counts as
+browser path available; paste the URL and wait for `response_path` validation
+instead of switching to CLI. If fallback is needed, present the structured CLI
+path below.
 
 ```
 PRODUCTION PARAMETERS — [Brand Name] [Platform] Ad

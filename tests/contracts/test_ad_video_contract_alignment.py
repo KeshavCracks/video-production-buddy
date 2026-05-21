@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from lib.pipeline_loader import get_required_tools
+from lib.pipeline_loader import get_required_tools, load_pipeline
 from schemas.artifacts import validate_artifact
 from tools.compliance.compliance_check import ComplianceCheck
 from tools.analysis.video_analyzer import VideoAnalyzer
@@ -41,6 +41,13 @@ def _load_scene_type_registry() -> dict:
     return json.loads(
         (ROOT / "remotion-composer" / "scene_type_registry.json").read_text(encoding="utf-8")
     )
+
+
+def _stage_tool_names(stage: dict) -> set[str]:
+    tools: set[str] = set()
+    for key in ("required_tools", "optional_tools", "preferred_tools", "fallback_tools", "tools_available"):
+        tools.update(stage.get(key, []))
+    return tools
 
 
 def _json_fences(markdown: str) -> list[str]:
@@ -999,6 +1006,23 @@ def test_ad_video_manifest_exposes_planning_chain_gate_before_assets() -> None:
     assert "ad_video_planning_chain_check" in asset_director
     assert "ad_video_planning_chain_check" in compose_director
     assert "Do not treat missing planning artifacts as permission to skip" in compose_director
+
+
+def test_ad_video_manifest_declares_genui_form_for_form_first_gates() -> None:
+    """Form-first human gates must make genui_form visible to preflight audits."""
+    manifest = load_pipeline("ad-video")
+    stages = {stage["name"]: stage for stage in manifest["stages"]}
+
+    for stage_name in ["brief_enrichment", "bible", "proposal", "script"]:
+        assert "genui_form" in _stage_tool_names(stages[stage_name]), stage_name
+
+    asset_substages = {
+        substage["name"]: substage for substage in stages["assets"].get("sub_stages", [])
+    }
+    for substage_name in ["product_reference", "asset_review"]:
+        assert "genui_form" in asset_substages[substage_name].get("tools_available", []), substage_name
+
+    assert "genui_form" in get_required_tools(manifest)
 
 
 def test_video_analysis_detects_chinese_short_video_platforms() -> None:

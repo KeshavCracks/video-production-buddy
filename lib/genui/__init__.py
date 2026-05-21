@@ -209,14 +209,15 @@ def render_form_html(config: dict[str, Any], *, submit_url: str | None = None) -
         label = escape(str(action["label"]))
         if submit_url is None:
             actions.append(
-                f"<button type=\"button\" class=\"action{recommended}\" disabled "
+                f"<button type=\"button\" class=\"action{recommended}\" "
+                f"data-action-kind=\"{escape(action['kind'], quote=True)}\" disabled "
                 "title=\"Start GenUI in serve mode to submit this form\">"
                 f"{label}</button>"
             )
         else:
             actions.append(
                 f"<button type=\"button\" class=\"action{recommended}\" "
-                f"onclick=\"submitGenUI('{escape(action['kind'], quote=True)}')\">"
+                f"data-action-kind=\"{escape(action['kind'], quote=True)}\">"
                 f"{label}</button>"
             )
 
@@ -265,7 +266,7 @@ def render_form_html(config: dict[str, Any], *, submit_url: str | None = None) -
   </header>
   <form id="genui-form">
     {''.join(sections)}
-    <div id="status" role="status">{preview_notice}</div>
+    <div id="status" role="status" aria-live="polite" tabindex="-1">{preview_notice}</div>
     <div class="actions">
       {''.join(actions)}
     </div>
@@ -274,11 +275,24 @@ def render_form_html(config: dict[str, Any], *, submit_url: str | None = None) -
 <script>
 const GENUI_FIELDS = {fields_json};
 const SUBMIT_URL = {json.dumps(submit_url)};
+function browserEvent(type, detail) {{
+  return {{
+    type,
+    timestamp: new Date().toISOString(),
+    ...(detail || {{}})
+  }};
+}}
+function setStatus(message, color) {{
+  const status = document.getElementById('status');
+  status.style.color = color || '#0f766e';
+  status.textContent = message;
+  status.focus();
+}}
 async function submitGenUI(action) {{
   const form = document.getElementById('genui-form');
   const status = document.getElementById('status');
   if (!SUBMIT_URL) {{
-    status.textContent = 'Preview only. Start GenUI in serve mode to submit this form.';
+    setStatus('Preview only. Start GenUI in serve mode to submit this form.', '#526071');
     return;
   }}
   if (!form.reportValidity()) return;
@@ -293,7 +307,14 @@ async function submitGenUI(action) {{
       values[field.id] = formData.get(field.id) || '';
     }}
   }}
-  const payload = {{ action, values, browser_events: [] }};
+  const payload = {{
+    action,
+    values,
+    browser_events: [
+      browserEvent('action_click', {{ action, field_count: GENUI_FIELDS.length }}),
+      browserEvent('submit_attempt', {{ action }})
+    ]
+  }};
   const buttons = document.querySelectorAll('button.action');
   buttons.forEach((button) => button.disabled = true);
   status.style.color = '#0f766e';
@@ -304,14 +325,24 @@ async function submitGenUI(action) {{
       headers: {{ 'Content-Type': 'application/json' }},
       body: JSON.stringify(payload)
     }});
-    if (!response.ok) throw new Error(await response.text());
-    status.textContent = 'Submitted. Return to the agent to continue.';
+    const responseText = await response.text();
+    let result = {{}};
+    try {{
+      result = responseText ? JSON.parse(responseText) : {{}};
+    }} catch (error) {{
+      result = {{}};
+    }}
+    if (!response.ok) throw new Error(result.error || responseText || response.statusText);
+    const responsePath = result.response_path || 'response.json';
+    setStatus(`Submitted. Response saved to ${{responsePath}}. Return to the agent to continue.`);
   }} catch (error) {{
-    status.textContent = 'Submission failed: ' + error.message;
-    status.style.color = '#b91c1c';
+    setStatus('Submission failed: ' + error.message, '#b91c1c');
     buttons.forEach((button) => button.disabled = false);
   }}
 }}
+document.querySelectorAll('button.action[data-action-kind]').forEach((button) => {{
+  button.addEventListener('click', () => submitGenUI(button.dataset.actionKind));
+}});
 </script>
 </body>
 </html>

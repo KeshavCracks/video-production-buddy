@@ -503,6 +503,19 @@ Present the results of reconciling `enriched_brief` against `intelligence_brief.
 This replaces the old narrative design presentation — the user already approved the creative
 direction at G-0. This step is about evidence, not re-design.
 
+Use GenUI by default for G-I when `genui_form` is available. Generate a
+project-specific `ui_form_config` that shows CONFIRMED, CHALLENGED, and FLAGGED
+dimension verdicts, lets the user keep brief choices or accept research-backed
+recommendations, and records CTA/execution concerns for Step 7b. After
+submission, read and validate `ui_response`, summarize choices, and only then
+update `production_bible`. The GenUI path must not write canonical artifacts
+directly: it must not write `production_bible`, `decision_log`, or checkpoints.
+
+CLI fallback: use it only when `genui_form` execution fails or the user
+explicitly declines the browser path. A returned localhost URL counts as
+browser path available; paste the URL and wait for `response_path` validation
+instead of switching to CLI.
+
 Build three sections from `dimension_verdicts`:
 
 ```

@@ -53,6 +53,8 @@ stages:
     - intake_brief
   produces:
     - enriched_brief
+  tools_available:
+    - genui_form
   checkpoint_required: true
   human_approval_default: true
   review_focus:
@@ -96,6 +98,8 @@ stages:
     - intelligence_brief
   produces:
     - production_bible
+  tools_available:
+    - genui_form
   checkpoint_required: true
   human_approval_default: true
   review_focus:
@@ -138,6 +142,8 @@ stages:
   - production_bible
   produces:
   - production_proposal
+  tools_available:
+  - genui_form
   checkpoint_required: true
   human_approval_default: true
   review_focus:
@@ -169,6 +175,9 @@ stages:
   - script
   optional_tools:
   - compliance_check
+  tools_available:
+  - compliance_check
+  - genui_form
   checkpoint_required: true
   human_approval_default: true
   review_focus:
@@ -263,6 +272,8 @@ stages:
     - selected reference image path or risk_accepted waiver is user-approved
     - product_identity_reference_selection decision is logged
     - no text-only generation for product-visible scenes unless risk_accepted is user-approved
+    tools_available:
+    - genui_form
   - name: sample
     description: Generate 10–15s preview clip from first 2–3 scenes. Always runs.
       State the file PATH only — do NOT describe visual content. Wait for user to
@@ -298,6 +309,8 @@ stages:
     - User has opened and reviewed at least the hero scenes (especially motion-required
       clips)
     - asset_review_approved == true
+    tools_available:
+    - genui_form
   - name: music_review
     description: Present the generated music track to user for approval before mixing.
       State the file path. Do NOT proceed to compose until user has listened and approved.

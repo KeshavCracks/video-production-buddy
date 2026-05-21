@@ -94,14 +94,36 @@ def test_ui_response_schema_accepts_agent_reviewable_submission():
 
 
 def test_ad_video_skills_document_form_first_and_cli_fallback():
-    brief_skill = (ROOT / "skills/pipelines/ad-video/brief-enrichment-director.md").read_text()
-    proposal_skill = (ROOT / "skills/pipelines/ad-video/proposal-director.md").read_text()
-    combined = f"{brief_skill}\n{proposal_skill}".lower()
+    skill_paths = [
+        ROOT / "skills/pipelines/ad-video/brief-enrichment-director.md",
+        ROOT / "skills/pipelines/ad-video/bible-director.md",
+        ROOT / "skills/pipelines/ad-video/proposal-director.md",
+        ROOT / "skills/pipelines/ad-video/script-director.md",
+        ROOT / "skills/pipelines/ad-video/asset-director.md",
+    ]
+    combined = "\n".join(path.read_text() for path in skill_paths).lower()
 
     assert "genui" in combined
     assert "ui_response" in combined
     assert "cli fallback" in combined or "cli path" in combined
     assert "must not write canonical" in combined
+
+
+def test_genui_cli_fallback_is_failure_or_explicit_decline_only():
+    paths = [
+        ROOT / "skills/meta/genui-interaction.md",
+        ROOT / "skills/pipelines/ad-video/brief-enrichment-director.md",
+        ROOT / "skills/pipelines/ad-video/bible-director.md",
+        ROOT / "skills/pipelines/ad-video/proposal-director.md",
+        ROOT / "skills/pipelines/ad-video/script-director.md",
+        ROOT / "skills/pipelines/ad-video/asset-director.md",
+    ]
+
+    for path in paths:
+        text = " ".join(path.read_text().lower().replace("`", "").split())
+        assert "genui_form execution fails" in text, path
+        assert "explicitly declines the browser path" in text, path
+        assert "localhost url counts as browser path available" in text, path
 
 
 def test_agent_guide_describes_genui_as_interaction_layer_not_orchestrator():

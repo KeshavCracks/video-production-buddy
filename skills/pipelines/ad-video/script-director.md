@@ -289,6 +289,20 @@ if not report["ok"]:
 
 Before submitting the script artifact, present the full narration text to the user for approval. Do this in two messages:
 
+Use GenUI by default for G3 when `genui_form` is available and the narration is
+long enough that section-by-section review is clearer than a terminal block.
+Generate a project-specific `ui_form_config` with the full script sections,
+word-count status, required-line confirmations, and approve/revise actions.
+After submission, read and validate `ui_response`, summarize requested changes
+or approval, and only then mark `script.user_approved`. The GenUI path must not
+write canonical artifacts directly: it must not write `script`, `decision_log`,
+or checkpoints.
+
+CLI fallback: use it only when `genui_form` execution fails or the user
+explicitly declines the browser path. A returned localhost URL counts as
+browser path available; paste the URL and wait for `response_path` validation
+instead of switching to CLI.
+
 **Message 1 — show the script:**
 > "Here is the narration for your [Xs] ad. Please read through it.
 >

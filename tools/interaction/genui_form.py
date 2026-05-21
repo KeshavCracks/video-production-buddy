@@ -80,6 +80,7 @@ class GenUIForm(BaseTool):
             "server_state": {"type": "string"},
             "url": {"type": ["string", "null"]},
             "pid": {"type": ["integer", "null"]},
+            "instructions": {"type": "string"},
         },
     }
     artifact_schema = {
@@ -179,6 +180,10 @@ class GenUIForm(BaseTool):
                 "server_state": "prepared",
                 "url": None,
                 "pid": None,
+                "instructions": (
+                    f"Preview prepared at {bundle.html_path}. Run genui_form in serve mode "
+                    f"to get a localhost URL, then wait while {bundle.response_path} is validated."
+                ),
             }
 
             artifacts = [str(bundle.config_path), str(bundle.html_path)]
@@ -201,6 +206,11 @@ class GenUIForm(BaseTool):
                         "server_state": "running",
                         "url": f"http://{host}:{port}/",
                         "pid": process.pid,
+                        "instructions": (
+                            f"Open http://{host}:{port}/ in a local browser, submit the form, "
+                            f"then wait while {bundle.response_path} is validated before any "
+                            "canonical artifacts are updated."
+                        ),
                     }
                 )
                 bundle.state_path.parent.mkdir(parents=True, exist_ok=True)

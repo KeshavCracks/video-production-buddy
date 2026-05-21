@@ -134,6 +134,52 @@ def test_render_form_html_preselects_recommended_radio_when_default_missing():
     assert 'value="animated" checked' not in html
 
 
+def test_render_form_html_binds_action_buttons_without_inline_onclick():
+    from lib.genui import render_form_html
+
+    html = render_form_html(_sample_config(), submit_url="/submit")
+
+    assert "onclick=" not in html
+    assert 'data-action-kind="approve"' in html
+    assert "addEventListener('click'" in html
+    assert 'aria-live="polite"' in html
+    assert 'tabindex="-1"' in html
+    assert "result.response_path" in html
+
+
+def test_response_payload_preserves_browser_submission_events():
+    from lib.genui import response_payload_from_submission
+
+    response = response_payload_from_submission(
+        _sample_config(),
+        {
+            "action": "approve",
+            "values": {
+                "product_model": "OPPO Find X9 Pro",
+                "visual_approach": "cinematic",
+                "derivatives": ["9:16"],
+            },
+            "browser_events": [
+                {
+                    "type": "action_click",
+                    "action": "approve",
+                    "field_count": 3,
+                    "timestamp": "2026-05-21T00:00:00.000Z",
+                }
+            ],
+        },
+    )
+
+    assert response["browser_events"] == [
+        {
+            "type": "action_click",
+            "action": "approve",
+            "field_count": 3,
+            "timestamp": "2026-05-21T00:00:00.000Z",
+        }
+    ]
+
+
 def test_project_path_containment_rejects_parent_escape(tmp_path: Path):
     from lib.genui import resolve_project_path
 

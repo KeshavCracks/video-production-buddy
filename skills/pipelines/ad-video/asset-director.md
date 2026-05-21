@@ -226,6 +226,20 @@ Missing either of these is a CRITICAL failure. Abort and alert the EP.
 
 Run this before any product-visible visual generation, including sample clips.
 
+Use GenUI by default for this G5 sub-gate when `genui_form` is available.
+Generate a project-specific `ui_form_config` that displays product-reference
+strategy, provided reference paths or generated candidate paths, risk waiver
+text when applicable, and approve/revise/abort actions. After submission, read
+and validate `ui_response`, summarize the selected reference or waiver, and
+only then write `product_identity_reference` and any `decision_log` entry. The
+GenUI path must not write canonical artifacts directly: it must not write
+`product_identity_reference`, `asset_manifest`, `decision_log`, or checkpoints.
+
+CLI fallback: use it only when `genui_form` execution fails or the user
+explicitly declines the browser path. A returned localhost URL counts as
+browser path available; paste the URL and wait for `response_path` validation
+instead of switching to CLI.
+
 1. Read `production_proposal.product_reference_strategy`.
 2. Read `scene_plan.scenes[].product_visibility` and `product_reference_required`.
 3. If no scene is product-visible, write `product_identity_reference` with
@@ -587,6 +601,14 @@ text-to-video when possible, and block compose/publish until keyframe review is 
 ### Step 5: Asset Review Gate (REQUIRED before compose)
 
 After all visual assets are generated, present them to the user for review. Do this in two messages.
+
+Use GenUI by default for asset review when `genui_form` is available. Generate
+a project-specific `ui_form_config` that lists every image/video path, keyframe
+review status for high-risk assets, hallucination WARN/FLAG notes, and
+approve/flag actions per scene. After submission, read and validate
+`ui_response`, summarize flagged assets or approval, and only then update
+`asset_manifest` review state. The GenUI path must not write canonical
+artifacts directly.
 
 **Message 1 — list all asset paths:**
 > "All assets generated. Please open and review the following files before I proceed to the final render:

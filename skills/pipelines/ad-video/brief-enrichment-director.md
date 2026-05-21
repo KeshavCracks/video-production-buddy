@@ -101,10 +101,11 @@ GenUI path must not write canonical artifacts directly: it must not write
 after validating `ui_response` and applying the normal review/checkpoint
 protocol.
 
-CLI fallback: if `genui_form` is unavailable, the browser cannot be opened, or
-the user asks to stay in terminal, present the worksheet in the CLI shape below.
-The CLI fallback captures the same dimensions and must follow the same
-FROM BRIEF / DELEGATED source rules.
+CLI fallback: use it only when `genui_form` execution fails or the user
+explicitly declines the browser path. A returned localhost URL counts as
+browser path available; paste the URL and wait for `response_path` validation
+instead of switching to CLI. The CLI fallback captures the same dimensions and
+must follow the same FROM BRIEF / DELEGATED source rules.
 
 Do not generate the enriched brief until every required worksheet dimension is recorded in
 `creative_requirements` with `source` equal to **FROM BRIEF or DELEGATED**. No required

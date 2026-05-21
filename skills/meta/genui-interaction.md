@@ -32,8 +32,10 @@ The agent validates and summarizes `ui_response` before updating those files.
 1. Generate a project-specific `ui_form_config` with defaults, recommended
    values, choices, help text, and bindings to the intended artifact fields.
 2. Call `genui_form` in `serve` mode when a local browser is available.
-3. If `genui_form` is unavailable or the user cannot open a browser, use the
-   CLI fallback from the stage director skill.
+3. Use CLI fallback only when `genui_form` execution fails or the user
+   explicitly declines the browser path. A returned localhost URL counts as
+   browser path available; paste that URL and wait for `response_path`
+   validation instead of switching to CLI.
 4. After submission, read `projects/<project>/artifacts/ui/<config_id>/response.json`.
 5. Validate it as `ui_response`.
 6. Summarize the user's selected values and any revisions.
@@ -50,4 +52,5 @@ Submit it when ready; I will validate the response before updating artifacts.
 ```
 
 For CLI fallback, present the same fields in a compact numbered worksheet and
-record that the form path was unavailable.
+record that `genui_form` execution fails or the user explicitly declined the
+browser path. Localhost URL counts as browser path available.
