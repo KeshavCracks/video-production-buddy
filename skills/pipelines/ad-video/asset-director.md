@@ -12,6 +12,28 @@ You are the Asset Director (base). You receive `scene_plan`, `script`, `producti
 
 All asset generation uses the tool registry — never construct raw shell commands or API calls manually. Import the tool class, call `.execute(inputs_dict)`, check `result.error` before proceeding. Never assume success.
 
+## Pre-Asset Planning Chain Gate
+
+Before generating narration, images, video, music, subtitles, or sample assets, run
+`ad_video_planning_chain_check` with `production_bible`, `script`, and
+`scene_plan`. If it fails, abort asset generation and send the exact issues back
+to the responsible planning stage. This gate catches stale ad-video artifacts
+where `truth_contract` or `trend_alignment` is missing, or where selected trend
+guidance did not reach script `source_ref/source_refs` and scene
+`trend_alignment_refs`.
+
+```python
+from tools.validation.ad_video_planning_chain_check import AdVideoPlanningChainCheck
+
+gate = AdVideoPlanningChainCheck().execute({
+    "production_bible": production_bible,
+    "script": script,
+    "scene_plan": scene_plan,
+})
+if not gate.success:
+    raise RuntimeError(f"Planning chain gate failed: {gate.error}")
+```
+
 **Cost capture (use `result.cost_usd`, NOT hand-authored estimates):**
 
 Every paid tool's `execute()` returns a `ToolResult` with a top-level `cost_usd: float` field (see `tools/base_tool.py` line 135 — this is part of the BaseTool contract, not inside `result.data`). Most paid tools populate it from `self.estimate_cost(inputs)` automatically; some can use real billing info from the API response when available.

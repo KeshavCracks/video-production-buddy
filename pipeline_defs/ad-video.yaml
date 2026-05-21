@@ -228,6 +228,7 @@ stages:
   - asset_manifest
   checkpoint_required: false
   required_tools:
+  - ad_video_planning_chain_check
   - cosyvoice_tts
   - wanx_image
   - wan_video_api
@@ -239,6 +240,7 @@ stages:
   - pixabay_video
   - frame_sampler
   tools_available:
+  - ad_video_planning_chain_check
   - cosyvoice_tts
   - openai_tts
   - wanx_image
@@ -256,6 +258,7 @@ stages:
       video clip may be generated before product_identity_reference is approved or waived.
     human_approval_default: true
     review_focus:
+    - ad_video_planning_chain_check passes before any asset generation
     - product_identity_reference artifact exists and validates
     - selected reference image path or risk_accepted waiver is user-approved
     - product_identity_reference_selection decision is logged
@@ -354,16 +357,22 @@ stages:
   required_artifacts_in:
   - edit_decisions
   - asset_manifest
+  - production_bible
+  - script
+  - scene_plan
   produces:
   - render_report
   checkpoint_required: false
   required_tools:
+  - ad_video_planning_chain_check
   - video_compose
   - audio_mixer
   tools_available:
+  - ad_video_planning_chain_check
   - video_compose
   - audio_mixer
   review_focus:
+  - ad_video_planning_chain_check passes with production_bible, script, and scene_plan before render
   - Primary render complete at declared aspect_ratio_primary (16:9 or 9:16)
   - asset_manifest has no blocker hallucination_review FLAG before render
   - hallucination_contract_check previously passed or warned with documented user-approved waiver
@@ -373,6 +382,7 @@ stages:
   - 'Audio channels: stereo'
   success_criteria:
   - render_report artifact produced
+  - ad_video_planning_chain_check passed before video_compose
   - output_files contains primary file at declared aspect_ratio_primary
   - output_files contains one entry per opted-in derivative
 - name: publish

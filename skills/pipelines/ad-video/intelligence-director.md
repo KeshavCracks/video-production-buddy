@@ -94,6 +94,24 @@ site:reddit.com "{product_category}" (finally|love|changed my life|best decision
 "{platform} creative best practices {year}"
 ```
 
+When the brief or target market calls for Chinese short-video sources, search
+platform-specific terms instead of treating all sources as generic social video:
+
+```
+"{product_category}" 广告 爆款 抖音 {year}
+"{product_category}" 广告 爆款 快手 {year}
+"{product_category}" 广告 B站 {year}
+site:douyin.com "{product_category}" 广告
+site:kuaishou.com "{product_category}" 广告
+site:bilibili.com "{product_category}" 广告
+```
+
+`video_analyzer` and `video_downloader` classify Bilibili, Douyin, and Kuaishou
+URLs explicitly. Use their metadata and scene analysis when downloads succeed.
+If a URL is geo-blocked, auth-gated, removed, or otherwise unavailable, record
+the text-inferred hit-ad fields and a short limitation note; do not fabricate
+`pacing_measured` or `classification`.
+
 For each trend, capture typed record fields so downstream stages can filter
 stale entries, dedupe duplicates, and select only brand-safe positive/neutral
 signals for `production_bible.intelligence.trend_alignment`. Bible-director
@@ -170,6 +188,9 @@ when the sample size threshold is met.
 
 ```
 "best {product_category} ads {year}" site:youtube.com
+"{product_category} 爆款 广告 {year}" site:bilibili.com
+"{product_category} 爆款 广告 {year}" site:douyin.com
+"{product_category} 爆款 广告 {year}" site:kuaishou.com
 "{product_category} award-winning commercial {year}"
 "{product_category} ad viral {year}"
 ```
@@ -185,7 +206,7 @@ from tools.analysis.video_analyzer import VideoAnalyzer
 
 analyzer = VideoAnalyzer()
 result = analyzer.execute({
-    "source": hit_ad["url"],          # YouTube / Shorts / TikTok / Instagram URL
+    "source": hit_ad["url"],          # YouTube / Shorts / TikTok / Instagram / Bilibili / Douyin / Kuaishou URL
     "analysis_depth": "standard",     # transcript + scene detection + keyframes
     "max_keyframes": 12,
 })

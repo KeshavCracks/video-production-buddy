@@ -144,6 +144,12 @@ class VideoDownloader(BaseTool):
             return "instagram"
         if "tiktok.com" in url_lower:
             return "tiktok"
+        if "bilibili.com" in url_lower or "b23.tv" in url_lower:
+            return "bilibili"
+        if "douyin.com" in url_lower or "iesdouyin.com" in url_lower:
+            return "douyin"
+        if "kuaishou.com" in url_lower or "kwai.com" in url_lower:
+            return "kuaishou"
         if "vimeo.com" in url_lower:
             return "vimeo"
         if "twitter.com" in url_lower or "x.com" in url_lower:

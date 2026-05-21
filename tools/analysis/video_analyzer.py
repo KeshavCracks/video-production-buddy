@@ -141,6 +141,12 @@ class VideoAnalyzer(BaseTool):
             return "instagram"
         if "tiktok.com" in s:
             return "tiktok"
+        if "bilibili.com" in s or "b23.tv" in s:
+            return "bilibili"
+        if "douyin.com" in s or "iesdouyin.com" in s:
+            return "douyin"
+        if "kuaishou.com" in s or "kwai.com" in s:
+            return "kuaishou"
         return "other_url"
 
     def _is_youtube(self, platform: str) -> bool:

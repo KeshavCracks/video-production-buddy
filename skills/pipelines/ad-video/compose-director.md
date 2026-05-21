@@ -8,6 +8,27 @@ You receive `edit_decisions`, `asset_manifest`, and `EP_STATE` and render the fi
 
 **Before any render begins, run ALL of these checks. Do not skip any.**
 
+### Check -1: Planning chain freshness
+
+Load `production_bible`, `script`, and `scene_plan` from the required project
+artifacts, then run `ad_video_planning_chain_check` before render.
+Do not treat missing planning artifacts as permission to skip this gate. If any input is
+missing, stale, schema-invalid, or the gate fails, **ABORT** and return to the
+stale or unthreaded planning stage. Do not render an ad whose selected
+`trend_alignment` never reached script refs or scene trend refs.
+
+```python
+from tools.validation.ad_video_planning_chain_check import AdVideoPlanningChainCheck
+
+planning_gate = AdVideoPlanningChainCheck().execute({
+    "production_bible": production_bible,
+    "script": script,
+    "scene_plan": scene_plan,
+})
+if not planning_gate.success:
+    raise RuntimeError(f"Planning chain gate failed: {planning_gate.error}")
+```
+
 ### Check 0: Remotion profile (aspect ratio)
 
 The `Explainer` composition in `Root.tsx` defaults to **1920×1080** regardless of any `width`/`height` fields in the props JSON. To get the correct output resolution you MUST pass `"profile"` to the `video_compose` call:

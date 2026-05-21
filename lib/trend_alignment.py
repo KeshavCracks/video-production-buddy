@@ -73,6 +73,18 @@ def _alignment_entries(production_bible: dict[str, Any]) -> list[dict[str, Any]]
     return entries if isinstance(entries, list) else []
 
 
+def _selected_trend_ids(production_bible: dict[str, Any]) -> list[str]:
+    trend_alignment = (
+        production_bible.get("intelligence", {}).get("trend_alignment", {})
+        if isinstance(production_bible, dict)
+        else {}
+    )
+    selected = trend_alignment.get("selected_trend_ids", [])
+    if not isinstance(selected, list):
+        return []
+    return [str(trend_id).strip() for trend_id in selected if str(trend_id).strip()]
+
+
 def _entry_ref(entry: dict[str, Any]) -> str:
     script_usage = entry.get("script_usage") or {}
     if isinstance(script_usage, dict) and script_usage.get("source_ref"):
@@ -227,5 +239,47 @@ def check_scene_plan_trend_alignment(
         "summary": {
             "alignments_checked": len(_alignment_entries(production_bible)),
             "scenes_checked": len(scenes),
+        },
+    }
+
+
+def check_ad_video_planning_trend_alignment(
+    production_bible: dict[str, Any],
+    script: dict[str, Any],
+    scene_plan: dict[str, Any],
+) -> dict[str, Any]:
+    """Check selected trend guidance survives from bible to script and scenes."""
+    script_report = check_script_trend_alignment(production_bible, script)
+    scene_report = check_scene_plan_trend_alignment(production_bible, scene_plan)
+    entries = _alignment_entries(production_bible)
+    aligned_trend_ids = {_trend_id(entry) for entry in entries if _trend_id(entry)}
+    issues: list[dict[str, Any]] = []
+    issues.extend(
+        {
+            "kind": "missing_selected_trend_alignment",
+            "trend_id": trend_id,
+            "artifact": "production_bible",
+        }
+        for trend_id in _selected_trend_ids(production_bible)
+        if trend_id not in aligned_trend_ids
+    )
+    issues.extend(
+        {**issue, "artifact": "script"}
+        for issue in script_report.get("issues", [])
+    )
+    issues.extend(
+        {**issue, "artifact": "scene_plan"}
+        for issue in scene_report.get("issues", [])
+    )
+    return {
+        "ok": not issues,
+        "issues": issues,
+        "script": script_report,
+        "scene_plan": scene_report,
+        "summary": {
+            "selected_trends_checked": len(_selected_trend_ids(production_bible)),
+            "alignments_checked": len(entries),
+            "script_sections_checked": script_report.get("summary", {}).get("sections_checked", 0),
+            "scenes_checked": scene_report.get("summary", {}).get("scenes_checked", 0),
         },
     }

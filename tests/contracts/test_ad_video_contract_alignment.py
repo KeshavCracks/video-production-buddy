@@ -13,6 +13,8 @@ import yaml
 from lib.pipeline_loader import get_required_tools
 from schemas.artifacts import validate_artifact
 from tools.compliance.compliance_check import ComplianceCheck
+from tools.analysis.video_analyzer import VideoAnalyzer
+from tools.analysis.video_downloader import VideoDownloader
 from tools.validation.hallucination_contract_check import check_hallucination_contract
 from tools.validation.product_identity_consistency_check import (
     check_product_identity_consistency,
@@ -847,6 +849,194 @@ def test_scene_plan_trend_alignment_requires_scene_for_visual_trend() -> None:
         "Native overlay text lands on the first visual beat; no viral layout copied."
     )
     assert check_scene_plan_trend_alignment(bible, scene_plan)["ok"] is True
+
+
+def _trend_threaded_script(source_ref: str = "trend_alignment:trend-tiktok-lofi-hook") -> dict:
+    voice_performance = {
+        "emotion": "intrigue",
+        "intonation": "soft rise, clean resolve",
+        "rhythm": "short phrase, breath, proof phrase",
+        "pace": "measured",
+        "pause_after_seconds": 0.25,
+    }
+    tts_directive = {"speed_mult": 0.96}
+    return {
+        "version": "1.0",
+        "title": "Trend Threaded Script",
+        "total_duration_seconds": 8,
+        "sections": [
+            {
+                "id": "hook",
+                "beat": "hook",
+                "text": "Three seconds decide the scroll.",
+                "start_seconds": 0,
+                "end_seconds": 3,
+                "source_ref": source_ref,
+                "speaker_directions": "Measured and immediate.",
+                "voice_performance": voice_performance,
+                "tts_directive": tts_directive,
+            },
+            {
+                "id": "build",
+                "beat": "build",
+                "text": "Then prove the change before attention drops.",
+                "start_seconds": 3,
+                "end_seconds": 8,
+                "source_ref": source_ref,
+                "speaker_directions": "Confident proof, no hype.",
+                "voice_performance": voice_performance,
+                "tts_directive": tts_directive,
+            },
+        ],
+    }
+
+
+def _trend_threaded_scene_plan(source_ref: str = "trend_alignment:trend-tiktok-lofi-hook") -> dict:
+    return {
+        "version": "1.0",
+        "style_mode": "animated",
+        "total_duration_seconds": 4,
+        "scenes": [
+            {
+                "id": "scene-hook",
+                "type": "generated",
+                "description": "Native overlay text lands on the first visual beat.",
+                "start_seconds": 0,
+                "end_seconds": 4,
+                "beat": "hook",
+                "product_visibility": "none",
+                "product_reference_required": False,
+                "core": True,
+                "motion_required": True,
+                "trend_alignment_refs": [source_ref],
+                "trend_alignment_notes": "Warm native pacing is adapted without copying source captions, audio, or shot order.",
+            }
+        ],
+    }
+
+
+def test_ad_video_planning_chain_check_rejects_unthreaded_selected_trends() -> None:
+    """The pre-asset gate must fail when selected trends stop at the bible."""
+    from tests.qa.test_artifact_chain import PRODUCTION_BIBLE_VALID
+    from tools.validation.ad_video_planning_chain_check import AdVideoPlanningChainCheck
+
+    bible = deepcopy(PRODUCTION_BIBLE_VALID)
+    script = _trend_threaded_script()
+    scene_plan = _trend_threaded_scene_plan()
+    del script["sections"][0]["source_ref"]
+
+    result = AdVideoPlanningChainCheck().execute({
+        "production_bible": bible,
+        "script": script,
+        "scene_plan": scene_plan,
+    })
+
+    assert result.success is False
+    assert "missing_trend_source_ref" in (result.error or "")
+
+    script = _trend_threaded_script()
+    scene_plan["scenes"][0].pop("trend_alignment_refs")
+    result = AdVideoPlanningChainCheck().execute({
+        "production_bible": bible,
+        "script": script,
+        "scene_plan": scene_plan,
+    })
+
+    assert result.success is False
+    assert "missing_scene_trend_alignment" in (result.error or "")
+
+    bible_without_alignments = deepcopy(PRODUCTION_BIBLE_VALID)
+    bible_without_alignments["intelligence"]["trend_alignment"]["selected_trend_ids"] = [
+        "trend-tiktok-lofi-hook"
+    ]
+    bible_without_alignments["intelligence"]["trend_alignment"]["alignments"] = []
+    result = AdVideoPlanningChainCheck().execute({
+        "production_bible": bible_without_alignments,
+        "script": _trend_threaded_script(),
+        "scene_plan": _trend_threaded_scene_plan(),
+    })
+
+    assert result.success is False
+    assert "missing_selected_trend_alignment" in (result.error or "")
+
+
+def test_ad_video_planning_chain_check_accepts_fresh_threaded_chain() -> None:
+    """A fresh planning chain with selected trends in bible, script, and scene plan passes."""
+    from tests.qa.test_artifact_chain import PRODUCTION_BIBLE_VALID
+    from tools.validation.ad_video_planning_chain_check import AdVideoPlanningChainCheck
+
+    result = AdVideoPlanningChainCheck().execute({
+        "production_bible": deepcopy(PRODUCTION_BIBLE_VALID),
+        "script": _trend_threaded_script(),
+        "scene_plan": _trend_threaded_scene_plan(),
+    })
+
+    assert result.success is True
+    assert result.data["trend_alignment"]["ok"] is True
+
+
+def test_ad_video_manifest_exposes_planning_chain_gate_before_assets() -> None:
+    """The pipeline must surface the planning-chain gate before asset generation."""
+    manifest = _load_ad_video_manifest()
+    asset_stage = next(stage for stage in manifest["stages"] if stage["name"] == "assets")
+    compose_stage = next(stage for stage in manifest["stages"] if stage["name"] == "compose")
+    asset_director = _read_skill("asset-director.md")
+    compose_director = _read_skill("compose-director.md")
+
+    asset_tools = set(asset_stage.get("required_tools", []))
+    asset_tools.update(asset_stage.get("optional_tools", []))
+    asset_tools.update(asset_stage.get("tools_available", []))
+    compose_tools = set(compose_stage.get("required_tools", []))
+    compose_tools.update(compose_stage.get("optional_tools", []))
+    compose_tools.update(compose_stage.get("tools_available", []))
+
+    assert "ad_video_planning_chain_check" in asset_tools
+    assert "ad_video_planning_chain_check" in compose_tools
+    assert "ad_video_planning_chain_check" in get_required_tools(manifest)
+    assert {"production_bible", "script", "scene_plan"}.issubset(
+        set(compose_stage["required_artifacts_in"])
+    )
+    assert "ad_video_planning_chain_check" in asset_director
+    assert "ad_video_planning_chain_check" in compose_director
+    assert "Do not treat missing planning artifacts as permission to skip" in compose_director
+
+
+def test_video_analysis_detects_chinese_short_video_platforms() -> None:
+    """Bilibili, Douyin, and Kuaishou must not collapse into generic other_url."""
+    analyzer = VideoAnalyzer()
+    downloader = VideoDownloader()
+
+    cases = [
+        ("https://www.bilibili.com/video/BV1xx411c7mD", "bilibili"),
+        ("https://b23.tv/abc123", "bilibili"),
+        ("https://www.douyin.com/video/7333333333333333333", "douyin"),
+        ("https://v.douyin.com/iabc123/", "douyin"),
+        ("https://www.kuaishou.com/short-video/3xabc123", "kuaishou"),
+        ("https://v.kuaishou.com/abc123", "kuaishou"),
+        ("https://www.kwai.com/@creator/video/123", "kuaishou"),
+    ]
+
+    for url, expected in cases:
+        assert analyzer._detect_platform(url) == expected
+        assert downloader._detect_platform(url) == expected
+
+        validate_artifact(
+            "video_analysis_brief",
+            {
+                "version": "1.0",
+                "source": {"type": expected, "duration_seconds": 10},
+                "content_analysis": {
+                    "summary": "Reference ad summary.",
+                    "topics": ["ad"],
+                    "target_audience": "general",
+                },
+                "structure_analysis": {
+                    "total_scenes": 0,
+                    "scenes": [],
+                    "pacing_profile": {},
+                },
+            },
+        )
 
 
 def test_ad_video_contract_mentions_trend_alignment_flow() -> None:
