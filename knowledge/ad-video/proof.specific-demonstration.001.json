@@ -1,0 +1,25 @@
+{
+  "card_id": "proof.specific-demonstration.001",
+  "version": "1.0",
+  "domain": "proof_logic",
+  "summary": "A proof beat is strongest when it demonstrates one claim in a concrete situation instead of asserting superiority.",
+  "principles": [
+    "Show the claim operating in a specific use case.",
+    "Prefer visible behavior, measured result, or side-by-side demonstration over abstract adjectives.",
+    "Keep the proof proportional to the evidence the user or research supplied."
+  ],
+  "apply_when": [
+    "The product has performance, quality, speed, camera, workflow, or sensory claims.",
+    "The audience is skeptical or expert enough to distrust generic hype.",
+    "The ad needs to justify a premium price or technical advantage."
+  ],
+  "avoid_when": [
+    "No evidence exists for the claim.",
+    "The proof would require a fake benchmark or unsupported comparison.",
+    "The scene cannot visually demonstrate the claim without hallucination risk."
+  ],
+  "downstream_targets": ["build", "reveal", "script", "scene_plan", "visual"],
+  "keywords": ["proof", "demonstration", "claim", "evidence", "specific", "camera", "performance", "premium", "side by side"],
+  "source_type": "openmontage-curated",
+  "content_hash": "sha256:5b7f5e92c7e6bb345c3ded3801c6b6c14303d526387dc7546a15c72c6ee60f15"
+}

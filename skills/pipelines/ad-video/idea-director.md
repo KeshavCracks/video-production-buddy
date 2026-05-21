@@ -41,6 +41,8 @@ Internalize from `production_bible`:
 - `narrative.hook_mechanic` — fixed; must be used
 - `visual.visual_motifs` where `mandatory=true` — must appear
 - `visual.key_visual_moments` where `mandatory=true` — must be included
+- `intelligence.knowledge_alignment.alignments[]` — professional producer-knowledge
+  constraints such as hook mechanics, proof logic, visual rhetoric, and claim discipline
 - `brand_constraints.mandatory_elements` + `prohibited_elements`
 - `identity.cta` — exact text; in final beat
 - `intelligence.rejected_approaches` — do not use
@@ -52,6 +54,7 @@ Each concept is a distinct creative treatment of the same approved arc. Options 
 - **Characters** — who do we follow?
 - **Visual metaphor** — what central image carries emotional weight?
 - **Hook execution** — HOW does the `hook_mechanic` land in this specific treatment?
+- **Producer logic** — how selected `knowledge_alignment` refs shape the execution
 
 Options MUST NOT differ in arc_type, beat structure, emotional targets, or hook_mechanic.
 
@@ -67,6 +70,7 @@ Beat mapping:
   [B2] ...:    [What specifically happens]
   ...
 Why this works: [One sentence connecting to intelligence findings]
+Knowledge refs: [list any required knowledge_alignment:* refs this concept explicitly uses]
 ```
 
 ### Step 3: Present and Wait for Selection
@@ -90,4 +94,5 @@ Write `idea_options` artifact to `projects/<project-name>/artifacts/idea_options
 
 - **Changing the arc**: bible locked arc_type. Every concept uses the same arc.
 - **Ignoring mandatory motifs**: All mandatory `visual_motifs` must appear in each concept.
+- **Ignoring producer knowledge**: Selected `knowledge_alignment` constraints are part of the bible, not optional inspiration.
 - **Using rejected approaches**: Check `intelligence.rejected_approaches` before writing.

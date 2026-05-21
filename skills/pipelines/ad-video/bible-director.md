@@ -269,6 +269,64 @@ preference being contradicted.
     `remotion-composer/scene_type_registry.json#style_layers`
     — `grain`, `vignette`, `ambient_glow`, `particle_field`, `light_rays`.
 
+### Step 3b — Build professional knowledge alignment
+
+Create the required `production_bible.intelligence.knowledge_alignment` block from
+`intelligence_brief.professional_knowledge.cards_used`. This block is the stable
+producer-doctrine counterpart to `trend_alignment`: it tells downstream stages which
+advertising principles must be visibly carried into idea, script, scene_plan, audio,
+format, or visual execution.
+
+Selection rules:
+- Select only cards that directly fit the brief, truth contract, and approved
+  enriched-brief hypothesis.
+- Do not select a card when its `contraindications` apply.
+- Prefer at most 3 cards in v1 so downstream refs remain auditable.
+- If no card is applicable, still write an empty block.
+
+For each selected card, write an alignment entry:
+
+The canonical ref for a card is always `knowledge_alignment:<card_id>`.
+Both the entry-level `source_ref` and `script_usage.source_ref` must use that
+same value; do not invent a different nested ref.
+
+```json
+{
+  "card_id": "hook.visual-contrast.001",
+  "domain": "hook_mechanic",
+  "summary": "Use visible contrast in the opening second to create a fast comprehension gap.",
+  "source_ref": "knowledge_alignment:hook.visual-contrast.001",
+  "application_targets": ["hook", "script", "scene_plan", "visual"],
+  "target_beat": "hook",
+  "script_usage": {
+    "required_section_ids": ["hook"],
+    "source_ref": "knowledge_alignment:hook.visual-contrast.001",
+    "usage_note": "Hook copy must create a visible before/after gap without explaining the whole product."
+  },
+  "scene_usage": {
+    "required": true,
+    "required_scene_count": 1,
+    "visual_or_pacing_instruction": "Open on a visual contradiction or before/after contrast that resolves into the product promise."
+  },
+  "do_not_overapply": [
+    "Do not turn the hook into clickbait unrelated to the product promise."
+  ]
+}
+```
+
+If no card is selected:
+
+```json
+"knowledge_alignment": {
+  "selected_card_ids": [],
+  "alignments": []
+}
+```
+
+Do not use professional knowledge as a silent override of the user's approved
+brief. If a card would materially change strategy, surface it at Round 2a as
+FLAGGED unless it is a truth/safety/compliance blocker.
+
 ### Step 4 — Build trend alignment
 
 Create the required `production_bible.intelligence.trend_alignment` block from

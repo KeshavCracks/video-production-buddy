@@ -210,6 +210,20 @@
             "minLength": 1,
             "description": "Visual or pacing instruction showing how the selected trend is adapted without copying source content."
           },
+          "knowledge_alignment_refs": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^knowledge_alignment:[A-Za-z0-9._:-]+$"
+            },
+            "description": "Selected production_bible.intelligence.knowledge_alignment refs applied by this scene."
+          },
+          "knowledge_alignment_notes": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Professional producer-knowledge instruction showing how the selected doctrine shapes this scene."
+          },
           "core": {
             "type": "boolean",
             "default": false,

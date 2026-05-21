@@ -136,6 +136,10 @@ REALISTIC_BIBLE = {
                 }
             ],
         },
+        "knowledge_alignment": {
+            "selected_card_ids": [],
+            "alignments": [],
+        },
         "trending_signals": [
             {"signal": "lo-fi aesthetic +34% on TikTok", "source": "Sprout Social 2026", "applied_to": "visual.color_direction"},
         ],

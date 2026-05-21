@@ -25,6 +25,7 @@ Agent reads pipeline manifest (YAML) → reads stage director skill (MD)
 - **Tool registry:** `tools/tool_registry.py`
 - **Pipeline manifests:** `pipeline_defs/`
 - **Artifact schemas:** `schemas/artifacts/`
+- **Curated knowledge:** `knowledge/ad-video/` for ad-video professional producer doctrine
 - **Style playbooks:** `styles/*.yaml` (schema: `schemas/styles/playbook.schema.json`)
 - **Stage director skills:** `skills/pipelines/<pipeline>/<stage>-director.md`
 - **Meta skills:** `skills/meta/*.md` (reviewer, checkpoint-protocol, skill-creator)
@@ -70,8 +71,11 @@ Each tool's `agent_skills[]` field bridges Layer 1 → Layer 3. See `skills/INDE
 | `tools/base_tool.py` | ToolContract base class |
 | `tools/tool_registry.py` | Tool discovery and reporting |
 | `tools/cost_tracker.py` | Budget governance |
+| `lib/ad_knowledge.py` | Curated ad-video knowledge-card loading, validation, and deterministic retrieval |
+| `lib/knowledge_alignment.py` | Checks that selected producer-knowledge refs reach script and scene_plan artifacts |
 | `lib/genui/` | GenUI config validation, local HTML rendering, and ui_response helpers |
 | `tools/interaction/genui_form.py` | Local form/questionnaire tool for dense human gates; writes ui_response only |
+| `tools/analysis/ad_knowledge_retriever.py` | Local professional advertising knowledge retrieval for ad-video pre-production |
 | `tools/compliance/compliance_check.py` | Deterministic structural compliance checks for `compliance_manifest` checkpoints (timing/presence/beat-mapping) |
 | `tools/video/video_stitch.py` | Multi-clip assembly (stitch, spatial, validate, preview) |
 | `tools/video/video_compose.py` | Runtime-aware composition orchestrator — routes to Remotion / HyperFrames / FFmpeg based on `edit_decisions.render_runtime` |

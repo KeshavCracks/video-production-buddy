@@ -1,0 +1,25 @@
+{
+  "card_id": "demo.context-before-ui.001",
+  "version": "1.0",
+  "domain": "product_demo_logic",
+  "summary": "A product demo persuades better when it first shows the viewer's situation, then the product action, then the changed state.",
+  "principles": [
+    "Start each demo moment from a concrete user context.",
+    "Show the product doing one decisive action.",
+    "End the moment on the human or business outcome, not the interface alone."
+  ],
+  "apply_when": [
+    "The product is software, an app, a camera feature, a device function, or a workflow tool.",
+    "The proof beat needs a demo but the audience is not already product-qualified.",
+    "The ad risks becoming a screen recording without emotion."
+  ],
+  "avoid_when": [
+    "The user requested a pure tutorial or product walkthrough.",
+    "The visual surface is legally restricted or cannot be shown accurately.",
+    "The product action is too complex to communicate in the selected duration."
+  ],
+  "downstream_targets": ["script", "scene_plan", "visual", "reveal"],
+  "keywords": ["demo", "product action", "ui", "app", "workflow", "camera feature", "before after", "outcome"],
+  "source_type": "openmontage-curated",
+  "content_hash": "sha256:ed647a3bc7fb6a77359c9b558ca7409de3ba8ebc30d78a68c26391f13e5e26aa"
+}

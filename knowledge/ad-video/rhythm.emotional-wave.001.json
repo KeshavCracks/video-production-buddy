@@ -1,0 +1,25 @@
+{
+  "card_id": "rhythm.emotional-wave.001",
+  "version": "1.0",
+  "domain": "emotional_rhythm",
+  "summary": "Professional commercial rhythm alternates pressure and release so the viewer feels progression instead of a flat list of features.",
+  "principles": [
+    "Map each beat to a distinct viewer feeling: curiosity, recognition, relief, proof, then action.",
+    "Use shorter cuts and tighter narration at pressure peaks, then leave breath around product proof.",
+    "Let music intensity and edit density support the emotional curve rather than run at one speed."
+  ],
+  "apply_when": [
+    "The brief asks for emotion, aspiration, premium energy, or a cinematic feeling.",
+    "The ad has a clear problem-solution, contrast, or desire-fulfillment arc.",
+    "The production includes narration, music, and multiple visual beats."
+  ],
+  "avoid_when": [
+    "The ad is a purely informational product listing.",
+    "Legal or medical claims require neutral delivery throughout.",
+    "The brand tone forbids emotional escalation."
+  ],
+  "downstream_targets": ["script", "scene_plan", "pacing", "audio"],
+  "keywords": ["emotion", "rhythm", "pacing", "intensity", "music", "cuts", "commercial", "premium", "cinematic"],
+  "source_type": "openmontage-curated",
+  "content_hash": "sha256:4e1850fea4e5cd78ca27a5959236a575ed9bab68ab99eff256082fd156be0198"
+}

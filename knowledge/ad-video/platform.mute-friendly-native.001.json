@@ -1,0 +1,25 @@
+{
+  "card_id": "platform.mute-friendly-native.001",
+  "version": "1.0",
+  "domain": "platform_format",
+  "summary": "Social ads should communicate the hook and proof while muted, using native framing without copying a viral source.",
+  "principles": [
+    "Put the first promise in readable visual form, not narration alone.",
+    "Use captions, overlays, or product action to make the ad legible on silent autoplay.",
+    "Adapt platform grammar while preserving brand-specific design."
+  ],
+  "apply_when": [
+    "The primary placement is TikTok, Reels, Shorts, Instagram, or mobile feed.",
+    "The audience may watch without sound.",
+    "The ad uses narration but still needs instant comprehension."
+  ],
+  "avoid_when": [
+    "The final placement is TV, cinema, or a sound-on landing page.",
+    "Native overlays would violate the brand's design system.",
+    "The required legal copy cannot be made readable in the chosen format."
+  ],
+  "downstream_targets": ["hook", "script", "scene_plan", "format"],
+  "keywords": ["mute friendly", "native", "caption", "overlay", "tiktok", "reels", "shorts", "mobile", "format"],
+  "source_type": "openmontage-curated",
+  "content_hash": "sha256:afd6fc64fedd4917cb01a6a306467256074477b2903b895a9e6c333967b2e064"
+}

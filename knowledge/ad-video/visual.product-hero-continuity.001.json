@@ -1,0 +1,25 @@
+{
+  "card_id": "visual.product-hero-continuity.001",
+  "version": "1.0",
+  "domain": "visual_rhetoric",
+  "summary": "Product-visible ads need a repeated visual anchor so generated clips feel like one campaign rather than unrelated shots.",
+  "principles": [
+    "Give the product one recurring hero angle, color cue, or interaction motif.",
+    "Repeat that anchor at hook, proof, and CTA with increasing clarity.",
+    "Preserve geometry, logo placement, and material cues across every generated shot."
+  ],
+  "apply_when": [
+    "The ad shows a physical product, package, device, app UI, or recognizable brand asset.",
+    "The production uses generated video where product identity drift is likely.",
+    "The campaign depends on premium product memory."
+  ],
+  "avoid_when": [
+    "The product is intentionally abstract or invisible.",
+    "The user accepts a risk waiver for generic concept visuals.",
+    "The ad is only a typography or voice-led announcement."
+  ],
+  "downstream_targets": ["scene_plan", "visual", "reveal", "cta_brand"],
+  "keywords": ["product", "hero", "continuity", "geometry", "logo", "reference", "smartphone", "device", "packshot"],
+  "source_type": "openmontage-curated",
+  "content_hash": "sha256:a098c19215b89042b155409026388912c987407b18c49526faa6edab74831ad9"
+}

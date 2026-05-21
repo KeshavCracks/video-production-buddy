@@ -879,6 +879,10 @@ def _trend_threaded_script(source_ref: str = "trend_alignment:trend-tiktok-lofi-
                 "start_seconds": 0,
                 "end_seconds": 3,
                 "source_ref": source_ref,
+                "source_refs": [
+                    source_ref,
+                    "knowledge_alignment:hook.visual-contrast.001",
+                ],
                 "speaker_directions": "Measured and immediate.",
                 "voice_performance": voice_performance,
                 "tts_directive": tts_directive,
@@ -917,6 +921,8 @@ def _trend_threaded_scene_plan(source_ref: str = "trend_alignment:trend-tiktok-l
                 "motion_required": True,
                 "trend_alignment_refs": [source_ref],
                 "trend_alignment_notes": "Warm native pacing is adapted without copying source captions, audio, or shot order.",
+                "knowledge_alignment_refs": ["knowledge_alignment:hook.visual-contrast.001"],
+                "knowledge_alignment_notes": "Opening scene uses a visible before/after contrast without turning into clickbait.",
             }
         ],
     }
@@ -931,6 +937,7 @@ def test_ad_video_planning_chain_check_rejects_unthreaded_selected_trends() -> N
     script = _trend_threaded_script()
     scene_plan = _trend_threaded_scene_plan()
     del script["sections"][0]["source_ref"]
+    script["sections"][0].pop("source_refs", None)
 
     result = AdVideoPlanningChainCheck().execute({
         "production_bible": bible,
@@ -965,6 +972,46 @@ def test_ad_video_planning_chain_check_rejects_unthreaded_selected_trends() -> N
 
     assert result.success is False
     assert "missing_selected_trend_alignment" in (result.error or "")
+
+
+def test_ad_video_planning_chain_check_rejects_unthreaded_selected_knowledge() -> None:
+    """The pre-asset gate must fail when selected producer knowledge stops at the bible."""
+    from tests.qa.test_artifact_chain import PRODUCTION_BIBLE_VALID
+    from tools.validation.ad_video_planning_chain_check import AdVideoPlanningChainCheck
+
+    bible = deepcopy(PRODUCTION_BIBLE_VALID)
+    script = _trend_threaded_script()
+    scene_plan = _trend_threaded_scene_plan()
+    script["sections"][0]["source_ref"] = "trend_alignment:trend-tiktok-lofi-hook"
+    script["sections"][0].pop("source_refs", None)
+
+    result = AdVideoPlanningChainCheck().execute({
+        "production_bible": bible,
+        "script": script,
+        "scene_plan": scene_plan,
+    })
+
+    assert result.success is False
+    assert "missing_knowledge_source_ref" in (result.error or "")
+
+    knowledge_ref = "knowledge_alignment:hook.visual-contrast.001"
+    script["sections"][0]["source_refs"] = [
+        "trend_alignment:trend-tiktok-lofi-hook",
+        knowledge_ref,
+    ]
+    scene_plan["scenes"][0]["knowledge_alignment_refs"] = [knowledge_ref]
+    scene_plan["scenes"][0]["knowledge_alignment_notes"] = (
+        "Opening scene uses a visible before/after contrast without turning into clickbait."
+    )
+
+    result = AdVideoPlanningChainCheck().execute({
+        "production_bible": bible,
+        "script": script,
+        "scene_plan": scene_plan,
+    })
+
+    assert result.success is True
+    assert result.data["knowledge_alignment"]["ok"] is True
 
 
 def test_ad_video_planning_chain_check_accepts_fresh_threaded_chain() -> None:
@@ -1006,6 +1053,30 @@ def test_ad_video_manifest_exposes_planning_chain_gate_before_assets() -> None:
     assert "ad_video_planning_chain_check" in asset_director
     assert "ad_video_planning_chain_check" in compose_director
     assert "Do not treat missing planning artifacts as permission to skip" in compose_director
+
+
+def test_ad_video_manifest_and_skills_require_professional_knowledge_retrieval() -> None:
+    """Professional producer knowledge must be a real intelligence-stage contract."""
+    manifest = _load_ad_video_manifest()
+    stages = {stage["name"]: stage for stage in manifest["stages"]}
+
+    intelligence_stage = stages["intelligence"]
+    assert "ad_knowledge_retriever" in _stage_tool_names(intelligence_stage)
+    assert any("professional_knowledge" in item for item in intelligence_stage["review_focus"])
+    assert any("professional_knowledge" in item for item in intelligence_stage["success_criteria"])
+
+    intelligence_director = _read_skill("intelligence-director.md")
+    bible_director = _read_skill("bible-director.md")
+    script_director = _read_skill("script-director.md")
+    scene_director = _read_skill("scene-director.md")
+
+    assert "ad_knowledge_retriever" in intelligence_director
+    assert "professional_knowledge" in intelligence_director
+    assert "knowledge_alignment" in bible_director
+    assert "knowledge_alignment" in script_director
+    assert "check_script_knowledge_alignment" in script_director
+    assert "knowledge_alignment_refs" in scene_director
+    assert "check_scene_plan_knowledge_alignment" in scene_director
 
 
 def test_ad_video_manifest_declares_genui_form_for_form_first_gates() -> None:

@@ -629,11 +629,19 @@ Key contract points:
   demographic, emotional intent. Logistics such as subtitles, dubbing,
   derivatives, runtime, and budget belong in `proposal`.
 - `brief_enrichment`, `intelligence`, and `bible` create the strategic contract.
+  `intelligence` must retrieve curated professional advertising knowledge through
+  `ad_knowledge_retriever` and write `intelligence_brief.professional_knowledge`
+  before live trend and hit-ad synthesis. This is the stable producer-doctrine
+  layer: positioning, hook mechanics, emotional rhythm, proof logic, visual
+  rhetoric, product-demo structure, platform format, and claim discipline.
   `production_bible` owns the approved arc, beats, emotional targets, visual
   motifs, audio direction, primary format, CTA, compliance checkpoints, and
   rejected approaches. It also owns `truth_contract`: objective facts, physical
   constraints, product geometry rules, motion-coherence rules, and values/safety
   guardrails used to block hallucinated assets before final render.
+  It also owns `intelligence.knowledge_alignment`: selected professional
+  producer-knowledge applications that script and scene_plan must reference
+  explicitly with `knowledge_alignment:*` refs.
   It also owns `intelligence.trend_alignment`: selected fresh, deduped,
   brand-safe positive/neutral trend applications that script and scene_plan must
   reference explicitly without imitating viral source content.

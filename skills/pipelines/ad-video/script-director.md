@@ -159,6 +159,39 @@ if not report["ok"]:
     raise RuntimeError(report["issues"])
 ```
 
+## Professional Knowledge Source Refs
+
+When `production_bible.intelligence.knowledge_alignment.alignments[]` contains
+selected entries, the script must also carry those refs into the sections named
+in each entry's `script_usage.required_section_ids`. These refs prove the script
+used stable producer doctrine such as hook mechanics, proof logic, emotional
+rhythm, platform format, or claim discipline.
+
+Use the exact canonical `source_ref` from the alignment entry. This must match
+`script_usage.source_ref`, for example
+`"knowledge_alignment:hook.visual-contrast.001"`. If a section already uses a
+trend ref, keep the section natural and put every ref in `source_refs`:
+
+```json
+"source_refs": [
+  "trend_alignment:trend-tiktok-text-hooks",
+  "knowledge_alignment:hook.visual-contrast.001"
+]
+```
+
+Use professional knowledge to shape the craft of the line, not to mention the
+knowledge card or explain advertising theory inside the ad copy.
+
+Before submitting, run:
+
+```python
+from lib.knowledge_alignment import check_script_knowledge_alignment
+
+report = check_script_knowledge_alignment(production_bible, script)
+if not report["ok"]:
+    raise RuntimeError(report["issues"])
+```
+
 ## Script Artifact Format
 
 ```json

@@ -1,0 +1,25 @@
+{
+  "card_id": "compliance.claim-discipline.001",
+  "version": "1.0",
+  "domain": "commercial_compliance",
+  "summary": "Commercial craft includes claim discipline: every strong promise must be either sourced, visually demonstrated, or softened.",
+  "principles": [
+    "Separate objective claims from emotional impressions.",
+    "Block superlatives, quantified results, and competitor comparisons unless the brief supplies evidence.",
+    "Convert unsupported certainty into experiential language or remove it."
+  ],
+  "apply_when": [
+    "The ad contains performance, health, beauty, productivity, safety, finance, or comparative claims.",
+    "The user provided selling points but not substantiation.",
+    "Generated visuals could imply more than the product can prove."
+  ],
+  "avoid_when": [
+    "The script uses only subjective mood and brand identity language.",
+    "The campaign already has approved legal copy for each claim.",
+    "The brief explicitly marks a claim as fictional or parody."
+  ],
+  "downstream_targets": ["script", "scene_plan", "cta_brand"],
+  "keywords": ["compliance", "claim", "legal", "substantiation", "superlative", "competitor", "safety", "truth"],
+  "source_type": "openmontage-curated",
+  "content_hash": "sha256:03cda8c182419153afe13ea7a8394415966d76b27d7fc2d7bd27ca4736cdaaa5"
+}

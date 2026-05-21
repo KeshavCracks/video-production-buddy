@@ -1,0 +1,25 @@
+{
+  "card_id": "positioning.single-promise.001",
+  "version": "1.0",
+  "domain": "positioning",
+  "summary": "A commercial should organize every beat around one primary promise, not a scattered list of product advantages.",
+  "principles": [
+    "Choose the one promise the audience should remember after the ad ends.",
+    "Treat secondary features as proof for that promise, not separate messages.",
+    "Make the CTA repeat or complete the same promise."
+  ],
+  "apply_when": [
+    "The brief lists many selling points.",
+    "The product is complex, premium, technical, or feature-rich.",
+    "The campaign needs a clear brand memory structure."
+  ],
+  "avoid_when": [
+    "The user explicitly asks for a catalogue, spec sheet, or comparison table.",
+    "Regulated disclosure requires multiple independent claims.",
+    "The ad is a retargeting variant for already-qualified buyers."
+  ],
+  "downstream_targets": ["idea", "script", "cta_brand"],
+  "keywords": ["positioning", "single promise", "message", "selling point", "launch", "premium", "brand", "cta"],
+  "source_type": "openmontage-curated",
+  "content_hash": "sha256:86217539a25a71546faf4e4a1ef3bb70501cda2c9d64f5b2358b8bc46395e9ca"
+}

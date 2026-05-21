@@ -162,6 +162,33 @@ if not report["ok"]:
     raise RuntimeError(report["issues"])
 ```
 
+## Professional Knowledge-Aligned Scene Instructions
+
+Read `production_bible.intelligence.knowledge_alignment.alignments[]` before
+drafting scenes. For every selected entry whose `application_targets` include
+`scene_plan`, `visual`, `pacing`, or `format`, or whose
+`scene_usage.required == true`, include at least
+`scene_usage.required_scene_count` scenes with:
+
+- `knowledge_alignment_refs`: an array containing the exact
+  canonical entry `source_ref` value, e.g. `knowledge_alignment:hook.visual-contrast.001`
+- `knowledge_alignment_notes`: a concrete visual, pacing, or format instruction
+  showing how the professional producer knowledge shapes the scene
+
+Use this as craft guidance, not as a visible theory label. For example, a
+visual-contrast hook card should produce a visible before/after gap in the
+opening scene; it should not put "visual contrast hook" text on screen.
+
+Before submitting, run:
+
+```python
+from lib.knowledge_alignment import check_scene_plan_knowledge_alignment
+
+report = check_scene_plan_knowledge_alignment(production_bible, scene_plan)
+if not report["ok"]:
+    raise RuntimeError(report["issues"])
+```
+
 ## Scene Plan Artifact Format
 
 ```json
@@ -183,6 +210,8 @@ if not report["ok"]:
       "beat": "hook",
       "trend_alignment_refs": ["trend_alignment:trend-tiktok-lofi-hook"],
       "trend_alignment_notes": "Native overlay text lands with the first visual beat; pacing is adapted without copying a source layout.",
+      "knowledge_alignment_refs": ["knowledge_alignment:hook.visual-contrast.001"],
+      "knowledge_alignment_notes": "Opening visual uses a clear before/after gap to make the promise readable immediately.",
       "required_assets": [],
       "motion_required": false,
       "product_visibility": "none",
@@ -223,6 +252,7 @@ After reading this base document:
 - [ ] Every high-risk generated scene has `hallucination_checks[]`
 - [ ] Scene count, scene duration, and transition plan satisfy `production_bible.visual.editing_rhythm`
 - [ ] Selected visual/pacing trend alignments have `trend_alignment_refs` and `trend_alignment_notes` on enough scenes
+- [ ] Selected professional knowledge alignments have `knowledge_alignment_refs` and `knowledge_alignment_notes` on enough scenes
 - [ ] If `derivative_variants` includes `"9:16"` or `"1:1"`: every scene has `crop_regions` entries for each opted-in aspect ratio
 - [ ] No more than 3 consecutive scenes of the same `scene_type`
 - [ ] Scenes with `motion_required: true` are realistic given production plan

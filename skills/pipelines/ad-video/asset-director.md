@@ -18,9 +18,10 @@ Before generating narration, images, video, music, subtitles, or sample assets, 
 `ad_video_planning_chain_check` with `production_bible`, `script`, and
 `scene_plan`. If it fails, abort asset generation and send the exact issues back
 to the responsible planning stage. This gate catches stale ad-video artifacts
-where `truth_contract` or `trend_alignment` is missing, or where selected trend
-guidance did not reach script `source_ref/source_refs` and scene
-`trend_alignment_refs`.
+where `truth_contract`, `trend_alignment`, or `knowledge_alignment` is missing,
+or where selected trend / producer-knowledge guidance did not reach script
+`source_ref/source_refs` and scene `trend_alignment_refs` /
+`knowledge_alignment_refs`.
 
 ```python
 from tools.validation.ad_video_planning_chain_check import AdVideoPlanningChainCheck

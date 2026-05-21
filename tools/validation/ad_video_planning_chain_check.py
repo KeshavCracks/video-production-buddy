@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from lib.knowledge_alignment import check_ad_video_planning_knowledge_alignment
 from lib.trend_alignment import check_ad_video_planning_trend_alignment
 from schemas.artifacts import validate_artifact
 from tools.base_tool import (
@@ -36,6 +37,7 @@ class AdVideoPlanningChainCheck(BaseTool):
     capabilities = [
         "validate_ad_video_planning_chain",
         "validate_trend_alignment_threading",
+        "validate_knowledge_alignment_threading",
         "validate_pre_asset_gate",
     ]
     best_for = [
@@ -64,9 +66,10 @@ class AdVideoPlanningChainCheck(BaseTool):
     }
     output_schema = {
         "type": "object",
-        "required": ["trend_alignment"],
+        "required": ["trend_alignment", "knowledge_alignment"],
         "properties": {
             "trend_alignment": {"type": "object"},
+            "knowledge_alignment": {"type": "object"},
         },
     }
     user_visible_verification = [
@@ -104,16 +107,24 @@ class AdVideoPlanningChainCheck(BaseTool):
                 script,
                 scene_plan,
             )
-            if not report["ok"]:
+            knowledge_report = check_ad_video_planning_knowledge_alignment(
+                production_bible,
+                script,
+                scene_plan,
+            )
+            if not report["ok"] or not knowledge_report["ok"]:
+                issues = []
+                issues.extend(report.get("issues", []))
+                issues.extend(knowledge_report.get("issues", []))
                 return ToolResult(
                     success=False,
-                    data={"trend_alignment": report},
-                    error=json.dumps(report["issues"], sort_keys=True),
+                    data={"trend_alignment": report, "knowledge_alignment": knowledge_report},
+                    error=json.dumps(issues, sort_keys=True),
                     duration_seconds=time.time() - started,
                 )
             return ToolResult(
                 success=True,
-                data={"trend_alignment": report},
+                data={"trend_alignment": report, "knowledge_alignment": knowledge_report},
                 duration_seconds=time.time() - started,
             )
         except Exception as exc:

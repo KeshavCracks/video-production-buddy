@@ -15,7 +15,8 @@ artifacts, then run `ad_video_planning_chain_check` before render.
 Do not treat missing planning artifacts as permission to skip this gate. If any input is
 missing, stale, schema-invalid, or the gate fails, **ABORT** and return to the
 stale or unthreaded planning stage. Do not render an ad whose selected
-`trend_alignment` never reached script refs or scene trend refs.
+`trend_alignment` or `knowledge_alignment` never reached script refs or scene
+trend / professional-knowledge refs.
 
 ```python
 from tools.validation.ad_video_planning_chain_check import AdVideoPlanningChainCheck

@@ -89,6 +89,46 @@ INTAKE_BRIEF_THIN = {
 }
 
 INTELLIGENCE_BRIEF_VALID = {
+    "professional_knowledge": {
+        "retrieval_backend": "bm25",
+        "cards_used": [
+            {
+                "card_id": "hook.visual-contrast.001",
+                "domain": "hook_mechanic",
+                "source_ref": "knowledge_alignment:hook.visual-contrast.001",
+                "summary": "A short-form ad hook should land as a visible contrast before the viewer has time to scroll.",
+                "relevance_score": 0.92,
+                "why_relevant": "The platform is TikTok, Reels, Shorts, or another fast-scroll placement.",
+                "downstream_targets": ["hook", "script", "scene_plan", "visual"],
+            },
+            {
+                "card_id": "rhythm.emotional-wave.001",
+                "domain": "emotional_rhythm",
+                "source_ref": "knowledge_alignment:rhythm.emotional-wave.001",
+                "summary": "Professional commercial rhythm alternates pressure and release so the viewer feels progression.",
+                "relevance_score": 0.86,
+                "why_relevant": "The brief asks for emotion, aspiration, premium energy, or a cinematic feeling.",
+                "downstream_targets": ["script", "scene_plan", "pacing", "audio"],
+            },
+        ],
+        "application_recommendations": [
+            {
+                "card_id": "hook.visual-contrast.001",
+                "target": "hook",
+                "recommendation": "Make the first second show a before/after gap, contradiction, or sensory mismatch.",
+                "confidence": "producer-doctrine",
+            }
+        ],
+        "contraindications": [
+            {
+                "card_id": "hook.visual-contrast.001",
+                "avoid_when": "The contrast would exaggerate the product claim beyond approved evidence.",
+                "reason": "Apply only when the brief and truth contract allow it.",
+            }
+        ],
+        "gaps": [],
+        "warnings": [],
+    },
     "audience_psychographics": {
         "emotional_profile": "time-starved, achievement-oriented, frustrated by inefficiency",
         "core_pain_point": "feel busy but not productive; hours vanish without progress",
@@ -220,6 +260,32 @@ PRODUCTION_BIBLE_VALID = {
                     },
                     "do_not_imitate": [
                         "Do not copy source captions, audio, creator identity, choreography, or exact shot sequence.",
+                    ],
+                }
+            ],
+        },
+        "knowledge_alignment": {
+            "selected_card_ids": ["hook.visual-contrast.001"],
+            "alignments": [
+                {
+                    "card_id": "hook.visual-contrast.001",
+                    "domain": "hook_mechanic",
+                    "summary": "Use visible contrast in the opening second to create a fast comprehension gap.",
+                    "source_ref": "knowledge_alignment:hook.visual-contrast.001",
+                    "application_targets": ["hook", "script", "scene_plan", "visual"],
+                    "target_beat": "hook",
+                    "script_usage": {
+                        "required_section_ids": ["hook"],
+                        "source_ref": "knowledge_alignment:hook.visual-contrast.001",
+                        "usage_note": "Hook copy must create a visible before/after gap without explaining the whole product.",
+                    },
+                    "scene_usage": {
+                        "required": True,
+                        "required_scene_count": 1,
+                        "visual_or_pacing_instruction": "Open on a visual contradiction or before/after contrast that resolves into the product promise.",
+                    },
+                    "do_not_overapply": [
+                        "Do not turn the hook into clickbait unrelated to the product promise.",
                     ],
                 }
             ],
@@ -919,6 +985,7 @@ def test_production_bible_accepts_intelligence_with_only_declared_keys():
     bible = deep_copy(PRODUCTION_BIBLE_VALID)
     bible["intelligence"] = {
         "trend_alignment": {"selected_trend_ids": [], "alignments": []},
+        "knowledge_alignment": {"selected_card_ids": [], "alignments": []},
         "trending_signals": [],
         "reference_ads_analyzed": [],
         "rejected_approaches": [{"approach": "x", "reason": "y"}],

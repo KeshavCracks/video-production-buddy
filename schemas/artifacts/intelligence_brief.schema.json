@@ -4,8 +4,83 @@
   "title": "Intelligence Brief",
   "description": "Market research and hit-ad analysis produced by intelligence-director.",
   "type": "object",
-  "required": ["audience_psychographics", "platform_trends", "hit_ads_analyzed", "rejected_approaches", "recommendations"],
+  "required": ["professional_knowledge", "audience_psychographics", "platform_trends", "hit_ads_analyzed", "rejected_approaches", "recommendations"],
   "properties": {
+    "professional_knowledge": {
+      "type": "object",
+      "description": "Curated professional advertising knowledge retrieved before live research. This is stable producer doctrine, not current trend research.",
+      "required": ["retrieval_backend", "cards_used", "application_recommendations", "contraindications", "gaps"],
+      "additionalProperties": false,
+      "properties": {
+        "retrieval_backend": {
+          "type": "string",
+          "enum": ["bm25", "embedding", "hybrid"],
+          "description": "Actual retrieval backend used by ad_knowledge_retriever. BM25 is the deterministic default."
+        },
+        "cards_used": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["card_id", "domain", "source_ref", "summary", "relevance_score", "why_relevant"],
+            "additionalProperties": false,
+            "properties": {
+              "card_id": { "type": "string", "minLength": 1 },
+              "domain": {
+                "type": "string",
+                "enum": ["positioning", "audience_insight", "hook_mechanic", "narrative_arc", "emotional_rhythm", "visual_rhetoric", "proof_logic", "product_demo_logic", "platform_format", "commercial_compliance"]
+              },
+              "source_ref": {
+                "type": "string",
+                "pattern": "^knowledge_alignment:[A-Za-z0-9._:-]+$"
+              },
+              "summary": { "type": "string", "minLength": 1 },
+              "relevance_score": { "type": "number", "minimum": 0, "maximum": 1 },
+              "why_relevant": { "type": "string", "minLength": 1 },
+              "downstream_targets": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        },
+        "application_recommendations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["card_id", "target", "recommendation", "confidence"],
+            "additionalProperties": false,
+            "properties": {
+              "card_id": { "type": "string", "minLength": 1 },
+              "target": { "type": "string", "minLength": 1 },
+              "recommendation": { "type": "string", "minLength": 1 },
+              "confidence": { "type": "string", "const": "producer-doctrine" }
+            }
+          }
+        },
+        "contraindications": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["card_id", "avoid_when", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "card_id": { "type": "string", "minLength": 1 },
+              "avoid_when": { "type": "string", "minLength": 1 },
+              "reason": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "gaps": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
     "audience_psychographics": {
       "type": "object",
       "required": ["emotional_profile", "core_pain_point", "aspiration"],

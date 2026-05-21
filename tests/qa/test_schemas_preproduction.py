@@ -496,6 +496,36 @@ class TestIntelligenceBriefSchema:
 
     def _valid_base(self) -> dict:
         return {
+            "professional_knowledge": {
+                "retrieval_backend": "bm25",
+                "cards_used": [
+                    {
+                        "card_id": "hook.visual-contrast.001",
+                        "domain": "hook_mechanic",
+                        "source_ref": "knowledge_alignment:hook.visual-contrast.001",
+                        "summary": "Use visible contrast in the opening second.",
+                        "relevance_score": 0.9,
+                        "why_relevant": "Short-form placement needs instant comprehension.",
+                    }
+                ],
+                "application_recommendations": [
+                    {
+                        "card_id": "hook.visual-contrast.001",
+                        "target": "hook",
+                        "recommendation": "Make the first second show a visible gap.",
+                        "confidence": "producer-doctrine",
+                    }
+                ],
+                "contraindications": [
+                    {
+                        "card_id": "hook.visual-contrast.001",
+                        "avoid_when": "The contrast would exaggerate the claim.",
+                        "reason": "Truth contract must permit the hook.",
+                    }
+                ],
+                "gaps": [],
+                "warnings": [],
+            },
             "audience_psychographics": {
                 "emotional_profile": "Overwhelmed but optimistic",
                 "core_pain_point": "Too much admin work steals creative time",
@@ -660,6 +690,10 @@ MINIMAL_BIBLE = {
     "intelligence": {
         "trend_alignment": {
             "selected_trend_ids": [],
+            "alignments": [],
+        },
+        "knowledge_alignment": {
+            "selected_card_ids": [],
             "alignments": [],
         },
         "rejected_approaches": [

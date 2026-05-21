@@ -14,6 +14,7 @@ market intelligence.
 | Schema | `schemas/artifacts/intelligence_brief.schema.json` | Artifact validation |
 | Input | `intake_brief` | Research scope (product, platform, demographic) |
 | Input | `enriched_brief` | Hypothesis validation agenda (hypothesis_flags table) |
+| Tool | `ad_knowledge_retriever` | Curated professional advertising producer knowledge |
 | Tools | Web search | All research (zero cost) |
 
 ## Confidence Tiers
@@ -69,6 +70,67 @@ and must not appear in `dimension_verdicts`. The user owns those choices.
 
 You do NOT modify `enriched_brief`. You produce your own output (`intelligence_brief`)
 which bible-director will reconcile against the enriched brief.
+
+### Step 0a: Retrieve Professional Advertising Knowledge
+
+Before live trend search, call `ad_knowledge_retriever`. This is the stable
+producer-knowledge layer: positioning logic, hook mechanics, emotional rhythm,
+proof logic, visual rhetoric, product-demo structure, platform format doctrine,
+and claim discipline. It complements live research; it does not replace current
+trend search or hit-ad analysis.
+
+```python
+from tools.analysis.ad_knowledge_retriever import AdKnowledgeRetriever
+
+knowledge = AdKnowledgeRetriever().execute({
+    "product_category": enriched_brief["product_brief"]["product_type"],
+    "platform": enriched_brief["ad_specification"]["platform"],
+    "audience": enriched_brief["product_brief"]["target_demographic"],
+    "objectives": [
+        enriched_brief["product_brief"]["tagline"],
+        enriched_brief["product_brief"]["product_description"],
+    ],
+    "validation_targets": [item["dimension"] for item in enriched_brief.get("hypothesis_flags", [])],
+    "backend": "auto",
+})
+if not knowledge.success:
+    raise RuntimeError(f"Professional knowledge retrieval failed: {knowledge.error}")
+```
+
+Write the returned data into top-level `intelligence_brief.professional_knowledge`:
+
+```json
+{
+  "professional_knowledge": {
+    "retrieval_backend": "bm25",
+    "cards_used": [
+      {
+        "card_id": "hook.visual-contrast.001",
+        "domain": "hook_mechanic",
+        "source_ref": "knowledge_alignment:hook.visual-contrast.001",
+        "summary": "A short-form ad hook should land as a visible contrast before the viewer has time to scroll.",
+        "relevance_score": 0.92,
+        "why_relevant": "The platform is TikTok, Reels, Shorts, or another fast-scroll placement.",
+        "downstream_targets": ["hook", "script", "scene_plan", "visual"]
+      }
+    ],
+    "application_recommendations": [
+      {
+        "card_id": "hook.visual-contrast.001",
+        "target": "hook",
+        "recommendation": "Make the first second show a before/after gap, contradiction, or sensory mismatch.",
+        "confidence": "producer-doctrine"
+      }
+    ],
+    "contraindications": [],
+    "gaps": [],
+    "warnings": []
+  }
+}
+```
+
+If the tool returns `warnings` (for example, embedding requested but BM25 used),
+preserve them in the artifact. Do not hide backend fallback.
 
 ### Step 1: Batch 1 — Audience Psychographics
 
@@ -334,6 +396,7 @@ Build `intelligence_brief` per schema. Validate against
 
 | Criterion | Minimum |
 |-----------|---------|
+| Professional knowledge | `professional_knowledge.cards_used` non-empty with `knowledge_alignment:*` refs |
 | Psychographics sourced from research | All 3 fields from real findings |
 | Platform trends | ≥ 3 |
 | Hit ads analyzed | ≥ 3 |
