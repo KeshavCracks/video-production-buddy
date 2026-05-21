@@ -212,6 +212,14 @@ def derive_duck_schedule(
         if pre < start:
             schedule.append({"t_seconds": pre, "gain_db": 0.0})
         schedule.append({"t_seconds": start, "gain_db": _gain_at(start)})
+        if have_curve:
+            for sample in intensity_curve:
+                t_seconds = float(sample["t_seconds"])
+                if start < t_seconds < end:
+                    schedule.append({
+                        "t_seconds": t_seconds,
+                        "gain_db": _gain_at(t_seconds),
+                    })
         schedule.append({"t_seconds": end, "gain_db": _gain_at(end)})
         schedule.append({"t_seconds": post, "gain_db": 0.0})
 

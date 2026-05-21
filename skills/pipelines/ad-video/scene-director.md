@@ -103,6 +103,21 @@ Rules for core tagging:
 - Reveal scene: always `core: true`
 - If "15s" is in `derivative_variants`: sum of `core: true` scene durations must be ≤ 15s
 
+## Editing Rhythm Contract
+
+`production_bible.visual.editing_rhythm` is executable direction, not advisory
+copy. Before drafting scenes, read the entry for each beat and use it to shape:
+
+- scene count: rapid beats need enough short scenes/cuts to hit the declared density
+- scene duration: average scene duration should stay near `avg_shot_duration_seconds`
+- transition_style: plan transitions the edit director can carry into `cuts[]`
+- compliance gates: every scene must preserve `beat` or `maps_to_beat` so CP-E
+  edit checks can measure the final cuts against the bible
+
+If a beat's requested rhythm is impossible with the approved production plan
+(for example, only one generated clip exists for a rapid beat), send it back to
+EP before asset generation. Do not silently turn a rapid beat into a long hold.
+
 ## Crop Regions
 
 When `derivative_variants` includes an aspect-ratio variant (`"9:16"` or
@@ -206,6 +221,7 @@ After reading this base document:
 - [ ] Every scene has `product_visibility` and `product_reference_required`
 - [ ] Every product-visible scene has `product_reference_required: true`
 - [ ] Every high-risk generated scene has `hallucination_checks[]`
+- [ ] Scene count, scene duration, and transition plan satisfy `production_bible.visual.editing_rhythm`
 - [ ] Selected visual/pacing trend alignments have `trend_alignment_refs` and `trend_alignment_notes` on enough scenes
 - [ ] If `derivative_variants` includes `"9:16"` or `"1:1"`: every scene has `crop_regions` entries for each opted-in aspect ratio
 - [ ] No more than 3 consecutive scenes of the same `scene_type`

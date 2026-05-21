@@ -39,16 +39,15 @@ def cuts_density_from_shot_duration(avg_seconds: float) -> str:
 
       ``avg < 2.0``       → ``"rapid"``
       ``2.0 ≤ avg < 4.5`` → ``"moderate"``
-      ``avg ≥ 4.5``       → ``"held"``
-
-    Note: the schema enum also defines ``"slow"`` but the deterministic
-    mappings in this codebase don't emit it (intelligence-director may
-    surface it directly from research instead).
+      ``4.5 ≤ avg < 6.0`` → ``"slow"``
+      ``avg ≥ 6.0``       → ``"held"``
     """
     if avg_seconds < 2.0:
         return "rapid"
     if avg_seconds < 4.5:
         return "moderate"
+    if avg_seconds < 6.0:
+        return "slow"
     return "held"
 
 

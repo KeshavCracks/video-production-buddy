@@ -7,6 +7,11 @@
   "required": ["version", "cuts", "render_runtime"],
   "properties": {
     "version": { "type": "string", "const": "1.0" },
+    "music_strategy": {
+      "type": "string",
+      "enum": ["generative_loose", "library_locked", "search_align", "none"],
+      "description": "Music strategy copied from production_proposal. Use 'none' to make an approved no-background-music edit explicit; music-backed ad edits must include audio.music.volume_schedule."
+    },
     "cuts": {
       "type": "array",
       "items": {
@@ -17,6 +22,18 @@
           "source": { "type": "string", "description": "Source file path, asset-manifest ID, or 'remotion:<component>' for Remotion-native cards (e.g. remotion:tagline_card, remotion:brand_outro_card)" },
           "in_seconds": { "type": "number", "minimum": 0 },
           "out_seconds": { "type": "number", "minimum": 0 },
+          "maps_to_beat": {
+            "type": "string",
+            "description": "Production-bible beat id this cut realizes. Required by ad-video contextual validation."
+          },
+          "beat_id": {
+            "type": "string",
+            "description": "Alias for maps_to_beat when upstream artifacts use beat_id naming."
+          },
+          "beat": {
+            "type": "string",
+            "description": "Human-readable beat label copied from scene_plan.scenes[].beat when no beat_id is available."
+          },
           "speed": { "type": "number", "minimum": 0.1, "default": 1.0 },
           "layer": {
             "type": "string",

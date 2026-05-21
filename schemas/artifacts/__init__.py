@@ -89,6 +89,45 @@ def _validate_ad_video_script(data: dict[str, Any]) -> None:
                 f"{section_id!r} voice_performance missing fields: {missing}"
             )
 
+        if not isinstance(section.get("tts_directive"), dict):
+            raise jsonschema.ValidationError(
+                "ad-video script section "
+                f"{section_id!r} must include tts_directive"
+            )
+
+
+def _validate_ad_video_production_bible(data: dict[str, Any]) -> None:
+    """Enforce derived emotional rhythm data for ad-video bibles."""
+    from lib.intensity_curve import derive_intensity_curve
+
+    narrative = data.get("narrative") or {}
+    beats = narrative.get("emotional_beat_sequence") or []
+    curve = narrative.get("intensity_curve")
+    if not isinstance(curve, list) or not curve:
+        raise jsonschema.ValidationError(
+            "ad-video production_bible.narrative.intensity_curve is required"
+        )
+
+    expected = derive_intensity_curve(beats)
+    if len(curve) != len(expected):
+        raise jsonschema.ValidationError(
+            "ad-video production_bible.narrative.intensity_curve must match "
+            "lib.intensity_curve.derive_intensity_curve(emotional_beat_sequence); "
+            f"expected {len(expected)} samples, got {len(curve)}"
+        )
+
+    for idx, (actual, wanted) in enumerate(zip(curve, expected)):
+        actual_t = float(actual.get("t_seconds"))
+        actual_value = float(actual.get("value"))
+        wanted_t = float(wanted["t_seconds"])
+        wanted_value = float(wanted["value"])
+        if abs(actual_t - wanted_t) > 1e-6 or abs(actual_value - wanted_value) > 1e-6:
+            raise jsonschema.ValidationError(
+                "ad-video production_bible.narrative.intensity_curve must match "
+                "lib.intensity_curve.derive_intensity_curve(emotional_beat_sequence); "
+                f"sample {idx} expected {wanted!r}, got {actual!r}"
+            )
+
 
 def _validate_ad_video_scene_plan(data: dict[str, Any]) -> None:
     """Enforce ad-video scene metadata that needs pipeline context."""
@@ -103,6 +142,31 @@ def _validate_ad_video_scene_plan(data: dict[str, Any]) -> None:
             raise jsonschema.ValidationError(
                 "ad-video scene_plan scene "
                 f"{scene_id!r} must include product_reference_required"
+            )
+
+
+def _validate_ad_video_edit_decisions(data: dict[str, Any]) -> None:
+    """Enforce ad-video edit decisions that carry emotional rhythm to render."""
+    audio = data.get("audio")
+    music = audio.get("music") if isinstance(audio, dict) else None
+    schedule = music.get("volume_schedule") if isinstance(music, dict) else None
+    metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+    music_strategy = data.get("music_strategy") or metadata.get("music_strategy")
+    if music_strategy != "none" and (not isinstance(schedule, list) or not schedule):
+        raise jsonschema.ValidationError(
+            "ad-video edit_decisions.audio.music.volume_schedule is required"
+        )
+
+    for idx, cut in enumerate(data.get("cuts", []) or []):
+        cut_id = cut.get("id", f"cut-{idx}")
+        if not any(
+            isinstance(cut.get(field), str) and cut[field].strip()
+            for field in ("maps_to_beat", "beat_id", "beat")
+        ):
+            raise jsonschema.ValidationError(
+                "ad-video edit_decisions cut "
+                f"{cut_id!r} must include a beat label "
+                "(maps_to_beat, beat_id, or beat)"
             )
 
 
@@ -123,6 +187,14 @@ def _is_ad_video_scene_plan(pipeline_type: str | None) -> bool:
     return pipeline_type == "ad-video"
 
 
+def _is_ad_video_production_bible(data: dict[str, Any], pipeline_type: str | None) -> bool:
+    return pipeline_type == "ad-video" or data.get("pipeline") == "ad-video"
+
+
+def _is_ad_video_edit_decisions(pipeline_type: str | None) -> bool:
+    return pipeline_type == "ad-video"
+
+
 def validate_artifact(
     name: str,
     data: dict[str, Any],
@@ -132,10 +204,14 @@ def validate_artifact(
     """Validate artifact data against its schema. Raises on failure."""
     schema = load_schema(name)
     jsonschema.validate(instance=data, schema=schema)
+    if name == "production_bible" and _is_ad_video_production_bible(data, pipeline_type):
+        _validate_ad_video_production_bible(data)
     if name == "script" and _is_ad_video_script(data, pipeline_type):
         _validate_ad_video_script(data)
     if name == "scene_plan" and _is_ad_video_scene_plan(pipeline_type):
         _validate_ad_video_scene_plan(data)
+    if name == "edit_decisions" and _is_ad_video_edit_decisions(pipeline_type):
+        _validate_ad_video_edit_decisions(data)
 
 
 def list_schemas() -> list[str]:

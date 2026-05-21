@@ -81,7 +81,7 @@
         },
         "intensity_curve": {
           "type": "array",
-          "description": "Time-indexed emotional intensity curve derived from emotional_beat_sequence by lib.intensity_curve.derive_intensity_curve. Consumed by edit-director (duck schedule), audio_mixer (volume envelope), and asset-director (music-gen prompt). Optional in v1 — fall back to flat behavior when absent.",
+          "description": "Time-indexed emotional intensity curve derived from emotional_beat_sequence by lib.intensity_curve.derive_intensity_curve. Consumed by edit-director (duck schedule), audio_mixer (volume envelope), and asset-director (music-gen prompt). Required by ad-video contextual validation; legacy non-ad callers may omit it.",
           "items": {
             "type": "object",
             "required": ["t_seconds", "value"],
@@ -525,6 +525,19 @@
                     "properties": {
                       "kind": { "type": "string", "const": "beat_mapping" },
                       "beat_id": { "type": "string", "minLength": 1 }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": ["kind", "beat_id", "cuts_density", "avg_shot_duration_seconds", "transition_style"],
+                    "properties": {
+                      "kind": { "type": "string", "const": "editing_rhythm" },
+                      "beat_id": { "type": "string", "minLength": 1 },
+                      "cuts_density": { "type": "string", "enum": ["rapid", "moderate", "slow", "held"] },
+                      "avg_shot_duration_seconds": { "type": "number", "minimum": 0.1 },
+                      "transition_style": { "type": "string", "enum": ["hard_cut", "dissolve", "whip", "match_cut"] },
+                      "tolerance": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.25 }
                     },
                     "additionalProperties": false
                   }

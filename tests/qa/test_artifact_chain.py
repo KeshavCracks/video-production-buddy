@@ -186,6 +186,14 @@ PRODUCTION_BIBLE_VALID = {
              "intensity": 0.5, "script_constraint": "Deliver 'Try free at acme.com' verbatim",
              "visual_constraint": "Acme logo + CTA text on screen"},
         ],
+        "intensity_curve": [
+            {"t_seconds": 0.0, "value": 0.8},
+            {"t_seconds": 4.0, "value": 0.6},
+            {"t_seconds": 11.0, "value": 0.9},
+            {"t_seconds": 19.0, "value": 0.7},
+            {"t_seconds": 25.0, "value": 0.5},
+            {"t_seconds": 30.0, "value": 0.5},
+        ],
     },
     "intelligence": {
         "trend_alignment": {

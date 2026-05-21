@@ -258,6 +258,29 @@ def test_duck_schedule_tracks_intensity_within_window():
     assert ends[0]["gain_db"] == pytest.approx(duck_db_for_intensity(0.9))
 
 
+def test_duck_schedule_preserves_internal_curve_samples_inside_merged_window():
+    """A continuous narration bed must not flatten internal emotional peaks."""
+    curve = _curve(
+        (0.0, 0.2),
+        (12.0, 0.95),
+        (24.0, 0.35),
+        (36.0, 0.85),
+        (48.0, 0.4),
+        (60.0, 0.4),
+    )
+    schedule = derive_duck_schedule(
+        curve,
+        # Near-contiguous narration windows merge into one [2, 55] body.
+        [_window(2.0, 20.0), _window(20.4, 40.0), _window(40.2, 55.0)],
+        fade_seconds=0.3,
+    )
+
+    by_time = {round(sample["t_seconds"], 6): sample for sample in schedule}
+    for t_seconds, intensity in [(12.0, 0.95), (24.0, 0.35), (36.0, 0.85), (48.0, 0.4)]:
+        assert t_seconds in by_time, f"schedule missing internal curve boundary {t_seconds}s: {schedule}"
+        assert by_time[t_seconds]["gain_db"] == pytest.approx(duck_db_for_intensity(intensity))
+
+
 def test_duck_schedule_two_disjoint_windows_restore_between():
     curve = _curve((0.0, 0.5), (30.0, 0.5))
     schedule = derive_duck_schedule(

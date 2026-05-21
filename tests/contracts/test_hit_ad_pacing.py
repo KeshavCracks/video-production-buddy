@@ -176,7 +176,10 @@ def test_aggregate_skips_malformed_pacing_silently():
     (2.0, "moderate"),
     (3.5, "moderate"),
     (4.49, "moderate"),
-    (4.5, "held"),
+    (4.5, "slow"),
+    (5.5, "slow"),
+    (5.99, "slow"),
+    (6.0, "held"),
     (10.0, "held"),
 ])
 def test_cuts_density_band_boundaries(avg, expected):

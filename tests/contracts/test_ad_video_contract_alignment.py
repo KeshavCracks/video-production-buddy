@@ -12,6 +12,7 @@ import yaml
 
 from lib.pipeline_loader import get_required_tools
 from schemas.artifacts import validate_artifact
+from tools.compliance.compliance_check import ComplianceCheck
 from tools.validation.hallucination_contract_check import check_hallucination_contract
 from tools.validation.product_identity_consistency_check import (
     check_product_identity_consistency,
@@ -241,6 +242,10 @@ def test_ad_video_script_validation_requires_section_voice_cues() -> None:
         "pace": "measured",
         "pause_after_seconds": 0.35,
     }
+    with pytest.raises(Exception, match="tts_directive"):
+        validate_artifact("script", script, pipeline_type="ad-video")
+
+    script["sections"][0]["tts_directive"] = {"speed_mult": 0.94}
     validate_artifact("script", script, pipeline_type="ad-video")
 
 
@@ -465,6 +470,24 @@ def test_production_bible_schema_requires_truth_contract() -> None:
         validate_artifact("production_bible", bad)
 
 
+def test_production_bible_validation_requires_derived_intensity_curve() -> None:
+    """Ad-video bibles must carry the exact curve derived from emotional beats."""
+    from tests.qa.test_artifact_chain import PRODUCTION_BIBLE_VALID
+
+    bible = deepcopy(PRODUCTION_BIBLE_VALID)
+    validate_artifact("production_bible", bible)
+
+    missing = deepcopy(bible)
+    del missing["narrative"]["intensity_curve"]
+    with pytest.raises(Exception, match="intensity_curve"):
+        validate_artifact("production_bible", missing)
+
+    drifted = deepcopy(bible)
+    drifted["narrative"]["intensity_curve"][1]["value"] = 0.1
+    with pytest.raises(Exception, match="derive_intensity_curve"):
+        validate_artifact("production_bible", drifted)
+
+
 def _trend_alignment_block() -> dict:
     return {
         "selected_trend_ids": ["trend-tiktok-text-hooks"],
@@ -513,6 +536,187 @@ def test_production_bible_schema_requires_trend_alignment_block() -> None:
     unsafe["intelligence"]["trend_alignment"]["alignments"][0]["brand_safety"] = "unsafe"
     with pytest.raises(Exception):
         validate_artifact("production_bible", unsafe)
+
+
+def test_production_bible_schema_accepts_structured_editing_rhythm_checkpoint() -> None:
+    """CP-E checkpoints need a structured form so compliance_check can inspect cuts."""
+    from tests.qa.test_artifact_chain import PRODUCTION_BIBLE_VALID
+
+    bible = deepcopy(PRODUCTION_BIBLE_VALID)
+    bible["compliance_manifest"]["checkpoints"].append(
+        {
+            "id": "CP-E-STRUCTURED",
+            "applies_to_stage": "edit",
+            "description": "B3 edit rhythm",
+            "check_type": "timing",
+            "evaluation_method": "structural",
+            "criterion": "Cuts in beat B3 match rapid/match-cut rhythm",
+            "structured": {
+                "kind": "editing_rhythm",
+                "beat_id": "B3",
+                "cuts_density": "rapid",
+                "avg_shot_duration_seconds": 1.2,
+                "transition_style": "match_cut",
+                "tolerance": 0.25,
+            },
+            "source_confidence": "research-grounded",
+            "failure_action": "revise",
+        }
+    )
+
+    validate_artifact("production_bible", bible)
+
+
+def _editing_rhythm_checkpoint(**overrides: object) -> dict:
+    structured = {
+        "kind": "editing_rhythm",
+        "beat_id": "B3",
+        "cuts_density": "rapid",
+        "avg_shot_duration_seconds": 1.2,
+        "transition_style": "match_cut",
+        "tolerance": 0.25,
+    }
+    structured.update(overrides)
+    return {
+        "id": "CP-E3",
+        "applies_to_stage": "edit",
+        "description": "B3 edit rhythm",
+        "check_type": "timing",
+        "evaluation_method": "structural",
+        "criterion": "Cuts in beat B3 match rapid/match-cut rhythm",
+        "structured": structured,
+        "source_confidence": "research-grounded",
+        "failure_action": "revise",
+    }
+
+
+def test_compliance_beat_mapping_checks_edit_decision_cuts() -> None:
+    """Beat mapping is not only a scene-plan check; edit cuts must preserve it."""
+    result = ComplianceCheck().execute(
+        {
+            "stage_output": {
+                "cuts": [
+                    {
+                        "id": "cut-1",
+                        "source": "asset-1",
+                        "in_seconds": 0,
+                        "out_seconds": 1.2,
+                        "maps_to_beat": "B3",
+                    }
+                ]
+            },
+            "checkpoint": {
+                "id": "CP-E-BEAT",
+                "evaluation_method": "structural",
+                "check_type": "structural",
+                "structured": {"kind": "beat_mapping", "beat_id": "B3"},
+                "failure_action": "revise",
+            },
+        }
+    )
+
+    assert result.success is True
+    assert result.data["pass"] is True
+
+
+def test_compliance_editing_rhythm_passes_matching_cuts() -> None:
+    result = ComplianceCheck().execute(
+        {
+            "stage_output": {
+                "cuts": [
+                    {
+                        "id": "cut-1",
+                        "source": "asset-1",
+                        "in_seconds": 0.0,
+                        "out_seconds": 1.2,
+                        "maps_to_beat": "B3",
+                        "transition_out": "match_cut",
+                    },
+                    {
+                        "id": "cut-2",
+                        "source": "asset-2",
+                        "in_seconds": 1.2,
+                        "out_seconds": 2.4,
+                        "maps_to_beat": "B3",
+                        "transition_in": "match_cut",
+                    },
+                ]
+            },
+            "checkpoint": _editing_rhythm_checkpoint(),
+        }
+    )
+
+    assert result.success is True
+    assert result.data["pass"] is True
+
+
+def test_compliance_editing_rhythm_rejects_flattened_long_cuts() -> None:
+    result = ComplianceCheck().execute(
+        {
+            "stage_output": {
+                "cuts": [
+                    {
+                        "id": "cut-1",
+                        "source": "asset-1",
+                        "in_seconds": 0.0,
+                        "out_seconds": 7.4,
+                        "maps_to_beat": "B3",
+                        "transition_out": "dissolve",
+                    },
+                    {
+                        "id": "cut-2",
+                        "source": "asset-2",
+                        "in_seconds": 7.4,
+                        "out_seconds": 15.2,
+                        "maps_to_beat": "B3",
+                        "transition_in": "dissolve",
+                    },
+                ]
+            },
+            "checkpoint": _editing_rhythm_checkpoint(),
+        }
+    )
+
+    assert result.success is True
+    assert result.data["pass"] is False
+    assert "avg_shot_duration_seconds" in result.data["deviation"]
+    assert "transition_style" in result.data["deviation"]
+
+
+def test_compliance_editing_rhythm_accepts_schema_valid_slow_density() -> None:
+    result = ComplianceCheck().execute(
+        {
+            "stage_output": {
+                "cuts": [
+                    {
+                        "id": "cut-1",
+                        "source": "asset-1",
+                        "in_seconds": 0.0,
+                        "out_seconds": 4.5,
+                        "maps_to_beat": "B3",
+                        "transition_out": "match_cut",
+                    },
+                    {
+                        "id": "cut-2",
+                        "source": "asset-2",
+                        "in_seconds": 4.5,
+                        "out_seconds": 9.0,
+                        "maps_to_beat": "B3",
+                        "transition_in": "match_cut",
+                    },
+                ]
+            },
+            "checkpoint": _editing_rhythm_checkpoint(
+                cuts_density="slow",
+                avg_shot_duration_seconds=4.5,
+                transition_style="match_cut",
+                tolerance=0.10,
+            ),
+        }
+    )
+
+    assert result.success is True
+    assert result.data["pass"] is True
 
 
 def test_script_trend_alignment_requires_hook_build_source_refs() -> None:
@@ -567,6 +771,7 @@ def test_script_schema_accepts_multiple_source_refs_per_section() -> None:
                 ],
                 "speaker_directions": "Measured and immediate.",
                 "voice_performance": voice_performance,
+                "tts_directive": {"speed_mult": 0.96},
             }
         ],
     }
@@ -1798,6 +2003,21 @@ def test_ad_video_directors_reference_current_contract_names() -> None:
 
     assert "production_bible.kvms" not in animated_scene
     assert "production_bible.visual.key_visual_moments" in animated_scene
+
+
+def test_ad_video_scene_and_edit_directors_enforce_editing_rhythm_contract() -> None:
+    scene = _read_skill("scene-director.md")
+    edit = _read_skill("edit-director.md")
+
+    assert "production_bible.visual.editing_rhythm" in scene
+    assert "scene count" in scene
+    assert "scene duration" in scene
+    assert "transition_style" in scene
+
+    assert "production_bible.visual.editing_rhythm" in edit
+    assert "maps_to_beat" in edit
+    assert "scene.get(\"beat\")" in edit or "scene.beat" in edit
+    assert "audio.music.volume_schedule" in edit
 
 
 def test_ad_video_contract_mentions_product_identity_reference_flow() -> None:

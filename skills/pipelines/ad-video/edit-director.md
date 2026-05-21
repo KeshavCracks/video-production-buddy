@@ -110,9 +110,17 @@ For each scene in `scene_plan.scenes[]`:
 2. Set `in_seconds` to the cumulative offset from scene durations.
 3. Set `out_seconds` to `in_seconds + scene.duration_seconds`.
 4. Set `source` to an asset ID/path from `asset_manifest`, or `remotion:<component>` for generated component scenes.
-5. Copy registry props from the scene into the cut (`text`, `subtitle`, `brandName`, `ctaText`, `productImage`, `hardwareTreatment`, `banners`, `sidebarItems`, etc.). For `creator_workflow_scene`, `productImage` must be the approved `product_identity_reference.selected_reference_image_path`; do not leave it blank and do not substitute generic laptop hardware.
-6. Put narration timing under `audio.narration.segments[]` using asset IDs from `asset_manifest`.
-7. Verify: each narration segment duration is ≤ its scene duration.
+5. Preserve beat identity on the cut. Prefer `maps_to_beat = scene.get("maps_to_beat")`;
+   otherwise copy `beat_id = scene.get("beat_id")` or `beat = scene.get("beat")`.
+   Do not submit any ad-video cut without one of these fields.
+6. Apply `production_bible.visual.editing_rhythm` to the cut timing and
+   transitions: average cut duration, cut density, and `transition_style` must
+   match the rhythm entry for that beat. Split or combine scene-level material
+   as needed before asset generation; do not let rapid beats collapse into long
+   holds.
+7. Copy registry props from the scene into the cut (`text`, `subtitle`, `brandName`, `ctaText`, `productImage`, `hardwareTreatment`, `banners`, `sidebarItems`, etc.). For `creator_workflow_scene`, `productImage` must be the approved `product_identity_reference.selected_reference_image_path`; do not leave it blank and do not substitute generic laptop hardware.
+8. Put narration timing under `audio.narration.segments[]` using asset IDs from `asset_manifest`.
+9. Verify: each narration segment duration is ≤ its scene duration.
 
 ## Edit Decisions Artifact Format
 
@@ -120,6 +128,7 @@ For each scene in `scene_plan.scenes[]`:
 {
   "version": "1.0",
   "render_runtime": "remotion",
+  "music_strategy": "generative_loose",
   "renderer_family": "product-reveal",
   "total_duration_seconds": 11.0,
   "cuts": [
@@ -128,6 +137,7 @@ For each scene in `scene_plan.scenes[]`:
       "source": "v01",
       "in_seconds": 0.0,
       "out_seconds": 5.0,
+      "maps_to_beat": "B1",
       "type": "text_card",
       "text": "45 minutes. Gone.",
       "transition_out": "cut",
@@ -138,6 +148,7 @@ For each scene in `scene_plan.scenes[]`:
       "source": "remotion:stat_card",
       "in_seconds": 5.0,
       "out_seconds": 11.0,
+      "maps_to_beat": "B2",
       "type": "stat_card",
       "stat": "4 HRS",
       "subtitle": "back every week",
@@ -157,7 +168,12 @@ For each scene in `scene_plan.scenes[]`:
     "music": {
       "asset_id": "m01",
       "volume": 0.3,
-      "volume_schedule": []
+      "volume_schedule": [
+        {"t_seconds": 0.0, "gain_db": 0.0},
+        {"t_seconds": 0.3, "gain_db": -14.0},
+        {"t_seconds": 10.7, "gain_db": -14.0},
+        {"t_seconds": 11.0, "gain_db": 0.0}
+      ]
     }
   },
   "subtitles": {
@@ -174,6 +190,11 @@ For each scene in `scene_plan.scenes[]`:
   }
 }
 ```
+
+If `production_proposal.music_strategy == "none"`, set
+`edit_decisions.music_strategy = "none"` and omit `audio.music` entirely. Do not
+fabricate `audio.music.volume_schedule` for a no-background-music edit; there is
+no music bed to duck.
 
 ## Derivative Edit Specifications
 
@@ -208,6 +229,8 @@ with one entry per opted-in variant:
 
 - [ ] Timeline covers 0.0 to `total_duration_seconds` with no gaps
 - [ ] All `cuts[].source` and `audio.narration.segments[].asset_id` references resolve through `asset_manifest`
+- [ ] Every cut carries `maps_to_beat`, `beat_id`, or `beat` copied from the scene plan
+- [ ] `cuts[]` average durations, cut density, and transitions satisfy `production_bible.visual.editing_rhythm`
 - [ ] If `production_bible.narrative.intensity_curve` is **absent** (legacy briefs):
       `audio.music.ducking` covers all narration windows AND duck depth matches `audio_contract.duck_depth_db`
 - [ ] If `production_bible.narrative.intensity_curve` is **present** (Path B):

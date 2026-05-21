@@ -15,6 +15,7 @@ from tools.base_tool import (
 )
 
 from lib.constants import WORDS_PER_MINUTE_VO
+from lib.hit_ad_pacing import cuts_density_from_shot_duration
 
 # VO pacing assumption per spec §9 — sourced from lib.constants so
 # lib/hook_window.py and this module can never silently diverge. Tests pin
@@ -126,6 +127,7 @@ class ComplianceCheck(BaseTool):
             "timing": self._check_structured_timing,
             "presence": self._check_structured_presence,
             "beat_mapping": self._check_structured_beat_mapping,
+            "editing_rhythm": self._check_structured_editing_rhythm,
         }
         handler = dispatch.get(kind)
         if handler is None:
@@ -208,20 +210,119 @@ class ComplianceCheck(BaseTool):
             raise _StructuredCriterionError(
                 "beat_mapping structured criterion requires 'beat_id'"
             )
-        scenes = stage_output.get("scenes", []) or stage_output.get("sections", [])
+        scenes = _stage_entries(stage_output)
         matched = [
             s for s in scenes
-            if (
-                s.get("maps_to_beat") == beat_id
-                or s.get("beat_id") == beat_id
-                or s.get("beat") == beat_id
-            )
+            if _entry_maps_to_beat(s, beat_id)
         ]
         passed = len(matched) > 0
         return {
             "pass": passed,
             "actual_value": f"{len(matched)} entry(ies) mapped to beat {beat_id}",
-            "deviation": (None if passed else f"No scene/section mapped to beat {beat_id}"),
+            "deviation": (None if passed else f"No scene/section/cut mapped to beat {beat_id}"),
+        }
+
+    def _check_structured_editing_rhythm(self, stage_output: dict, structured: dict) -> dict:
+        """Verify edit_decisions.cuts[] match the bible's editing_rhythm entry."""
+        try:
+            beat_id = structured["beat_id"]
+            target_avg = float(structured["avg_shot_duration_seconds"])
+            expected_density = str(structured["cuts_density"])
+            expected_transition = _normalize_transition_style(
+                str(structured["transition_style"])
+            )
+            tolerance = float(structured.get("tolerance", 0.25))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise _StructuredCriterionError(
+                "editing_rhythm structured criterion is missing or has invalid fields "
+                "(beat_id, cuts_density, avg_shot_duration_seconds, transition_style, "
+                f"optional tolerance): {exc}"
+            ) from exc
+
+        if target_avg <= 0:
+            raise _StructuredCriterionError(
+                "editing_rhythm avg_shot_duration_seconds must be > 0"
+            )
+        if not 0 <= tolerance <= 1:
+            raise _StructuredCriterionError(
+                "editing_rhythm tolerance must be between 0 and 1"
+            )
+
+        cuts = _stage_cuts(stage_output)
+        matched = [cut for cut in cuts if _entry_maps_to_beat(cut, beat_id)]
+        if not matched:
+            return {
+                "pass": False,
+                "actual_value": "0 cut(s)",
+                "deviation": f"No edit_decisions.cuts[] mapped to beat {beat_id}",
+            }
+
+        durations: list[float] = []
+        invalid_duration_ids: list[str] = []
+        for cut in matched:
+            start = cut.get("in_seconds")
+            end = cut.get("out_seconds")
+            if (
+                not isinstance(start, (int, float))
+                or not isinstance(end, (int, float))
+                or end <= start
+            ):
+                invalid_duration_ids.append(str(cut.get("id", "<unknown>")))
+                continue
+            durations.append(float(end) - float(start))
+
+        if not durations:
+            return {
+                "pass": False,
+                "actual_value": f"{len(matched)} cut(s)",
+                "deviation": (
+                    "No valid cut durations for beat "
+                    f"{beat_id}; invalid cut ids: {invalid_duration_ids}"
+                ),
+            }
+
+        actual_avg = sum(durations) / len(durations)
+        actual_density = cuts_density_from_shot_duration(actual_avg)
+        observed_transitions = sorted(
+            {
+                _normalize_transition_style(style)
+                for cut in matched
+                for style in (cut.get("transition_in"), cut.get("transition_out"))
+                if isinstance(style, str) and style.strip()
+            }
+        )
+
+        tolerance_seconds = target_avg * tolerance
+        deviations: list[str] = []
+        if abs(actual_avg - target_avg) > tolerance_seconds:
+            deviations.append(
+                "avg_shot_duration_seconds "
+                f"{actual_avg:.2f}s vs target {target_avg:.2f}s "
+                f"(tolerance ±{tolerance_seconds:.2f}s)"
+            )
+        if actual_density != expected_density:
+            deviations.append(
+                f"cuts_density {actual_density!r} vs expected {expected_density!r}"
+            )
+        if not observed_transitions:
+            deviations.append(
+                f"transition_style missing; expected {expected_transition!r}"
+            )
+        elif any(style != expected_transition for style in observed_transitions):
+            deviations.append(
+                "transition_style "
+                f"{observed_transitions!r} vs expected {expected_transition!r}"
+            )
+
+        return {
+            "pass": not deviations,
+            "actual_value": {
+                "cut_count": len(matched),
+                "avg_shot_duration_seconds": round(actual_avg, 3),
+                "cuts_density": actual_density,
+                "transition_styles": observed_transitions,
+            },
+            "deviation": None if not deviations else "; ".join(deviations),
         }
 
     def _check_timing(self, stage_output: dict, checkpoint: dict) -> dict:
@@ -315,12 +416,59 @@ class ComplianceCheck(BaseTool):
         if not beat_match:
             return self._check_presence(stage_output, checkpoint)
         target_beat = beat_match.group(1)
-        scenes = stage_output.get("scenes", [])
+        scenes = _stage_entries(stage_output)
         matched = [s for s in scenes
-                   if s.get("maps_to_beat") == target_beat or s.get("beat_id") == target_beat]
+                   if _entry_maps_to_beat(s, target_beat)]
         passed = len(matched) > 0
         return {
             "pass": passed,
-            "actual_value": f"{len(matched)} scene(s) mapped to beat {target_beat}",
-            "deviation": (None if passed else f"No scene found mapped to beat {target_beat}"),
+            "actual_value": f"{len(matched)} entry(ies) mapped to beat {target_beat}",
+            "deviation": (None if passed else f"No scene/section/cut found mapped to beat {target_beat}"),
         }
+
+
+def _entry_maps_to_beat(entry: dict[str, Any], beat_id: str) -> bool:
+    return (
+        entry.get("maps_to_beat") == beat_id
+        or entry.get("beat_id") == beat_id
+        or entry.get("beat") == beat_id
+    )
+
+
+def _stage_cuts(stage_output: dict[str, Any]) -> list[dict[str, Any]]:
+    cuts = stage_output.get("cuts")
+    if isinstance(cuts, list):
+        return [cut for cut in cuts if isinstance(cut, dict)]
+
+    edit_decisions = stage_output.get("edit_decisions")
+    if isinstance(edit_decisions, dict) and isinstance(edit_decisions.get("cuts"), list):
+        return [cut for cut in edit_decisions["cuts"] if isinstance(cut, dict)]
+
+    return []
+
+
+def _stage_entries(stage_output: dict[str, Any]) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for key in ("scenes", "sections", "cuts"):
+        value = stage_output.get(key)
+        if isinstance(value, list):
+            entries.extend(item for item in value if isinstance(item, dict))
+
+    edit_decisions = stage_output.get("edit_decisions")
+    if isinstance(edit_decisions, dict) and isinstance(edit_decisions.get("cuts"), list):
+        entries.extend(item for item in edit_decisions["cuts"] if isinstance(item, dict))
+
+    return entries
+
+
+def _normalize_transition_style(style: str) -> str:
+    normalized = style.strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "cut": "hard_cut",
+        "hardcut": "hard_cut",
+        "hard_cut": "hard_cut",
+        "match": "match_cut",
+        "matchcut": "match_cut",
+        "match_cut": "match_cut",
+    }
+    return aliases.get(normalized, normalized)

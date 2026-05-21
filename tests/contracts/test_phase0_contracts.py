@@ -308,6 +308,64 @@ class TestSchemas:
         }
         validate_artifact("edit_decisions", artifact)
 
+    def test_ad_video_edit_decisions_accept_cut_beat_labels_and_volume_schedule(self):
+        artifact = {
+            "version": "1.0",
+            "render_runtime": "remotion",
+            "music_strategy": "generative_loose",
+            "cuts": [
+                {
+                    "id": "cut-1",
+                    "source": "asset-1",
+                    "in_seconds": 0,
+                    "out_seconds": 1.2,
+                    "maps_to_beat": "B3",
+                    "transition_out": "match_cut",
+                },
+            ],
+            "audio": {
+                "music": {
+                    "asset_id": "music-1",
+                    "volume_schedule": [
+                        {"t_seconds": 0.0, "gain_db": 0.0},
+                        {"t_seconds": 0.3, "gain_db": -11.2},
+                        {"t_seconds": 1.2, "gain_db": -11.2},
+                        {"t_seconds": 1.5, "gain_db": 0.0},
+                    ],
+                }
+            },
+        }
+
+        validate_artifact("edit_decisions", artifact, pipeline_type="ad-video")
+
+    def test_ad_video_edit_decisions_allow_no_music_without_volume_schedule(self):
+        artifact = {
+            "version": "1.0",
+            "render_runtime": "remotion",
+            "music_strategy": "none",
+            "cuts": [
+                {
+                    "id": "cut-1",
+                    "source": "asset-1",
+                    "in_seconds": 0,
+                    "out_seconds": 1.2,
+                    "maps_to_beat": "B3",
+                },
+            ],
+            "audio": {
+                "narration": {
+                    "segments": [
+                        {"asset_id": "narr-1", "start_seconds": 0, "end_seconds": 1.1},
+                    ],
+                },
+                "sfx": [
+                    {"asset_id": "sfx-1", "start_seconds": 0.8, "volume": 0.5},
+                ],
+            },
+        }
+
+        validate_artifact("edit_decisions", artifact, pipeline_type="ad-video")
+
     def test_edit_decisions_rejects_volume_schedule_missing_gain_db(self):
         """volume_schedule items must carry gain_db (no default)."""
         artifact = {
@@ -522,6 +580,136 @@ class TestCheckpoint:
                 },
                 pipeline_type="ad-video",
             )
+
+    def test_ad_video_script_checkpoint_requires_tts_directive(self, tmp_path):
+        with pytest.raises(CheckpointValidationError, match="tts_directive"):
+            write_checkpoint(
+                tmp_path,
+                "proj",
+                "script",
+                "completed",
+                {
+                    "script": {
+                        "version": "1.0",
+                        "title": "Missing TTS Directive",
+                        "total_duration_seconds": 5,
+                        "sections": [
+                            {
+                                "id": "hook",
+                                "text": "A sparse ad-video line.",
+                                "start_seconds": 0,
+                                "end_seconds": 5,
+                                "speaker_directions": "Measured and intimate.",
+                                "voice_performance": {
+                                    "emotion": "intrigue",
+                                    "intonation": "soft rise, clean resolve",
+                                    "rhythm": "short phrase with a breath before the claim",
+                                    "pace": "measured",
+                                    "pause_after_seconds": 0.25,
+                                },
+                            }
+                        ],
+                    }
+                },
+                pipeline_type="ad-video",
+            )
+
+    def test_ad_video_edit_checkpoint_requires_volume_schedule(self, tmp_path):
+        with pytest.raises(CheckpointValidationError, match="volume_schedule"):
+            write_checkpoint(
+                tmp_path,
+                "proj",
+                "edit",
+                "completed",
+                {
+                    "edit_decisions": {
+                        "version": "1.0",
+                        "render_runtime": "remotion",
+                        "cuts": [
+                            {
+                                "id": "cut-1",
+                                "source": "asset-1",
+                                "in_seconds": 0,
+                                "out_seconds": 1.2,
+                                "maps_to_beat": "B3",
+                            }
+                        ],
+                    }
+                },
+                pipeline_type="ad-video",
+            )
+
+    def test_ad_video_edit_checkpoint_requires_cut_beat_labels(self, tmp_path):
+        with pytest.raises(CheckpointValidationError, match="beat"):
+            write_checkpoint(
+                tmp_path,
+                "proj",
+                "edit",
+                "completed",
+                {
+                    "edit_decisions": {
+                        "version": "1.0",
+                        "render_runtime": "remotion",
+                        "cuts": [
+                            {
+                                "id": "cut-1",
+                                "source": "asset-1",
+                                "in_seconds": 0,
+                                "out_seconds": 1.2,
+                            }
+                        ],
+                        "audio": {
+                            "music": {
+                                "volume_schedule": [
+                                    {"t_seconds": 0.0, "gain_db": 0.0},
+                                    {"t_seconds": 0.3, "gain_db": -11.2},
+                                    {"t_seconds": 1.2, "gain_db": -11.2},
+                                    {"t_seconds": 1.5, "gain_db": 0.0},
+                                ],
+                            }
+                        },
+                    }
+                },
+                pipeline_type="ad-video",
+            )
+
+    def test_ad_video_edit_checkpoint_allows_no_music_strategy_none(self, tmp_path):
+        path = write_checkpoint(
+            tmp_path,
+            "proj",
+            "edit",
+            "completed",
+            {
+                "edit_decisions": {
+                    "version": "1.0",
+                    "render_runtime": "remotion",
+                    "music_strategy": "none",
+                    "cuts": [
+                        {
+                            "id": "cut-1",
+                            "source": "asset-1",
+                            "in_seconds": 0,
+                            "out_seconds": 1.2,
+                            "maps_to_beat": "B3",
+                        }
+                    ],
+                    "audio": {
+                        "narration": {
+                            "segments": [
+                                {
+                                    "asset_id": "narr-1",
+                                    "start_seconds": 0,
+                                    "end_seconds": 1.1,
+                                },
+                            ],
+                        }
+                    },
+                }
+            },
+            pipeline_type="ad-video",
+        )
+
+        assert path.exists()
 
     def test_invalid_canonical_artifact_rejected(self, tmp_path):
         with pytest.raises(CheckpointValidationError):

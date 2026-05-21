@@ -468,6 +468,24 @@ the parser and reported a "content failure" that wasn't.
   },
   ...
 }
+
+// editing rhythm → structured form for CP-E checks against edit_decisions.cuts[]
+{
+  "id": "CP-E3",
+  "applies_to_stage": "edit",
+  "check_type": "timing",
+  "evaluation_method": "structural",
+  "criterion": "Cuts in beat B3 match rapid/match-cut rhythm",
+  "structured": {
+    "kind": "editing_rhythm",
+    "beat_id": "B3",
+    "cuts_density": "rapid",
+    "avg_shot_duration_seconds": 1.2,
+    "transition_style": "match_cut",
+    "tolerance": 0.25
+  },
+  ...
+}
 ```
 
 Semantic checkpoints (`evaluation_method == "semantic"`) do NOT emit a
