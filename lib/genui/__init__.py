@@ -69,8 +69,13 @@ def _field_default(field: dict[str, Any]) -> Any:
     if "default" in field:
         return field["default"]
     field_type = field.get("type")
+    choices = field.get("choices") or []
     if field_type == "multiselect":
-        return []
+        return [choice["value"] for choice in choices if choice.get("recommended")]
+    if field_type in {"radio", "select"}:
+        for choice in choices:
+            if choice.get("recommended"):
+                return choice["value"]
     if field_type == "checkbox":
         return False
     return ""
@@ -168,7 +173,7 @@ def _render_field(field: dict[str, Any]) -> str:
     )
 
 
-def render_form_html(config: dict[str, Any], *, submit_url: str = "/submit") -> str:
+def render_form_html(config: dict[str, Any], *, submit_url: str | None = None) -> str:
     """Render a self-contained HTML form for a GenUI config."""
     validate_config(config)
     fields = [
@@ -194,14 +199,26 @@ def render_form_html(config: dict[str, Any], *, submit_url: str = "/submit") -> 
             "</section>"
         )
 
+    preview_notice = ""
+    if submit_url is None:
+        preview_notice = "Preview only. Start GenUI in serve mode to submit this form."
+
     actions = []
     for action in config["submit_actions"]:
         recommended = " recommended" if action.get("recommended") else ""
-        actions.append(
-            f"<button type=\"button\" class=\"action{recommended}\" "
-            f"onclick=\"submitGenUI('{escape(action['kind'], quote=True)}')\">"
-            f"{escape(str(action['label']))}</button>"
-        )
+        label = escape(str(action["label"]))
+        if submit_url is None:
+            actions.append(
+                f"<button type=\"button\" class=\"action{recommended}\" disabled "
+                "title=\"Start GenUI in serve mode to submit this form\">"
+                f"{label}</button>"
+            )
+        else:
+            actions.append(
+                f"<button type=\"button\" class=\"action{recommended}\" "
+                f"onclick=\"submitGenUI('{escape(action['kind'], quote=True)}')\">"
+                f"{label}</button>"
+            )
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -234,6 +251,7 @@ def render_form_html(config: dict[str, Any], *, submit_url: str = "/submit") -> 
     .info-card {{ border: 1px solid #b8c2cf; border-radius: 8px; background: #f8fafc; padding: 14px; }}
     .actions {{ display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; position: sticky; bottom: 0; padding: 16px 0; background: #f6f7f9; }}
     button.action {{ border: 1px solid #1f2937; background: #ffffff; color: #111827; border-radius: 6px; padding: 10px 14px; font: inherit; font-weight: 700; cursor: pointer; }}
+    button.action:disabled {{ cursor: not-allowed; opacity: 0.55; }}
     button.recommended {{ background: #111827; color: #ffffff; }}
     #status {{ min-height: 22px; color: #0f766e; font-weight: 650; }}
     @media (max-width: 640px) {{ main {{ width: min(100vw - 20px, 1040px); margin: 20px auto; }} .section {{ padding: 16px; }} .actions {{ justify-content: stretch; }} button.action {{ flex: 1 1 100%; }} }}
@@ -247,7 +265,7 @@ def render_form_html(config: dict[str, Any], *, submit_url: str = "/submit") -> 
   </header>
   <form id="genui-form">
     {''.join(sections)}
-    <div id="status" role="status"></div>
+    <div id="status" role="status">{preview_notice}</div>
     <div class="actions">
       {''.join(actions)}
     </div>
@@ -258,6 +276,12 @@ const GENUI_FIELDS = {fields_json};
 const SUBMIT_URL = {json.dumps(submit_url)};
 async function submitGenUI(action) {{
   const form = document.getElementById('genui-form');
+  const status = document.getElementById('status');
+  if (!SUBMIT_URL) {{
+    status.textContent = 'Preview only. Start GenUI in serve mode to submit this form.';
+    return;
+  }}
+  if (!form.reportValidity()) return;
   const formData = new FormData(form);
   const values = {{}};
   for (const field of GENUI_FIELDS) {{
@@ -270,7 +294,10 @@ async function submitGenUI(action) {{
     }}
   }}
   const payload = {{ action, values, browser_events: [] }};
-  const status = document.getElementById('status');
+  const buttons = document.querySelectorAll('button.action');
+  buttons.forEach((button) => button.disabled = true);
+  status.style.color = '#0f766e';
+  status.textContent = 'Submitting...';
   try {{
     const response = await fetch(SUBMIT_URL, {{
       method: 'POST',
@@ -282,6 +309,7 @@ async function submitGenUI(action) {{
   }} catch (error) {{
     status.textContent = 'Submission failed: ' + error.message;
     status.style.color = '#b91c1c';
+    buttons.forEach((button) => button.disabled = false);
   }}
 }}
 </script>

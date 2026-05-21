@@ -14,6 +14,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from lib.genui import render_form_html, response_payload_from_submission, write_response
 
@@ -22,11 +23,43 @@ class GenUIRequestHandler(BaseHTTPRequestHandler):
     config: dict[str, Any]
     response_path: Path
 
+    def _is_allowed_origin(self, origin: str | None) -> bool:
+        if origin is None:
+            return True
+        if origin == "null":
+            return True
+
+        parsed = urlparse(origin)
+        if parsed.scheme != "http":
+            return False
+        try:
+            hostname = parsed.hostname
+            origin_port = parsed.port or 80
+        except ValueError:
+            return False
+        if hostname not in {"127.0.0.1", "localhost", "::1"}:
+            return False
+        return origin_port == self.server.server_address[1]
+
+    def _cors_headers(self) -> dict[str, str]:
+        origin = self.headers.get("Origin")
+        if origin is None or not self._is_allowed_origin(origin):
+            return {}
+
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+            "Vary": "Origin",
+        }
+
     def _send(self, status: HTTPStatus, body: str, content_type: str) -> None:
         encoded = body.encode("utf-8")
         self.send_response(status.value)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(encoded)))
+        for header, value in self._cors_headers().items():
+            self.send_header(header, value)
         self.end_headers()
         self.wfile.write(encoded)
 
@@ -34,15 +67,30 @@ class GenUIRequestHandler(BaseHTTPRequestHandler):
         if self.path not in {"/", "/form"}:
             self._send(HTTPStatus.NOT_FOUND, "Not found", "text/plain; charset=utf-8")
             return
+        if not self._is_allowed_origin(self.headers.get("Origin")):
+            self._send(HTTPStatus.FORBIDDEN, "Forbidden origin", "text/plain; charset=utf-8")
+            return
         self._send(
             HTTPStatus.OK,
             render_form_html(self.config, submit_url="/submit"),
             "text/html; charset=utf-8",
         )
 
+    def do_OPTIONS(self) -> None:
+        if self.path != "/submit":
+            self._send(HTTPStatus.NOT_FOUND, "Not found", "text/plain; charset=utf-8")
+            return
+        if not self._is_allowed_origin(self.headers.get("Origin")):
+            self._send(HTTPStatus.FORBIDDEN, "Forbidden origin", "text/plain; charset=utf-8")
+            return
+        self._send(HTTPStatus.NO_CONTENT, "", "text/plain; charset=utf-8")
+
     def do_POST(self) -> None:
         if self.path != "/submit":
             self._send(HTTPStatus.NOT_FOUND, "Not found", "text/plain; charset=utf-8")
+            return
+        if not self._is_allowed_origin(self.headers.get("Origin")):
+            self._send(HTTPStatus.FORBIDDEN, "Forbidden origin", "text/plain; charset=utf-8")
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))

@@ -125,6 +125,15 @@ def test_render_form_html_does_not_submit_info_card_fields():
     ]
 
 
+def test_render_form_html_preselects_recommended_radio_when_default_missing():
+    from lib.genui import render_form_html
+
+    html = render_form_html(_sample_config())
+
+    assert 'value="cinematic" checked' in html
+    assert 'value="animated" checked' not in html
+
+
 def test_project_path_containment_rejects_parent_escape(tmp_path: Path):
     from lib.genui import resolve_project_path
 
@@ -219,7 +228,12 @@ def test_genui_form_tool_prepare_mode_returns_reviewable_paths(tmp_path: Path):
     assert result.data["server_state"] == "prepared"
     assert result.data["url"] is None
     assert Path(result.data["config_path"]).exists()
-    assert Path(result.data["html_path"]).exists()
+    html_path = Path(result.data["html_path"])
+    assert html_path.exists()
+    html = html_path.read_text()
+    assert "Preview only" in html
+    assert "const SUBMIT_URL = null;" in html
+    assert "disabled" in html
     assert result.data["response_path"].endswith("response.json")
     assert "enriched_brief" not in [Path(p).name for p in result.artifacts]
 
@@ -242,6 +256,146 @@ def test_genui_form_tool_serve_mode_reports_port_conflict(tmp_path: Path):
 
     assert not result.success
     assert "ready" in (result.error or "")
+
+
+def test_genui_form_serve_mode_static_preview_posts_to_live_server(tmp_path: Path):
+    from tools.interaction.genui_form import GenUIForm
+
+    result = GenUIForm().execute(
+        {
+            "project_dir": str(tmp_path / "projects" / "demo-ad"),
+            "config": _sample_config(project_id="demo-ad"),
+            "mode": "serve",
+        }
+    )
+
+    assert result.success, result.error
+    url = result.data["url"].rstrip("/")
+    submit_url = f"{url}/submit"
+    html = Path(result.data["html_path"]).read_text()
+
+    assert f'const SUBMIT_URL = "{submit_url}";' in html
+
+    preflight = urllib.request.Request(
+        submit_url,
+        method="OPTIONS",
+        headers={
+            "Origin": "null",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    with urllib.request.urlopen(preflight, timeout=2.0) as response:
+        assert response.status == 204
+        assert response.headers["Access-Control-Allow-Origin"] == "null"
+
+    same_origin_preflight = urllib.request.Request(
+        submit_url,
+        method="OPTIONS",
+        headers={
+            "Origin": url,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    with urllib.request.urlopen(same_origin_preflight, timeout=2.0) as response:
+        assert response.status == 204
+        assert response.headers["Access-Control-Allow-Origin"] == url
+
+    payload = (
+        b'{"action":"approve","values":{'
+        b'"product_model":"OPPO Find X9 Pro",'
+        b'"visual_approach":"cinematic",'
+        b'"derivatives":["9:16"]'
+        b"}}"
+    )
+    request = urllib.request.Request(
+        submit_url,
+        data=payload,
+        method="POST",
+        headers={"Content-Type": "application/json", "Origin": "null"},
+    )
+    with urllib.request.urlopen(request, timeout=2.0) as response:
+        assert response.status == 200
+        assert response.headers["Access-Control-Allow-Origin"] == "null"
+
+    response_payload = json.loads(Path(result.data["response_path"]).read_text())
+    assert response_payload["action"] == "approve"
+    assert response_payload["values"]["visual_approach"] == "cinematic"
+
+
+def test_genui_form_serve_mode_rejects_untrusted_browser_origin(tmp_path: Path):
+    from tools.interaction.genui_form import GenUIForm
+
+    result = GenUIForm().execute(
+        {
+            "project_dir": str(tmp_path / "projects" / "demo-ad"),
+            "config": _sample_config(project_id="demo-ad"),
+            "mode": "serve",
+        }
+    )
+
+    assert result.success, result.error
+    submit_url = f"{result.data['url'].rstrip('/')}/submit"
+    response_path = Path(result.data["response_path"])
+    payload = (
+        b'{"action":"approve","values":{'
+        b'"product_model":"OPPO Find X9 Pro",'
+        b'"visual_approach":"cinematic",'
+        b'"derivatives":["9:16"]'
+        b"}}"
+    )
+
+    try:
+        preflight = urllib.request.Request(
+            submit_url,
+            method="OPTIONS",
+            headers={
+                "Origin": "https://example.test",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type",
+            },
+        )
+        with pytest.raises(urllib.error.HTTPError) as preflight_error:
+            urllib.request.urlopen(preflight, timeout=2.0)
+        assert preflight_error.value.code == 403
+
+        malformed_preflight = urllib.request.Request(
+            submit_url,
+            method="OPTIONS",
+            headers={
+                "Origin": "http://localhost:not-a-port",
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type",
+            },
+        )
+        with pytest.raises(urllib.error.HTTPError) as malformed_preflight_error:
+            urllib.request.urlopen(malformed_preflight, timeout=2.0)
+        assert malformed_preflight_error.value.code == 403
+
+        request = urllib.request.Request(
+            submit_url,
+            data=payload,
+            method="POST",
+            headers={"Content-Type": "application/json", "Origin": "https://example.test"},
+        )
+        with pytest.raises(urllib.error.HTTPError) as post_error:
+            urllib.request.urlopen(request, timeout=2.0)
+        assert post_error.value.code == 403
+        assert not response_path.exists()
+    finally:
+        if not response_path.exists():
+            shutdown_request = urllib.request.Request(
+                submit_url,
+                data=payload,
+                method="POST",
+                headers={"Content-Type": "application/json", "Origin": "null"},
+            )
+            try:
+                with urllib.request.urlopen(shutdown_request, timeout=2.0) as response:
+                    assert response.status == 200
+            except OSError:
+                pass
 
 
 def test_genui_form_server_stops_after_successful_submission(tmp_path: Path):

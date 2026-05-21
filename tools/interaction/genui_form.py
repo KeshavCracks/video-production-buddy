@@ -11,7 +11,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from lib.genui import write_form_bundle
+from lib.genui import render_form_html, write_form_bundle
 from tools.base_tool import BaseTool, ToolResult, ToolRuntime, ToolStability, ToolTier
 
 
@@ -186,6 +186,9 @@ class GenUIForm(BaseTool):
                 port = int(inputs.get("port") or 0)
                 if port == 0:
                     port = self._choose_port(host)
+                submit_url = f"http://{host}:{port}/submit"
+                with open(bundle.html_path, "w") as f:
+                    f.write(render_form_html(config, submit_url=submit_url))
                 process = self._start_server(bundle, host, port)
                 try:
                     self._wait_until_ready(process, host, port)
