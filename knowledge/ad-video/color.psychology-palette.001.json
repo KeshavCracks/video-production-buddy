@@ -1,0 +1,76 @@
+{
+  "card_id": "color.psychology-palette.001",
+  "version": "1.0",
+  "domain": "color_theory",
+  "summary": "Color is the fastest emotional signal in video. Palette temperature, saturation, and contrast shape how the viewer feels before they process any text or narration.",
+  "principles": [
+    "Every palette has a temperature: warm tones (amber, orange, red) signal comfort, energy, and appetite; cool tones (blue, teal, gray) signal precision, premium, and calm.",
+    "Saturation communicates intensity: high saturation = energy, urgency, youth; low saturation = sophistication, heritage, quiet confidence.",
+    "Complementary color pairs (opposite on the wheel) create visual tension and attention; analogous palettes (adjacent) create harmony and immersion.",
+    "The product color should anchor the palette or intentionally break from it — never drift accidentally.",
+    "Color transitions between beats signal emotional shifts: desaturated problem → saturated solution is the most powerful visual before/after.",
+    "Background color should support the product, not compete with it. Neutral or tonal backgrounds let the product dominate.",
+    "CTA frames should use the highest-contrast color pairing in the palette to maximize visual stop."
+  ],
+  "apply_when": [
+    "The brief specifies a mood, tone, or emotional register that color can reinforce.",
+    "The brand has a defined color system that must be integrated.",
+    "The ad uses a problem-solution arc where visual contrast amplifies the narrative."
+  ],
+  "avoid_when": [
+    "The platform or format forces a monochrome or brand-locked template.",
+    "Color manipulation would misrepresent the actual product appearance.",
+    "The audience includes color-vision-deficient viewers who need luminance contrast rather than hue contrast."
+  ],
+  "downstream_targets": [
+    "scene_plan",
+    "visual",
+    "color",
+    "hook",
+    "reveal",
+    "cta_brand"
+  ],
+  "keywords": [
+    "color",
+    "palette",
+    "temperature",
+    "warm",
+    "cool",
+    "saturation",
+    "contrast",
+    "complementary",
+    "analogous",
+    "brand color",
+    "mood",
+    "tone",
+    "visual"
+  ],
+  "source_type": "openmontage-curated",
+  "content_hash": "sha256:db2343a5b04f9fd9acad63b4dcfebc285de726955d2b11fd8655e34d901e2438",
+  "failure_patterns": [
+    "Rainbow palette with no dominant temperature — the viewer can't settle into a mood and the ad feels chaotic.",
+    "Product color lost in the background: the hero product is the same value/saturation as its surroundings, so nothing pops.",
+    "Sudden color shift with no narrative reason — jarring the viewer without earning it through the story arc.",
+    "Overusing brand blue across every frame: the ad becomes a corporate presentation instead of an emotional experience."
+  ],
+  "cross_domain_notes": [
+    {
+      "domain": "cinematography",
+      "note": "Lighting direction and intensity determine which colors read strongest; side lighting warms up, overhead lighting cools down."
+    },
+    {
+      "domain": "emotional_rhythm",
+      "note": "Color temperature shifts should track the emotional curve: cool at low intensity, warm at resolution."
+    },
+    {
+      "domain": "sound_design",
+      "note": "Warm saturated visuals pair naturally with warm acoustic textures; cool desaturated visuals pair with clean electronic sound."
+    }
+  ],
+  "execution_techniques": [
+    "Desaturate everything except the product for instant visual dominance without changing composition.",
+    "Shift from cool blues in the problem beat to warm ambers in the solution beat — the viewer feels the shift before they name it.",
+    "Use a single accent color from the brand palette on the CTA frame to create visual punctuation.",
+    "Match background color value (brightness) to the product so it sits naturally in the scene rather than floating."
+  ]
+}

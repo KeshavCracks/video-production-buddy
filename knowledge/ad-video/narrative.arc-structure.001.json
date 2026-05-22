@@ -1,0 +1,78 @@
+{
+  "card_id": "narrative.arc-structure.001",
+  "version": "1.0",
+  "domain": "narrative_arc",
+  "summary": "Every effective ad follows a narrative arc — a structured emotional progression from the viewer's current state to the desired outcome. Arc selection determines beat count, ratio, and the emotional logic of every scene.",
+  "principles": [
+    "Six canonical ad arcs: problem-solution (frustration → resolution), desire-fulfillment (aspiration → achievement), contrast (before → after), journey (departure → transformation → arrival), social-proof (skepticism → evidence → trust), demo-reveal (curiosity → demonstration → payoff).",
+    "Each arc has a beat ratio table that determines time allocation: problem-solution gives 25% to the problem and 25% to the proof; desire-fulfillment gives 30% to the aspiration and 20% to the payoff.",
+    "Arc selection is driven by product category + audience + platform: tech products favor demo-reveal; lifestyle brands favor desire-fulfillment; challenger brands favor contrast.",
+    "The hook must establish the arc type in the first 2 seconds so the viewer knows the emotional contract: is this a journey or a demonstration?",
+    "Every beat must advance the arc — a scene that stalls or repeats the same emotional register is wasted time.",
+    "The CTA must complete the arc's promise: the call to action is the viewer's next step in the story, not an interruption of it.",
+    "Luxury and prestige brands can break arc conventions with slow-burn or abstract structures, but the break must be intentional and documented.",
+    "Arc-to-script mapping ensures each beat produces a required script section with defined emotional target, intensity, and visual constraint."
+  ],
+  "apply_when": [
+    "The ad has a duration longer than 6 seconds and multiple scenes.",
+    "The brief describes a clear viewer transformation or journey.",
+    "The production needs structural guidance for scene planning and pacing."
+  ],
+  "avoid_when": [
+    "The ad is a single shot or static image with no narrative progression.",
+    "The brand style guide mandates a specific non-arc structure.",
+    "The platform format (e.g., bumper ads) constrains to a single moment with no arc."
+  ],
+  "downstream_targets": [
+    "idea",
+    "script",
+    "scene_plan",
+    "hook",
+    "build",
+    "reveal",
+    "cta_brand",
+    "pacing"
+  ],
+  "keywords": [
+    "narrative",
+    "arc",
+    "story",
+    "structure",
+    "beat",
+    "progression",
+    "problem-solution",
+    "desire",
+    "contrast",
+    "journey",
+    "social proof",
+    "demo"
+  ],
+  "source_type": "openmontage-curated",
+  "content_hash": "sha256:f3b206f243c7c408c6f603b4484d721fc6867fffff41a77f00be59061997912c",
+  "failure_patterns": [
+    "No arc at all: a sequence of features or shots with no emotional progression — the viewer watches but doesn't feel anything.",
+    "Wrong arc for the product: desire-fulfillment for a cleaning product (nobody aspires to clean) instead of problem-solution.",
+    "Arc that doesn't resolve: the story builds tension but the CTA doesn't pay it off, leaving the viewer emotionally stranded.",
+    "Too many arcs in one ad: trying to be a journey AND a demo AND a contrast in 30 seconds creates structural chaos."
+  ],
+  "cross_domain_notes": [
+    {
+      "domain": "emotional_rhythm",
+      "note": "The arc determines the intensity curve shape: problem-solution escalates, desire-fulfillment builds gradually, contrast alternates, social-proof fluctuates."
+    },
+    {
+      "domain": "positioning",
+      "note": "The single promise determines which arc to use: promise of transformation → journey, promise of proof → social-proof, promise of upgrade → contrast."
+    },
+    {
+      "domain": "audience_insight",
+      "note": "The audience's self-image determines which arc resonates: identity-driven audiences prefer journeys, practical audiences prefer demos and proof."
+    }
+  ],
+  "execution_techniques": [
+    "Map the arc to concrete beat durations before writing: for a 30-second problem-solution, that's roughly 4s hook + 7s problem + 5s solution intro + 7s proof + 4s resolution + 3s CTA.",
+    "Write the hook to signal the arc type immediately: 'Tired of X?' signals problem-solution; 'Imagine if...' signals desire-fulfillment; side-by-side signals contrast.",
+    "End each beat on a forward-looking moment that pulls the viewer into the next beat rather than closing each scene neatly.",
+    "Test the CTA against the arc promise: if the arc is 'transformation through X,' the CTA must offer the viewer their own transformation, not just a purchase link."
+  ]
+}

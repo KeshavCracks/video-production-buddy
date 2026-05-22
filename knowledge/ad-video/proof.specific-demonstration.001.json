@@ -4,9 +4,13 @@
   "domain": "proof_logic",
   "summary": "A proof beat is strongest when it demonstrates one claim in a concrete situation instead of asserting superiority.",
   "principles": [
-    "Show the claim operating in a specific use case.",
-    "Prefer visible behavior, measured result, or side-by-side demonstration over abstract adjectives.",
-    "Keep the proof proportional to the evidence the user or research supplied."
+    "Show the claim operating in a specific, relatable use case — not an abstract laboratory scenario.",
+    "Prefer visible behavior, measured result, or side-by-side demonstration over adjectives and superlatives.",
+    "Keep the proof proportional to the evidence available — stronger claims require stronger, more specific proof.",
+    "The proof moment should be the most visually decisive 3-5 seconds of the entire ad — clear, concrete, and memorable.",
+    "One well-demonstrated proof point is more persuasive than three asserted claims — depth beats breadth in credibility.",
+    "Proof should feel like the viewer is discovering the evidence themselves, not being told what to think.",
+    "If the product claim is comparative, the comparison must be fair, documented, and compliant with advertising standards."
   ],
   "apply_when": [
     "The product has performance, quality, speed, camera, workflow, or sensory claims.",
@@ -18,8 +22,50 @@
     "The proof would require a fake benchmark or unsupported comparison.",
     "The scene cannot visually demonstrate the claim without hallucination risk."
   ],
-  "downstream_targets": ["build", "reveal", "script", "scene_plan", "visual"],
-  "keywords": ["proof", "demonstration", "claim", "evidence", "specific", "camera", "performance", "premium", "side by side"],
+  "downstream_targets": [
+    "build",
+    "reveal",
+    "script",
+    "scene_plan",
+    "visual"
+  ],
+  "keywords": [
+    "proof",
+    "demonstration",
+    "claim",
+    "evidence",
+    "specific",
+    "camera",
+    "performance",
+    "premium",
+    "side by side"
+  ],
   "source_type": "openmontage-curated",
-  "content_hash": "sha256:5b7f5e92c7e6bb345c3ded3801c6b6c14303d526387dc7546a15c72c6ee60f15"
+  "content_hash": "sha256:4cae78c8a25e7de76adfe7c87ba23a58209d4d56380ff2f8e95bacb4e1fff42a",
+  "failure_patterns": [
+    "Proof that's actually just another claim: 'Our fastest chip ever' without showing what makes it fast is a restated superlative, not proof.",
+    "Generic stock footage that illustrates a category instead of the specific product claim — the viewer sees a placeholder, not evidence.",
+    "Proof that exceeds the available evidence: the demonstration implies a result the product can't consistently deliver.",
+    "Complex technical proof that loses the viewer in 2 seconds — if the proof needs explaining, it's not a demonstration, it's a lecture."
+  ],
+  "cross_domain_notes": [
+    {
+      "domain": "cinematography",
+      "note": "Macro shots of product details and slow-motion capture of product actions make proof moments visually decisive and credible."
+    },
+    {
+      "domain": "color_theory",
+      "note": "Side-by-side proof shots should use split-screen with consistent color treatment — different grading on each side reads as manipulation."
+    },
+    {
+      "domain": "product_demo_logic",
+      "note": "Proof logic determines what to demonstrate; demo logic determines how to show it — they collaborate on the same beat."
+    }
+  ],
+  "execution_techniques": [
+    "Shoot the proof moment from the viewer's perspective: the camera sees what the user would see, not a cinematic angle that hides the evidence.",
+    "Use split-screen or sequential before/after for comparative claims — simultaneous comparison is more powerful than sequential.",
+    "Add a brief text overlay with the specific metric during the proof beat: '2x faster' is more credible than 'much faster.'",
+    "Let the demonstration run for a full 2-3 seconds without narration so the viewer can process the visual evidence independently."
+  ]
 }

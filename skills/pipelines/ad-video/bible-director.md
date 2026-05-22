@@ -418,6 +418,38 @@ safe_audio_trends = [
 ]
 ```
 
+### Step 5a — Conflict detection (mandatory after Steps 3b + 4)
+
+After both `knowledge_alignment` and `trend_alignment` are built, cross-check
+them for conflicts where a selected trend's visual/pacing direction contradicts
+a professional knowledge card's `avoid_when` conditions or `do_not_overapply`
+guardrails.
+
+```python
+from lib.conflict_detection import check_trend_knowledge_conflicts
+from lib.ad_knowledge import load_ad_knowledge_cards
+
+all_cards = load_ad_knowledge_cards()
+selected_ids = production_bible["intelligence"]["knowledge_alignment"]["selected_card_ids"]
+selected_cards = [c for c in all_cards if c["card_id"] in selected_ids]
+
+conflicts = check_trend_knowledge_conflicts(
+    trend_alignments=production_bible["intelligence"]["trend_alignment"]["alignments"],
+    knowledge_cards=selected_cards,
+    knowledge_alignments=production_bible["intelligence"]["knowledge_alignment"]["alignments"],
+)
+```
+
+If `conflicts["ok"] is False`:
+1. Present each conflict to the user with the trend ID, card ID, and recommendation.
+2. Default resolution: follow the professional principle and exclude or reframe the
+   conflicting trend application.
+3. Record the resolution in `decision_log` as a `trend_knowledge_conflict_resolution`
+   decision.
+4. Update the trend_alignment block to reflect the resolution before proceeding.
+
+Do not silently resolve conflicts. The user must approve every resolution.
+
 ### Step 6 — Build deliverables
 
 Primary aspect ratio from platform:

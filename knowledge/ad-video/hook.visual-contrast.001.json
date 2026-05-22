@@ -4,9 +4,14 @@
   "domain": "hook_mechanic",
   "summary": "A short-form ad hook should land as a visible contrast before the viewer has time to scroll.",
   "principles": [
-    "Make the first second show a before/after gap, contradiction, or sensory mismatch.",
-    "Let the visual gap raise the question; do not spend the hook explaining the whole product.",
-    "Resolve the contrast into the product promise by the reveal beat."
+    "First second shows visible contrast (before/after, contradiction, sensory mismatch) that creates an immediate comprehension gap.",
+    "The visual gap raises the question — do not explain the product in the hook. Let curiosity pull the viewer forward.",
+    "Resolve the contrast into the product promise by the reveal beat — the hook's question must have an answer.",
+    "Hook must land without sound — 85%+ of TikTok/Reels/Shorts viewers start muted, so the contrast must be visually self-evident.",
+    "The contrast should relate to the viewer's real pain or aspiration, not abstract product superiority.",
+    "Frame the contrast so the product is visually absent in frame 1 and naturally present by frame 2-3 for maximum curiosity payoff.",
+    "Contrast speed matters: the before/after gap should be perceivable within 0.5-1.0 seconds on a mobile screen.",
+    "The hook contrast establishes the visual grammar for the entire ad — every subsequent beat should echo or resolve it."
   ],
   "apply_when": [
     "The platform is TikTok, Reels, Shorts, or another fast-scroll placement.",
@@ -18,8 +23,49 @@
     "The only available contrast is unrelated clickbait.",
     "The brand requires a slow prestige opening with no abrupt visual interruption."
   ],
-  "downstream_targets": ["hook", "script", "scene_plan", "visual"],
-  "keywords": ["hook", "visual contrast", "before after", "first second", "tiktok", "shorts", "smartphone", "camera", "launch"],
+  "downstream_targets": [
+    "hook",
+    "script",
+    "scene_plan",
+    "visual"
+  ],
+  "keywords": [
+    "hook",
+    "visual contrast",
+    "before after",
+    "first second",
+    "tiktok",
+    "shorts",
+    "smartphone",
+    "camera",
+    "launch"
+  ],
   "source_type": "openmontage-curated",
-  "content_hash": "sha256:03a0e001d427de3104419d1d10ab30123d6ebe58df4afb63a7e0485b83bc1c8c"
+  "content_hash": "sha256:df33801edfed32caf1430296404908f534c466ff4b611a9852bcccc12507b8ae",
+  "failure_patterns": [
+    "Clickbait contrast unrelated to the product — viewers feel deceived and bounce at the 2-second mark.",
+    "Too many contrasts in the hook — cognitive overload kills the single-question clarity that makes hooks work.",
+    "Before/after that exaggerates beyond what the product can deliver — compliance risk and credibility destruction.",
+    "Visual contrast that requires narration to understand — fails on muted autoplay where 85% of viewers start."
+  ],
+  "cross_domain_notes": [
+    {
+      "domain": "emotional_rhythm",
+      "note": "Hook sets the emotional baseline; the wave pattern starts from it. A high-energy hook demands a different escalation curve than a quiet one."
+    },
+    {
+      "domain": "cinematography",
+      "note": "Extreme close-up or macro shot maximizes visual contrast in tight mobile formats; wide shots lose the detail needed for contrast."
+    },
+    {
+      "domain": "sound_design",
+      "note": "A sharp audio cut (silence to texture) at the contrast moment reinforces the visual surprise and makes it land harder."
+    }
+  ],
+  "execution_techniques": [
+    "Shoot the 'before' state in cool, desaturated tones and the 'after' in warm, saturated light for maximum visual contrast.",
+    "Use a hard cut (no transition) between before and after — dissolves soften the contrast and reduce impact.",
+    "Frame the product at the exact same position in both before and after shots so the eye locks onto the difference, not the camera move.",
+    "Add a single impact sound effect at the cut point between before and after to reinforce the visual contrast auditorily."
+  ]
 }

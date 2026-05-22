@@ -1,0 +1,76 @@
+{
+  "card_id": "music.emotion-sync.001",
+  "version": "1.0",
+  "domain": "music_direction",
+  "summary": "Music is the emotional engine of the ad. Tempo, instrumentation, arc resolution, and harmonic events at key moments transform a sequence of clips into a unified emotional experience.",
+  "principles": [
+    "Tempo maps to intensity: 60-80 BPM for calm/contemplative, 90-110 BPM for building/warm, 120-140 BPM for peak energy, above 150 BPM for urgent/hype.",
+    "Instrument choice maps to brand positioning: synth = tech/modern/future, strings/piano = premium/heritage/trust, percussion-forward = energy/action/sport, acoustic guitar = authentic/approachable/warm.",
+    "Music arc must resolve — ending on a musical question (unresolved chord, open melody) creates viewer anxiety that undermines the CTA.",
+    "The product reveal deserves a harmonic shift: new chord, key change, instrument entry, or rhythmic change that marks the moment as special.",
+    "Music should duck (not stop) during narration — the emotional thread continues through the voiceover at reduced volume.",
+    "Vocal music competes with narration. If the ad has a voiceover, specify instrumental-only or minimal non-lyrical vocal pads.",
+    "Genre must match the audience's self-image, not just the product category. Tech-savvy audiences expect electronic, not corporate orchestral."
+  ],
+  "apply_when": [
+    "The ad has an audio track and a defined emotional arc.",
+    "The brief specifies mood, energy, or brand tone that music can express.",
+    "The production timeline has identifiable beat moments (hook, build, reveal, CTA) that need musical punctuation."
+  ],
+  "avoid_when": [
+    "The platform plays sound-off by default and the budget doesn't support a music track.",
+    "The brand has strict audio guidelines that pre-approve specific tracks or genres.",
+    "The ad is ultra-short (under 6 seconds) and a full music arc cannot develop."
+  ],
+  "downstream_targets": [
+    "audio",
+    "music",
+    "hook",
+    "build",
+    "reveal",
+    "cta_brand",
+    "pacing"
+  ],
+  "keywords": [
+    "music",
+    "tempo",
+    "genre",
+    "instrument",
+    "arc",
+    "harmony",
+    "key change",
+    "beat",
+    "energy",
+    "score",
+    "soundtrack",
+    "instrumental"
+  ],
+  "source_type": "openmontage-curated",
+  "content_hash": "sha256:b5341a82a70031564c2f23dd0281d1d529981514e3a4c9aa6a460d75c96cde32",
+  "failure_patterns": [
+    "Music that fights the emotional curve: calm music during peak moments or intense music during quiet beats creates cognitive dissonance.",
+    "Stock music that sounds like every other ad: generic corporate uplifting tracks make the product feel replaceable.",
+    "Music that doesn't resolve by the CTA: the viewer is left with musical tension when they should feel completion and confidence.",
+    "Competing vocals: lyrics and narration overlap and the viewer processes neither."
+  ],
+  "cross_domain_notes": [
+    {
+      "domain": "emotional_rhythm",
+      "note": "Music tempo and dynamics are the audible expression of the intensity curve — they must be derived from the same beat sequence."
+    },
+    {
+      "domain": "sound_design",
+      "note": "Music and ambient texture share frequency space; reduce music complexity when layered with detailed sound design."
+    },
+    {
+      "domain": "editing_technique",
+      "note": "Cut points that land on musical beats feel natural; cuts between beats feel jarring. Align editing rhythm with the music grid."
+    }
+  ],
+  "execution_techniques": [
+    "Request music at 100 BPM for the build, then a tempo rise to 130 BPM at the proof beat for escalating energy.",
+    "Specify no vocals for ads with narration — competing voices confuse the viewer and dilute both messages.",
+    "Ask for a key change upward at the product reveal timestamp to create an audible moment of transformation.",
+    "Use a single sustained bass note under the CTA to provide grounding without distracting from the call to action."
+  ]
+}

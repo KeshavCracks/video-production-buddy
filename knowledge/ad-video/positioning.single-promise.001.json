@@ -4,9 +4,13 @@
   "domain": "positioning",
   "summary": "A commercial should organize every beat around one primary promise, not a scattered list of product advantages.",
   "principles": [
-    "Choose the one promise the audience should remember after the ad ends.",
-    "Treat secondary features as proof for that promise, not separate messages.",
-    "Make the CTA repeat or complete the same promise."
+    "Choose the one promise the audience should remember after the ad ends — this is the ad's reason to exist.",
+    "Treat every secondary feature as proof for the primary promise, not a separate message competing for attention.",
+    "The CTA must repeat or complete the same promise — a CTA that introduces a new benefit undoes the positioning work.",
+    "The single promise should be the intersection of what the product genuinely delivers and what the audience most wants to believe.",
+    "Every scene that doesn't serve the single promise should be cut or reframed — luxury of focus is the primary creative discipline.",
+    "The promise should be specific enough to be testable: 'takes better photos' is vague, 'captures the color your eyes see' is specific and memorable.",
+    "If the brief lists competing promises, the positioning decision must be made in the bible stage and locked — downstream stages must not reopen it."
   ],
   "apply_when": [
     "The brief lists many selling points.",
@@ -18,8 +22,47 @@
     "Regulated disclosure requires multiple independent claims.",
     "The ad is a retargeting variant for already-qualified buyers."
   ],
-  "downstream_targets": ["idea", "script", "cta_brand"],
-  "keywords": ["positioning", "single promise", "message", "selling point", "launch", "premium", "brand", "cta"],
+  "downstream_targets": [
+    "idea",
+    "script",
+    "cta_brand"
+  ],
+  "keywords": [
+    "positioning",
+    "single promise",
+    "message",
+    "selling point",
+    "launch",
+    "premium",
+    "brand",
+    "cta"
+  ],
   "source_type": "openmontage-curated",
-  "content_hash": "sha256:86217539a25a71546faf4e4a1ef3bb70501cda2c9d64f5b2358b8bc46395e9ca"
+  "content_hash": "sha256:2a3e7e163d1f82b53892c56aae323d225652852f3ebd2ce97153e389caad127b",
+  "failure_patterns": [
+    "Three equal promises in one ad: the viewer remembers none of them and the ad feels like a product listing.",
+    "Promise that's a category descriptor, not a brand differentiator: 'fast performance' when every competitor claims the same.",
+    "CTA that pivots to a different promise than the one the ad just made — the viewer's trust is broken.",
+    "Promise so generic it could apply to any product in the category — no positioning has actually occurred."
+  ],
+  "cross_domain_notes": [
+    {
+      "domain": "audience_insight",
+      "note": "The single promise must be the one the audience most wants to believe, not necessarily the strongest technical claim the product team prefers."
+    },
+    {
+      "domain": "narrative_arc",
+      "note": "The arc type is determined by the promise: promise of resolution → problem-solution, promise of transformation → journey, promise of proof → social-proof."
+    },
+    {
+      "domain": "hook_mechanic",
+      "note": "The hook must activate the single promise in the first second — if the viewer can't identify the promise from the hook, positioning failed."
+    }
+  ],
+  "execution_techniques": [
+    "Write the single promise as a single sentence on paper before writing anything else. If it takes two sentences, it's two promises.",
+    "Test each scene against the promise: if you can remove the scene without weakening the promise's credibility, the scene is unnecessary.",
+    "End the CTA with the promise restated in action language: 'See the difference' not 'Learn more about our technology.'",
+    "When the brief lists five selling points, rank them and commit to one as the star — the other four become one-line proof points."
+  ]
 }

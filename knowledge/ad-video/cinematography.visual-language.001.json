@@ -1,0 +1,77 @@
+{
+  "card_id": "cinematography.visual-language.001",
+  "version": "1.0",
+  "domain": "cinematography",
+  "summary": "Camera language is the viewer's eye. Shot size, movement, lens choice, and composition each carry meaning that shapes how the product is perceived before a single word is spoken.",
+  "principles": [
+    "Shot size carries meaning: extreme wide = scale/isolation, medium = intimacy/conversation, close-up = detail/obsession, extreme close-up = texture/quality.",
+    "Camera movement maps to emotional trajectory: dolly in = growing realization, crane up = detachment/freedom, handheld = urgency/authenticity, locked tripod = confidence/stability.",
+    "Depth of field creates attention hierarchy: shallow focus isolates the product in a hero shot, deep focus establishes environmental context and lifestyle credibility.",
+    "Center-compose for product hero moments (packshot, reveal); rule-of-thirds for lifestyle and narrative scenes.",
+    "Leading lines and foreground framing guide the eye toward the product without calling attention to the technique.",
+    "Lens choice affects perception: wide-angle enlarges foreground products and adds drama, telephoto compresses background and flatters product proportions, macro reveals surface quality.",
+    "Lighting direction shapes product character: frontal = clean/clear, side = texture/dimension, back = silhouette/mystery, overhead = clinical/precise.",
+    "Every camera decision should serve the emotional target of the beat, not just look cinematic for its own sake."
+  ],
+  "apply_when": [
+    "The brief calls for premium, cinematic, or high-production-value visuals.",
+    "The product has physical geometry, material quality, or design detail worth showcasing.",
+    "The ad uses generated video where camera language must be explicitly directed."
+  ],
+  "avoid_when": [
+    "The ad is purely typographic or abstract with no physical subject.",
+    "The platform constrains resolution such that camera subtleties won't read (tiny thumbnails).",
+    "Legal or safety rules prohibit showing the real product in close-up."
+  ],
+  "downstream_targets": [
+    "scene_plan",
+    "visual",
+    "reveal",
+    "hook",
+    "editing"
+  ],
+  "keywords": [
+    "cinematography",
+    "camera",
+    "shot size",
+    "angle",
+    "movement",
+    "dolly",
+    "crane",
+    "lens",
+    "depth of field",
+    "composition",
+    "framing",
+    "lighting",
+    "visual language",
+    "hero shot"
+  ],
+  "source_type": "openmontage-curated",
+  "content_hash": "sha256:5328afea264f524257428dce31a7d2e37f898da1332e30d6257091b2c3ddc798",
+  "failure_patterns": [
+    "Camera movement for its own sake: rapid pans and zooms that feel like a music video but disconnect from the product story.",
+    "Inconsistent camera style across scenes: handheld hook, locked build, handheld proof — the viewer can't settle into the visual grammar.",
+    "Shallow depth of field on everything: when every shot is blurred bokeh, nothing is special, and the product hero moment loses its isolation.",
+    "Wide establishing shots that take 3+ seconds on a 15-second ad — precious screen time wasted on empty space."
+  ],
+  "cross_domain_notes": [
+    {
+      "domain": "emotional_rhythm",
+      "note": "Camera movement speed and energy should track the intensity curve: slow drift at low intensity, kinetic tracking at peak."
+    },
+    {
+      "domain": "color_theory",
+      "note": "Lighting direction determines which colors read strongest; collaborate with color palette rather than fighting it."
+    },
+    {
+      "domain": "editing_technique",
+      "note": "Shot-to-shot camera consistency enables match cuts and smooth transitions; inconsistent camera language forces hard cuts."
+    }
+  ],
+  "execution_techniques": [
+    "Shoot the product reveal at f/1.4 with center-compose to isolate it from all background context — the viewer's eye locks immediately.",
+    "Use a slow dolly-in during the proof beat to simulate growing conviction as the evidence accumulates.",
+    "Handheld for lifestyle and pain-point scenes (authenticity), locked tripod for product hero and packshot scenes (precision).",
+    "Frame the product at the same screen position across hook, proof, and CTA scenes to create subconscious visual continuity."
+  ]
+}

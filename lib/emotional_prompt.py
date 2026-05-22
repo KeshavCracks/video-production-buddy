@@ -162,6 +162,14 @@ def find_beat_for_scene(
     return None
 
 
+def _quality_filter_note(note: str) -> str:
+    """Filter alignment notes for quality. Returns empty string if the note is too vague."""
+    condensed = _condense_target(note)
+    if len(condensed) < 15:
+        return ""
+    return condensed
+
+
 def apply_alignment_notes(
     prompt: str,
     scene: dict[str, Any],
@@ -174,24 +182,27 @@ def apply_alignment_notes(
     and professional advertising knowledge that should influence the generated
     footage, not just serve as compliance metadata.
 
-    Returns ``prompt`` unchanged when the scene has no alignment notes.
-    Idempotent: skips if the suffix is already present.
+    Notes shorter than 15 characters are filtered out as too vague to influence
+    generation. Returns ``prompt`` unchanged when the scene has no substantive
+    alignment notes. Idempotent: skips if the suffix is already present.
     """
     parts: list[str] = []
 
     trend_notes = (scene.get("trend_alignment_notes") or "").strip()
     if trend_notes:
-        condensed = _condense_target(trend_notes)
-        if len(condensed) > 120:
-            condensed = condensed[:117] + "..."
-        parts.append(condensed)
+        filtered = _quality_filter_note(trend_notes)
+        if filtered:
+            if len(filtered) > 120:
+                filtered = filtered[:117] + "..."
+            parts.append(filtered)
 
     knowledge_notes = (scene.get("knowledge_alignment_notes") or "").strip()
     if knowledge_notes:
-        condensed = _condense_target(knowledge_notes)
-        if len(condensed) > 120:
-            condensed = condensed[:117] + "..."
-        parts.append(condensed)
+        filtered = _quality_filter_note(knowledge_notes)
+        if filtered:
+            if len(filtered) > 120:
+                filtered = filtered[:117] + "..."
+            parts.append(filtered)
 
     if not parts:
         return prompt

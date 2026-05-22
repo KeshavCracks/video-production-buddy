@@ -238,6 +238,96 @@ def check_scene_plan_knowledge_alignment(
     }
 
 
+def _cross_domain_partners(entries: list[dict[str, Any]]) -> dict[str, set[str]]:
+    """Build a map of card_id -> set of partner card_ids from cross_domain_notes."""
+    all_card_ids = {_card_id(e) for e in entries if _card_id(e)}
+    partners: dict[str, set[str]] = {cid: set() for cid in all_card_ids}
+
+    for entry in entries:
+        card_id = _card_id(entry)
+        if not card_id:
+            continue
+        for note in entry.get("cross_domain_notes") or []:
+            if not isinstance(note, dict):
+                continue
+            partner_domain = _lower(note.get("domain"))
+            for other_entry in entries:
+                other_id = _card_id(other_entry)
+                if other_id and other_id != card_id and _lower(other_entry.get("domain")) == partner_domain:
+                    partners[card_id].add(other_id)
+                    partners[other_id].add(card_id)
+
+    return partners
+
+
+def _check_cross_domain_co_presence(
+    entries: list[dict[str, Any]],
+    scenes: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Check that cards with cross_domain_notes referencing each other co-occur in overlapping scenes.
+
+    When two cards list each other's domain in their cross_domain_notes and share
+    application_targets, they should both appear in at least one scene together.
+    Missing co-presence means the director treated them independently when they
+    are professionally interrelated.
+    """
+    if not entries or not scenes:
+        return []
+
+    partners = _cross_domain_partners(entries)
+    issues: list[dict[str, Any]] = []
+
+    for card_id, partner_ids in partners.items():
+        if not partner_ids:
+            continue
+
+        entry = next((e for e in entries if _card_id(e) == card_id), None)
+        if not entry:
+            continue
+
+        card_targets = {t for t in entry.get("application_targets") or []}
+        expected_ref = f"knowledge_alignment:{card_id}"
+
+        for partner_id in partner_ids:
+            partner_entry = next((e for e in entries if _card_id(e) == partner_id), None)
+            if not partner_entry:
+                continue
+
+            partner_targets = {t for t in partner_entry.get("application_targets") or []}
+            if not card_targets.intersection(partner_targets):
+                continue
+
+            partner_ref = f"knowledge_alignment:{partner_id}"
+
+            co_present_scenes = [
+                scene for scene in scenes
+                if isinstance(scene, dict)
+                and expected_ref in _scene_refs(scene)
+                and partner_ref in _scene_refs(scene)
+            ]
+
+            if not co_present_scenes:
+                issues.append({
+                    "kind": "missing_cross_domain_co_presence",
+                    "card_id": card_id,
+                    "partner_card_id": partner_id,
+                    "shared_targets": sorted(card_targets.intersection(partner_targets)),
+                    "expected_ref": expected_ref,
+                    "partner_ref": partner_ref,
+                })
+
+    # Deduplicate: (A,B) and (B,A) are the same co-presence requirement.
+    seen: set[tuple[str, str]] = set()
+    deduped: list[dict[str, Any]] = []
+    for issue in issues:
+        pair = tuple(sorted([issue["card_id"], issue["partner_card_id"]]))
+        if pair not in seen:
+            seen.add(pair)
+            deduped.append(issue)
+
+    return deduped
+
+
 def check_ad_video_planning_knowledge_alignment(
     production_bible: dict[str, Any],
     script: dict[str, Any],
@@ -288,6 +378,13 @@ def check_ad_video_planning_knowledge_alignment(
     issues.extend({**issue, "artifact": "script"} for issue in script_report.get("issues", []))
     issues.extend({**issue, "artifact": "scene_plan"} for issue in scene_report.get("issues", []))
 
+    scene_list = scene_plan.get("scenes", []) if isinstance(scene_plan, dict) else []
+    if not isinstance(scene_list, list):
+        scene_list = []
+    cross_domain_issues = _check_cross_domain_co_presence(entries, scene_list)
+
+    issues.extend(cross_domain_issues)
+
     return {
         "ok": not issues,
         "issues": issues,
@@ -298,5 +395,6 @@ def check_ad_video_planning_knowledge_alignment(
             "alignments_checked": len(entries),
             "script_sections_checked": script_report.get("summary", {}).get("sections_checked", 0),
             "scenes_checked": scene_report.get("summary", {}).get("scenes_checked", 0),
+            "cross_domain_issues": len(cross_domain_issues),
         },
     }

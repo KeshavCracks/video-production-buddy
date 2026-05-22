@@ -15,7 +15,10 @@
     "downstream_targets",
     "keywords",
     "source_type",
-    "content_hash"
+    "content_hash",
+    "failure_patterns",
+    "cross_domain_notes",
+    "execution_techniques"
   ],
   "additionalProperties": false,
   "properties": {
@@ -39,7 +42,12 @@
         "proof_logic",
         "product_demo_logic",
         "platform_format",
-        "commercial_compliance"
+        "commercial_compliance",
+        "cinematography",
+        "color_theory",
+        "editing_technique",
+        "sound_design",
+        "music_direction"
       ]
     },
     "summary": {
@@ -48,7 +56,7 @@
     },
     "principles": {
       "type": "array",
-      "minItems": 1,
+      "minItems": 5,
       "items": { "type": "string", "minLength": 1 }
     },
     "apply_when": {
@@ -78,7 +86,11 @@
           "hook",
           "build",
           "reveal",
-          "cta_brand"
+          "cta_brand",
+          "color",
+          "sound",
+          "music",
+          "editing"
         ]
       }
     },
@@ -95,6 +107,29 @@
     "content_hash": {
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "failure_patterns": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "cross_domain_notes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["domain", "note"],
+        "additionalProperties": false,
+        "properties": {
+          "domain": { "type": "string", "minLength": 1 },
+          "note": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "execution_techniques": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "type": "string", "minLength": 1 }
     }
   }
 }

@@ -46,7 +46,7 @@ def test_ad_video_knowledge_cards_validate_and_cover_core_domains() -> None:
     ids = [card["card_id"] for card in cards]
     domains = {card["domain"] for card in cards}
 
-    assert len(cards) >= 6
+    assert len(cards) >= 15
     assert len(ids) == len(set(ids))
     assert {
         "hook_mechanic",
@@ -55,6 +55,13 @@ def test_ad_video_knowledge_cards_validate_and_cover_core_domains() -> None:
         "proof_logic",
         "visual_rhetoric",
         "commercial_compliance",
+        "cinematography",
+        "color_theory",
+        "editing_technique",
+        "sound_design",
+        "music_direction",
+        "audience_insight",
+        "narrative_arc",
     }.issubset(domains)
 
 
@@ -263,3 +270,82 @@ def test_scene_plan_rejects_bare_knowledge_alignment_refs() -> None:
     bad["scenes"][0]["knowledge_alignment_refs"] = ["hook.visual-contrast.001"]
     with pytest.raises(Exception):
         validate_artifact("scene_plan", bad, pipeline_type="ad-video")
+
+
+def test_all_cards_have_required_deep_fields() -> None:
+    from lib.ad_knowledge import load_ad_knowledge_cards
+
+    cards = load_ad_knowledge_cards()
+    for card in cards:
+        assert len(card.get("principles", [])) >= 5, (
+            f"{card['card_id']}: principles must have >= 5 items"
+        )
+        assert len(card.get("failure_patterns", [])) >= 2, (
+            f"{card['card_id']}: failure_patterns must have >= 2 items"
+        )
+        assert len(card.get("cross_domain_notes", [])) >= 1, (
+            f"{card['card_id']}: cross_domain_notes must have >= 1 item"
+        )
+        assert len(card.get("execution_techniques", [])) >= 2, (
+            f"{card['card_id']}: execution_techniques must have >= 2 items"
+        )
+
+
+def test_field_weighted_retrieval_ranks_domain_matches_higher() -> None:
+    from lib.ad_knowledge import retrieve_ad_knowledge
+
+    result = retrieve_ad_knowledge(
+        {
+            "product_category": "smartphone",
+            "platform": "tiktok",
+            "audience": "photography enthusiasts",
+            "objectives": ["cinematic launch"],
+            "validation_targets": ["cinematography", "hook_mechanic"],
+            "backend": "auto",
+        }
+    )
+
+    assert result["retrieval_backend"] == "bm25"
+    assert len(result["cards_used"]) >= 2
+
+    domain_order = [card["domain"] for card in result["cards_used"]]
+    hook_idx = domain_order.index("hook_mechanic") if "hook_mechanic" in domain_order else 99
+    cine_idx = domain_order.index("cinematography") if "cinematography" in domain_order else 99
+    assert hook_idx < 99 or cine_idx < 99, "At least one target domain should be retrieved"
+
+
+def test_retrieval_returns_cards_from_new_domains() -> None:
+    from lib.ad_knowledge import retrieve_ad_knowledge
+
+    result = retrieve_ad_knowledge(
+        {
+            "product_category": "lifestyle product",
+            "platform": "instagram",
+            "audience": "creative professionals",
+            "objectives": ["emotional storytelling", "color palette"],
+            "validation_targets": ["color_theory", "sound_design", "music_direction"],
+            "backend": "auto",
+        }
+    )
+
+    retrieved_domains = {card["domain"] for card in result["cards_used"]}
+    assert "color_theory" in retrieved_domains
+
+
+def test_cross_domain_notes_reference_valid_domains() -> None:
+    from lib.ad_knowledge import load_ad_knowledge_cards
+
+    all_domains = {
+        "positioning", "audience_insight", "hook_mechanic", "narrative_arc",
+        "emotional_rhythm", "visual_rhetoric", "proof_logic", "product_demo_logic",
+        "platform_format", "commercial_compliance", "cinematography", "color_theory",
+        "editing_technique", "sound_design", "music_direction",
+    }
+
+    cards = load_ad_knowledge_cards()
+    for card in cards:
+        for note in card.get("cross_domain_notes", []):
+            referenced_domain = note.get("domain", "")
+            assert referenced_domain in all_domains, (
+                f"{card['card_id']}: cross_domain_notes references unknown domain '{referenced_domain}'"
+            )

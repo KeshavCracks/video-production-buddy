@@ -14,7 +14,7 @@ import math
 import re
 from collections import Counter
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Protocol
 
 import jsonschema
 
@@ -24,7 +24,34 @@ DEFAULT_CARD_DIR = ROOT / "knowledge" / "ad-video"
 CARD_SCHEMA_PATH = ROOT / "schemas" / "knowledge" / "ad_video_knowledge_card.schema.json"
 DEFAULT_TOP_K = 6
 
-EmbeddingScorer = Callable[[list[dict[str, Any]], str], list[float]]
+# Per-field BM25 boost weights. Higher weight = stronger influence on retrieval
+# ranking. Domain and keywords are curated high-precision signals; avoid_when
+# and failure_patterns are weaker positive matches but help distinguish cards.
+FIELD_WEIGHTS: dict[str, float] = {
+    "domain": 3.0,
+    "keywords": 2.5,
+    "apply_when": 2.0,
+    "principles": 1.5,
+    "execution_techniques": 1.0,
+    "summary": 1.0,
+    "avoid_when": 0.5,
+    "failure_patterns": 0.5,
+}
+
+# Boosts applied *after* BM25 scoring when the card's metadata matches query
+# inputs directly. These reward structural relevance on top of text similarity.
+TARGET_DOMAIN_BOOST = 2.0
+TARGET_DOWNSTREAM_BOOST = 0.75
+TARGET_KEYWORD_BOOST = 0.5
+
+
+class EmbeddingScorer(Protocol):
+    """Protocol for pluggable embedding-based card scoring."""
+
+    def __call__(self, cards: list[dict[str, Any]], query: str) -> list[float]: ...
+
+    @property
+    def model_name(self) -> str: ...
 
 
 def _load_card_schema() -> dict[str, Any]:
@@ -71,35 +98,21 @@ def _tokens(value: Any) -> list[str]:
     return re.findall(r"[a-z0-9]+", str(value or "").lower())
 
 
-def _flatten_strings(value: Any) -> Iterable[str]:
-    if isinstance(value, str):
-        yield value
-    elif isinstance(value, dict):
-        for item in value.values():
-            yield from _flatten_strings(item)
-    elif isinstance(value, list):
-        for item in value:
-            yield from _flatten_strings(item)
-    elif value is not None:
-        yield str(value)
+def _field_tokens(card: dict[str, Any], field: str) -> list[str]:
+    """Extract tokens from a specific card field for field-weighted scoring."""
+    if field == "domain":
+        return _tokens(card.get("domain", ""))
 
-
-def _card_text(card: dict[str, Any]) -> str:
-    fields = [
-        card.get("card_id", ""),
-        card.get("domain", ""),
-        card.get("summary", ""),
-        " ".join(card.get("principles", [])),
-        " ".join(card.get("apply_when", [])),
-        " ".join(card.get("avoid_when", [])),
-        " ".join(card.get("downstream_targets", [])),
-        " ".join(card.get("keywords", [])),
-    ]
-    return " ".join(fields)
+    value = card.get(field)
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return _tokens(" ".join(str(item) for item in value))
+    return _tokens(str(value))
 
 
 def _query_text(inputs: dict[str, Any]) -> str:
-    parts = []
+    parts: list[str] = []
     for key in (
         "product_category",
         "platform",
@@ -109,7 +122,11 @@ def _query_text(inputs: dict[str, Any]) -> str:
         "brief",
         "product",
     ):
-        parts.extend(_flatten_strings(inputs.get(key)))
+        raw = inputs.get(key)
+        if isinstance(raw, str):
+            parts.append(raw)
+        elif isinstance(raw, list):
+            parts.extend(str(item) for item in raw)
     return " ".join(parts)
 
 
@@ -126,42 +143,89 @@ def _target_terms(inputs: dict[str, Any]) -> set[str]:
     return terms
 
 
+def _bm25_score_field(
+    query_terms: list[str],
+    field_tokens: list[str],
+    doc_freq: Counter[str],
+    num_docs: int,
+    avg_field_len: float,
+    k1: float = 1.2,
+    b: float = 0.75,
+) -> float:
+    """Score a single card field against query terms using BM25."""
+    if not query_terms or not field_tokens:
+        return 0.0
+
+    tf = Counter(field_tokens)
+    field_len = max(len(field_tokens), 1)
+    score = 0.0
+
+    for term in query_terms:
+        if tf[term] == 0:
+            continue
+        idf = math.log((num_docs - doc_freq[term] + 0.5) / (doc_freq[term] + 0.5) + 1.0)
+        denom = tf[term] + k1 * (1 - b + b * field_len / max(avg_field_len, 1))
+        score += idf * (tf[term] * (k1 + 1)) / denom
+
+    return score
+
+
+def _compute_field_doc_freq(
+    cards: list[dict[str, Any]], field: str,
+) -> tuple[Counter[str], float]:
+    """Compute document frequency and average length for a single field."""
+    doc_freq: Counter[str] = Counter()
+    total_len = 0
+
+    for card in cards:
+        tokens = _field_tokens(card, field)
+        doc_freq.update(set(tokens))
+        total_len += len(tokens)
+
+    avg_len = total_len / max(len(cards), 1)
+    return doc_freq, avg_len
+
+
 def _bm25_scores(cards: list[dict[str, Any]], query: str, inputs: dict[str, Any]) -> list[float]:
+    """Score cards using field-weighted BM25 plus target boosts."""
     query_terms = _tokens(query)
     if not query_terms:
         return [0.0 for _ in cards]
 
-    docs = [_tokens(_card_text(card)) for card in cards]
-    avg_len = sum(len(doc) for doc in docs) / max(len(docs), 1)
-    doc_freq: Counter[str] = Counter()
-    for doc in docs:
-        doc_freq.update(set(doc))
+    num_docs = len(cards)
+    scores: list[float] = []
+
+    # Pre-compute per-field document frequencies and average lengths.
+    field_stats: dict[str, tuple[Counter[str], float]] = {}
+    for field in FIELD_WEIGHTS:
+        field_stats[field] = _compute_field_doc_freq(cards, field)
 
     targets = _target_terms(inputs)
-    scores: list[float] = []
-    k1 = 1.2
-    b = 0.75
-    for card, doc in zip(cards, docs):
-        tf = Counter(doc)
-        doc_len = max(len(doc), 1)
-        score = 0.0
-        for term in query_terms:
-            if tf[term] == 0:
-                continue
-            idf = math.log((len(cards) - doc_freq[term] + 0.5) / (doc_freq[term] + 0.5) + 1.0)
-            denom = tf[term] + k1 * (1 - b + b * doc_len / max(avg_len, 1))
-            score += idf * (tf[term] * (k1 + 1)) / denom
 
+    for card in cards:
+        field_score = 0.0
+
+        for field, weight in FIELD_WEIGHTS.items():
+            doc_freq, avg_len = field_stats[field]
+            tokens = _field_tokens(card, field)
+            raw = _bm25_score_field(query_terms, tokens, doc_freq, num_docs, avg_len)
+            field_score += raw * weight
+
+        # Structural boosts: reward cards whose metadata aligns with the query
+        # intent even when the text match is partial.
         domain = str(card.get("domain") or "").lower()
         downstream = {str(item).lower() for item in card.get("downstream_targets", [])}
         keywords = {str(item).lower() for item in card.get("keywords", [])}
+
         if domain in targets:
-            score += 2.0
+            field_score += TARGET_DOMAIN_BOOST
         if downstream.intersection(targets):
-            score += 0.75
+            field_score += TARGET_DOWNSTREAM_BOOST
         if any(token in " ".join(keywords) for token in targets):
-            score += 0.5
-        scores.append(score)
+            field_score += TARGET_KEYWORD_BOOST
+
+        scores.append(field_score)
+
     return scores
 
 
@@ -246,10 +310,10 @@ def retrieve_ad_knowledge(
 ) -> dict[str, Any]:
     """Retrieve professional ad-video knowledge for the current brief.
 
-    `backend="auto"` and `backend="bm25"` use deterministic lexical scoring.
-    `backend="embedding"` or `backend="hybrid"` can use an injected scorer in
-    future providers; without one they deliberately fall back to BM25 with an
-    explicit warning so the pipeline remains local and testable.
+    ``backend="auto"`` and ``backend="bm25"`` use deterministic field-weighted
+    lexical scoring. ``backend="embedding"`` or ``backend="hybrid"`` can use an
+    injected scorer; without one they fall back to BM25 with an explicit warning
+    so the pipeline remains local and testable.
     """
     cards = list(cards) if cards is not None else load_ad_knowledge_cards()
     cards_by_id = {card["card_id"]: card for card in cards}

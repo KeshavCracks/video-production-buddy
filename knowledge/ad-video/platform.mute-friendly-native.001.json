@@ -4,9 +4,13 @@
   "domain": "platform_format",
   "summary": "Social ads should communicate the hook and proof while muted, using native framing without copying a viral source.",
   "principles": [
-    "Put the first promise in readable visual form, not narration alone.",
-    "Use captions, overlays, or product action to make the ad legible on silent autoplay.",
-    "Adapt platform grammar while preserving brand-specific design."
+    "Put the first promise in readable visual form — text overlay, product action, or visual contrast that communicates without audio.",
+    "Use captions, overlays, or product action to make the ad legible on silent autoplay — if it doesn't work muted, it doesn't work on mobile.",
+    "Adopt platform-native grammar (text overlays on TikTok, swipe-up on Reels) while preserving brand-specific design choices.",
+    "The first 3 seconds must be fully comprehensible without sound — the viewer decides to stay or scroll before audio even starts.",
+    "Dynamic captions that emphasize key words create visual rhythm that substitutes for audio emphasis on muted playback.",
+    "Platform-native doesn't mean platform-identical — the ad should feel like it belongs on the platform while being unmistakably the brand.",
+    "Test the ad's mute-friendliness by watching it with sound off before approval — if the story isn't clear, the overlay strategy needs rework."
   ],
   "apply_when": [
     "The primary placement is TikTok, Reels, Shorts, Instagram, or mobile feed.",
@@ -18,8 +22,49 @@
     "Native overlays would violate the brand's design system.",
     "The required legal copy cannot be made readable in the chosen format."
   ],
-  "downstream_targets": ["hook", "script", "scene_plan", "format"],
-  "keywords": ["mute friendly", "native", "caption", "overlay", "tiktok", "reels", "shorts", "mobile", "format"],
+  "downstream_targets": [
+    "hook",
+    "script",
+    "scene_plan",
+    "format"
+  ],
+  "keywords": [
+    "mute friendly",
+    "native",
+    "caption",
+    "overlay",
+    "tiktok",
+    "reels",
+    "shorts",
+    "mobile",
+    "format"
+  ],
   "source_type": "openmontage-curated",
-  "content_hash": "sha256:afd6fc64fedd4917cb01a6a306467256074477b2903b895a9e6c333967b2e064"
+  "content_hash": "sha256:966cff0aaeec7e86b7de76e7edb13825b177eaaf03d2d346cda1f2ad1b645c26",
+  "failure_patterns": [
+    "Ad that relies entirely on narration for comprehension: muted, the viewer sees pretty footage with no idea what's being sold.",
+    "Platform-native grammar applied without brand integration: the ad looks like a creator post but doesn't feel like the brand.",
+    "Text overlays that are too small, too fast, or too cluttered for mobile screens — if the viewer can't read the text while scrolling, it fails.",
+    "Captions that are verbatim narration transcripts without visual hierarchy — a wall of identical text isn't communication, it's subtitles."
+  ],
+  "cross_domain_notes": [
+    {
+      "domain": "hook_mechanic",
+      "note": "The hook must be visually self-contained — the contrast or question must read without audio since 85%+ of mobile viewers start muted."
+    },
+    {
+      "domain": "color_theory",
+      "note": "Text overlay contrast against the background must exceed WCAG AA standards on mobile — thin white text on light backgrounds is invisible."
+    },
+    {
+      "domain": "cinematography",
+      "note": "Center-compose key text and product moments for mobile's vertical center of attention; rule-of-thirds text gets lost on small screens."
+    }
+  ],
+  "execution_techniques": [
+    "Write the ad's core message as a single text overlay that could appear in the first 2 seconds — if it can't be said in 5 words, it's too complex.",
+    "Use bold, high-contrast dynamic captions that scale up on emphasis words — this creates visual rhythm that replaces audio emphasis.",
+    "Place all critical text in the center 60% of the frame to account for platform UI overlays (username, description, buttons) that cover the edges.",
+    "A/B test the first frame with and without text overlay — if the no-text version doesn't communicate the promise, the visual strategy needs strengthening."
+  ]
 }

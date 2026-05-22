@@ -234,7 +234,7 @@
                   "card_id": { "type": "string", "minLength": 1 },
                   "domain": {
                     "type": "string",
-                    "enum": ["positioning", "audience_insight", "hook_mechanic", "narrative_arc", "emotional_rhythm", "visual_rhetoric", "proof_logic", "product_demo_logic", "platform_format", "commercial_compliance"]
+                    "enum": ["positioning", "audience_insight", "hook_mechanic", "narrative_arc", "emotional_rhythm", "visual_rhetoric", "proof_logic", "product_demo_logic", "platform_format", "commercial_compliance", "cinematography", "color_theory", "editing_technique", "sound_design", "music_direction"]
                   },
                   "summary": { "type": "string", "minLength": 1 },
                   "source_ref": {

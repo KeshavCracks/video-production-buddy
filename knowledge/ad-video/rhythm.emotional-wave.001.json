@@ -4,9 +4,14 @@
   "domain": "emotional_rhythm",
   "summary": "Professional commercial rhythm alternates pressure and release so the viewer feels progression instead of a flat list of features.",
   "principles": [
-    "Map each beat to a distinct viewer feeling: curiosity, recognition, relief, proof, then action.",
-    "Use shorter cuts and tighter narration at pressure peaks, then leave breath around product proof.",
-    "Let music intensity and edit density support the emotional curve rather than run at one speed."
+    "Map each beat to a distinct viewer feeling: curiosity, recognition, relief, proof, then action — no two beats should carry the same emotional register.",
+    "Use shorter cuts and tighter narration at pressure peaks, then leave breath around product proof — density creates urgency, space creates trust.",
+    "Let music intensity and edit density support the emotional curve rather than running at one speed throughout.",
+    "The emotional wave should have 2-3 pressure-release cycles in a 30-second ad; a single flat escalation loses viewer engagement by the 20-second mark.",
+    "The peak emotional moment should coincide with the product reveal or proof — never waste peak intensity on a transition or branding frame.",
+    "Recovery after the peak should be partial, not complete — maintaining some tension into the CTA gives the viewer a reason to act.",
+    "Silence and visual stillness are valid emotional states — a beat that drops to quiet calm after high intensity creates a powerful contrast.",
+    "Every emotional transition should be motivated by the narrative, not arbitrary — the viewer should feel the shift is earned."
   ],
   "apply_when": [
     "The brief asks for emotion, aspiration, premium energy, or a cinematic feeling.",
@@ -18,8 +23,49 @@
     "Legal or medical claims require neutral delivery throughout.",
     "The brand tone forbids emotional escalation."
   ],
-  "downstream_targets": ["script", "scene_plan", "pacing", "audio"],
-  "keywords": ["emotion", "rhythm", "pacing", "intensity", "music", "cuts", "commercial", "premium", "cinematic"],
+  "downstream_targets": [
+    "script",
+    "scene_plan",
+    "pacing",
+    "audio"
+  ],
+  "keywords": [
+    "emotion",
+    "rhythm",
+    "pacing",
+    "intensity",
+    "music",
+    "cuts",
+    "commercial",
+    "premium",
+    "cinematic"
+  ],
   "source_type": "openmontage-curated",
-  "content_hash": "sha256:4e1850fea4e5cd78ca27a5959236a575ed9bab68ab99eff256082fd156be0198"
+  "content_hash": "sha256:8a469835a71a17f6aa2f4a8db2680ce3f66e06fab2b478cc3aa927c53096dbec",
+  "failure_patterns": [
+    "Flat emotional delivery where every beat has the same intensity — the ad feels like a list of features read aloud.",
+    "All pressure, no release: constant high intensity exhausts the viewer and the peak moment has no contrast to stand out against.",
+    "Emotional peak in the wrong place: maximum intensity at the branding frame instead of the product reveal.",
+    "Emotional curve that drops to zero before the CTA — the viewer has no motivational energy left to act."
+  ],
+  "cross_domain_notes": [
+    {
+      "domain": "music_direction",
+      "note": "Music dynamics and tempo are the audible expression of the emotional wave — they must be derived from the same beat sequence and intensity values."
+    },
+    {
+      "domain": "editing_technique",
+      "note": "Cut density tracks intensity: held shots at calm, rapid cuts at peak. They are the visual manifestation of the same emotional curve."
+    },
+    {
+      "domain": "hook_mechanic",
+      "note": "The hook's emotional register sets the starting point for the wave — a high-energy hook demands a different escalation path than a quiet one."
+    }
+  ],
+  "execution_techniques": [
+    "Design the beat sequence with explicit intensity values (0.0-1.0) per beat before writing the script, not after.",
+    "Place the highest-intensity beat at the product reveal and ensure the intensity curve peaks there, not earlier.",
+    "Build a brief calm beat (intensity 0.2-0.3) before the CTA to let the viewer process, then a slight rise at the CTA itself for action energy.",
+    "Use the intensity curve to drive music tempo, editing rhythm, and TTS speed simultaneously for coherent emotional expression."
+  ]
 }

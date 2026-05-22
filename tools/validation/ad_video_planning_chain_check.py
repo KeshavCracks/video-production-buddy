@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from lib.conflict_detection import check_trend_knowledge_conflicts
 from lib.knowledge_alignment import check_ad_video_planning_knowledge_alignment
 from lib.trend_alignment import check_ad_video_planning_trend_alignment
 from schemas.artifacts import validate_artifact
@@ -24,7 +25,7 @@ from tools.base_tool import (
 
 class AdVideoPlanningChainCheck(BaseTool):
     name = "ad_video_planning_chain_check"
-    version = "0.1.0"
+    version = "0.2.0"
     tier = ToolTier.CORE
     capability = "validation"
     provider = "openmontage"
@@ -38,11 +39,14 @@ class AdVideoPlanningChainCheck(BaseTool):
         "validate_ad_video_planning_chain",
         "validate_trend_alignment_threading",
         "validate_knowledge_alignment_threading",
+        "validate_trend_knowledge_conflicts",
+        "validate_cross_domain_co_presence",
         "validate_pre_asset_gate",
     ]
     best_for = [
         "blocking ad-video asset generation when selected trend guidance is not threaded",
         "detecting stale planning artifacts before render",
+        "catching trend-knowledge conflicts before asset generation",
     ]
     not_good_for = [
         "evaluating visual quality of rendered clips",
@@ -70,11 +74,13 @@ class AdVideoPlanningChainCheck(BaseTool):
         "properties": {
             "trend_alignment": {"type": "object"},
             "knowledge_alignment": {"type": "object"},
+            "conflict_detection": {"type": "object"},
         },
     }
     user_visible_verification = [
         "Confirm selected trend refs appear in required script sections",
         "Confirm visual/pacing trends appear in scene_plan trend refs and notes",
+        "Confirm no trend-knowledge conflicts detected",
     ]
 
     def _load_artifact(self, inputs: dict[str, Any], key: str) -> dict[str, Any]:
@@ -112,19 +118,31 @@ class AdVideoPlanningChainCheck(BaseTool):
                 script,
                 scene_plan,
             )
-            if not report["ok"] or not knowledge_report["ok"]:
-                issues = []
-                issues.extend(report.get("issues", []))
-                issues.extend(knowledge_report.get("issues", []))
+
+            # Conflict detection: cross-check trends against knowledge cards.
+            conflict_report = self._check_conflicts(production_bible)
+
+            issues: list[dict[str, Any]] = []
+            issues.extend(report.get("issues", []))
+            issues.extend(knowledge_report.get("issues", []))
+            issues.extend(conflict_report.get("conflicts", []))
+
+            data = {
+                "trend_alignment": report,
+                "knowledge_alignment": knowledge_report,
+                "conflict_detection": conflict_report,
+            }
+
+            if not report["ok"] or not knowledge_report["ok"] or not conflict_report["ok"]:
                 return ToolResult(
                     success=False,
-                    data={"trend_alignment": report, "knowledge_alignment": knowledge_report},
+                    data=data,
                     error=json.dumps(issues, sort_keys=True),
                     duration_seconds=time.time() - started,
                 )
             return ToolResult(
                 success=True,
-                data={"trend_alignment": report, "knowledge_alignment": knowledge_report},
+                data=data,
                 duration_seconds=time.time() - started,
             )
         except Exception as exc:
@@ -133,3 +151,40 @@ class AdVideoPlanningChainCheck(BaseTool):
                 error=str(exc),
                 duration_seconds=time.time() - started,
             )
+
+    def _check_conflicts(self, production_bible: dict[str, Any]) -> dict[str, Any]:
+        """Run trend-knowledge conflict detection if both alignment blocks exist."""
+        intelligence = production_bible.get("intelligence") if isinstance(production_bible, dict) else None
+        if not isinstance(intelligence, dict):
+            return {"ok": True, "conflicts": [], "summary": {"skipped": True, "reason": "no intelligence block"}}
+
+        trend_block = intelligence.get("trend_alignment")
+        knowledge_block = intelligence.get("knowledge_alignment")
+        if not isinstance(trend_block, dict) or not isinstance(knowledge_block, dict):
+            return {"ok": True, "conflicts": [], "summary": {"skipped": True, "reason": "missing alignment blocks"}}
+
+        trend_alignments = trend_block.get("alignments", [])
+        knowledge_alignments = knowledge_block.get("alignments", [])
+
+        # Load actual card data for the selected cards.
+        selected_ids = [
+            str(cid).strip()
+            for cid in knowledge_block.get("selected_card_ids", [])
+            if str(cid).strip()
+        ]
+
+        if not selected_ids:
+            return {"ok": True, "conflicts": [], "summary": {"skipped": True, "reason": "no cards selected"}}
+
+        try:
+            from lib.ad_knowledge import load_ad_knowledge_cards
+            all_cards = load_ad_knowledge_cards()
+            selected_cards = [c for c in all_cards if c["card_id"] in selected_ids]
+        except Exception:
+            selected_cards = []
+
+        return check_trend_knowledge_conflicts(
+            trend_alignments=trend_alignments if isinstance(trend_alignments, list) else [],
+            knowledge_cards=selected_cards,
+            knowledge_alignments=knowledge_alignments if isinstance(knowledge_alignments, list) else [],
+        )

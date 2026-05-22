@@ -1,0 +1,75 @@
+{
+  "card_id": "sound.ambient-texture.001",
+  "version": "1.0",
+  "domain": "sound_design",
+  "summary": "Sound design is the invisible half of professional video. Ambient texture, foley weight, silence placement, and audio-visual sync give generated footage the physical credibility that raw AI output lacks.",
+  "principles": [
+    "Silence is a tool, not an absence. A brief drop to quiet before the product reveal makes the moment land with physical weight.",
+    "Room tone and ambient layers ground the viewer in a space — without them, generated video feels like it's floating in a void.",
+    "Foley-like texture (clicks, whooshes, impacts, surface sounds) gives generated visuals physical credibility and tactile presence.",
+    "Audio transitions should anticipate visual transitions by 2-3 frames: the viewer hears the next scene arriving before they see it.",
+    "The sound bed should thin during narration and thicken during visual-only sequences to avoid competing with the voice.",
+    "Impact sounds on product touches, button presses, and transitions create a sense of physical interaction that AI video cannot generate natively.",
+    "Sub-bass presence (felt more than heard) during peak intensity moments adds visceral impact that elevates perceived production quality."
+  ],
+  "apply_when": [
+    "The ad uses generated video that benefits from added sound texture.",
+    "The brief specifies a mood or atmosphere that ambient sound can reinforce.",
+    "The production has narration gaps that need sound-bed support."
+  ],
+  "avoid_when": [
+    "The platform compresses or normalizes audio to the point where subtle sound design is lost.",
+    "The brand's audio identity is silence-minimal and adding texture would violate the tone.",
+    "Legal or regulatory constraints require clean narration without competing audio."
+  ],
+  "downstream_targets": [
+    "scene_plan",
+    "audio",
+    "sound",
+    "hook",
+    "reveal",
+    "build"
+  ],
+  "keywords": [
+    "sound",
+    "ambient",
+    "texture",
+    "foley",
+    "silence",
+    "room tone",
+    "impact",
+    "whoosh",
+    "audio",
+    "sub-bass",
+    "audio-visual sync",
+    "sound design"
+  ],
+  "source_type": "openmontage-curated",
+  "content_hash": "sha256:bce3612bc4551aec3ed7d65bd46c8e22a261f2aa7d92cd4a00c4a8b359c2833f",
+  "failure_patterns": [
+    "Wall-to-wall music with no ambient texture: every scene sounds the same and the viewer loses spatial awareness.",
+    "Silence used wrong: dropping audio to zero at random moments creates confusion, not emphasis — silence must be earned by the narrative.",
+    "Foley that's too loud or cartoonish: exaggerated sound effects pull the viewer out of the experience instead of grounding them.",
+    "Audio-visual desync by more than 3 frames: the viewer perceives the sound and image as disconnected."
+  ],
+  "cross_domain_notes": [
+    {
+      "domain": "music_direction",
+      "note": "Sound bed and music must share frequency space; thin the ambient texture in the music's dominant frequency range to avoid muddiness."
+    },
+    {
+      "domain": "emotional_rhythm",
+      "note": "Sound texture density should track intensity: sparse ambient at calm, dense layered texture at peak."
+    },
+    {
+      "domain": "cinematography",
+      "note": "Camera movement sounds (whoosh on dolly, creak on crane) reinforce the visual language and make camera decisions audible."
+    }
+  ],
+  "execution_techniques": [
+    "Add a subtle room tone (interior hum or exterior ambience) under every scene to prevent the AI void feel.",
+    "Layer a low-pass filtered whoosh under camera movements in generated footage to give them physical presence.",
+    "Drop to near-silence for 0.3 seconds before the product reveal, then a single impact sound as the product appears.",
+    "Use a heartbeat-like low pulse during the build beat to create subconscious tension that resolves at the proof."
+  ]
+}
