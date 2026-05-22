@@ -25,13 +25,33 @@ During every narration window:
 ]
 ```
 
-### Emotion-Aware Volume Schedule (Path B)
+### Emotion-Aware Volume Schedule (Path B) — HARD RULE
 
 When `production_bible.narrative.intensity_curve` is present (set by bible-director
-Step 2 from the beat sequence), prefer an emotion-aware duck contour over the flat
--18 dB rule. Quieter narration beats duck deeper so words land; peak beats duck
-shallower so the music breathes through the climax. The flat rule remains the
-fallback when the bible has no intensity_curve.
+Step 2 from the beat sequence), you **MUST** populate `audio.music.volume_schedule`
+using the emotion-aware duck contour. This is not optional — the intensity curve
+represents the creative team's explicit emotional arc and the final video's audio
+dynamics must reflect it.
+
+Quieter narration beats duck deeper so words land; peak beats duck shallower so
+the music breathes through the climax. The flat -18 dB rule is the fallback ONLY
+when the bible has no intensity_curve.
+
+**Gate:** Run this check before submitting edit_decisions:
+
+```python
+from lib.intensity_curve import derive_duck_schedule
+
+# If the bible has an intensity curve, volume_schedule is MANDATORY.
+curve = production_bible["narrative"].get("intensity_curve", [])
+if curve:
+    assert edit_decisions["audio"]["music"].get("volume_schedule"), (
+        "HARD RULE VIOLATION: production_bible has intensity_curve but "
+        "edit_decisions.audio.music.volume_schedule is empty. The emotional "
+        "arc has no effect on audio dynamics. Derive the schedule with "
+        "derive_duck_schedule() before submitting."
+    )
+```
 
 Compute the contour with the deterministic helper:
 
@@ -231,6 +251,15 @@ with one entry per opted-in variant:
 - [ ] All `cuts[].source` and `audio.narration.segments[].asset_id` references resolve through `asset_manifest`
 - [ ] Every cut carries `maps_to_beat`, `beat_id`, or `beat` copied from the scene plan
 - [ ] `cuts[]` average durations, cut density, and transitions satisfy `production_bible.visual.editing_rhythm`
+      (run `check_cuts_against_editing_rhythm` to verify — any warnings must be resolved before submitting):
+      ```python
+      from lib.intensity_curve import check_cuts_against_editing_rhythm
+      warnings = check_cuts_against_editing_rhythm(
+          cuts=edit_decisions["cuts"],
+          editing_rhythm=production_bible["visual"]["editing_rhythm"],
+      )
+      assert not warnings, f"Cut durations violate editing rhythm: {warnings}"
+      ```
 - [ ] If `production_bible.narrative.intensity_curve` is **absent** (legacy briefs):
       `audio.music.ducking` covers all narration windows AND duck depth matches `audio_contract.duck_depth_db`
 - [ ] If `production_bible.narrative.intensity_curve` is **present** (Path B):

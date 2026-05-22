@@ -115,13 +115,15 @@ if result.error:
 
 # Bible-derived prompt suffixes — applied to every visual prompt (image and
 # video) so the generation lands on-brief instead of using model defaults.
-# Both helpers return the prompt unchanged when the bible field is unset
+# All helpers return the prompt unchanged when the bible field is unset
 # (legacy briefs).
 from lib.color_direction import apply_color_direction
 from lib.resolution_treatment import apply_resolution_treatment
+from lib.emotional_prompt import apply_emotional_mood, find_beat_for_scene
 
 color_direction = production_bible["visual"].get("color_direction")
 resolution_type = production_bible["narrative"].get("resolution_type")
+beat_sequence = production_bible["narrative"].get("emotional_beat_sequence", [])
 
 # Identify whether this scene maps to the resolution beat. The resolution
 # beat is the highest-intensity beat before cta_brand — its beat_id varies
@@ -131,21 +133,25 @@ resolution_type = production_bible["narrative"].get("resolution_type")
 # Filter ONLY by beat_id (the authoritative identifier). Substring matching
 # on the free-form `name` field would falsely exclude beats whose name
 # happens to contain "cta" as a substring.
-beats = production_bible["narrative"]["emotional_beat_sequence"]
-non_cta = [b for b in beats if b.get("beat_id") != "cta_brand"]
+non_cta = [b for b in beat_sequence if b.get("beat_id") != "cta_brand"]
 resolution_beat_id = max(non_cta, key=lambda b: b["intensity"])["beat_id"] if non_cta else None
 is_resolution_scene = (scene.get("beat_id") == resolution_beat_id) or (scene.get("beat") == resolution_beat_id)
 
+# Look up the emotional beat for this scene so the mood suffix is scene-specific.
+scene_beat = find_beat_for_scene(beat_sequence, scene)
+
 
 # Use default-arg capture so this helper carries the per-iteration value of
-# `is_resolution_scene` even if the snippet is later refactored to define
-# `_wrap` outside the per-scene loop. Without the default-arg trick a
-# closure would capture the loop variable's *final* value for every scene.
-def _wrap(prompt: str, *, _is_resolution=is_resolution_scene) -> str:
-    """Apply color_direction always; apply resolution_treatment only on the
-    resolution-beat scene so the emotional register doesn't leak into other
-    beats' generation."""
+# `is_resolution_scene` and `scene_beat` even if the snippet is later
+# refactored to define `_wrap` outside the per-scene loop. Without the
+# default-arg trick a closure would capture the loop variable's *final*
+# value for every scene.
+def _wrap(prompt: str, *, _is_resolution=is_resolution_scene, _beat=scene_beat) -> str:
+    """Apply color_direction and emotional mood to every scene; apply
+    resolution_treatment only on the resolution-beat scene so the emotional
+    register doesn't leak into other beats' generation."""
     out = apply_color_direction(prompt, color_direction)
+    out = apply_emotional_mood(out, _beat)
     if _is_resolution:
         out = apply_resolution_treatment(out, resolution_type)
     return out

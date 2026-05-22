@@ -2535,3 +2535,24 @@ def test_ad_video_asset_stage_exposes_frame_sampler_for_hallucination_keyframes(
 
     assert "frame_sampler" in asset_stage_tools
     assert "frame_sampler" in get_required_tools(manifest)
+
+
+def test_edit_director_enforces_duck_schedule_when_intensity_curve_present() -> None:
+    edit = _read_skill("edit-director.md")
+
+    # The edit-director must make volume_schedule MANDATORY when intensity_curve
+    # exists — not just mention it as a "prefer" option.
+    assert "HARD RULE" in edit
+    assert "derive_duck_schedule" in edit
+    assert "volume_schedule" in edit
+    assert "intensity_curve" in edit
+
+
+def test_asset_director_threads_emotional_mood_into_prompts() -> None:
+    asset = _read_skill("asset-director.md")
+
+    # The asset-director must apply emotional mood from the beat sequence
+    # to every visual prompt, not just color_direction and resolution_treatment.
+    assert "apply_emotional_mood" in asset
+    assert "find_beat_for_scene" in asset
+    assert "emotional_prompt" in asset

@@ -367,6 +367,76 @@ def check_editing_rhythm_consistency(
     return warnings
 
 
+def check_cuts_against_editing_rhythm(
+    cuts: list[dict[str, Any]],
+    editing_rhythm: list[dict[str, Any]],
+    *,
+    tolerance: float = 0.5,
+) -> list[str]:
+    """Return warnings where actual cut durations disagree with editing_rhythm.
+
+    For each beat declared in ``editing_rhythm``, collect the cuts that map to
+    it (via ``maps_to_beat``) and check whether their average duration is within
+    ``tolerance`` seconds of the rhythm's ``avg_shot_duration_seconds``.
+
+    ``cuts`` is the ``edit_decisions.cuts[]`` list. Each cut should carry
+    ``maps_to_beat`` (or ``beat_id`` / ``beat`` as fallback) to identify which
+    beat it belongs to.
+
+    ``editing_rhythm`` is the ``production_bible.visual.editing_rhythm`` list.
+    Each entry carries ``maps_to_beat`` and ``avg_shot_duration_seconds``.
+
+    Returns a list of warning strings. Empty list means no violations.
+    """
+    if not cuts or not editing_rhythm:
+        return []
+
+    warnings: list[str] = []
+
+    # Group cuts by beat
+    cuts_by_beat: dict[str, list[dict[str, Any]]] = {}
+    for cut in cuts:
+        beat_id = cut.get("maps_to_beat") or cut.get("beat_id") or cut.get("beat")
+        if beat_id:
+            cuts_by_beat.setdefault(beat_id, []).append(cut)
+
+    for rhythm_entry in editing_rhythm:
+        beat_id = rhythm_entry.get("maps_to_beat")
+        if not beat_id:
+            continue
+
+        target_duration = rhythm_entry.get("avg_shot_duration_seconds")
+        if not isinstance(target_duration, (int, float)):
+            continue
+
+        beat_cuts = cuts_by_beat.get(beat_id, [])
+        if not beat_cuts:
+            warnings.append(
+                f"editing_rhythm entry for beat {beat_id!r} has no matching cuts"
+            )
+            continue
+
+        durations = []
+        for c in beat_cuts:
+            out_s = c.get("out_seconds")
+            in_s = c.get("in_seconds")
+            if isinstance(out_s, (int, float)) and isinstance(in_s, (int, float)):
+                durations.append(out_s - in_s)
+
+        if not durations:
+            continue
+
+        avg = sum(durations) / len(durations)
+        if abs(avg - target_duration) > tolerance:
+            warnings.append(
+                f"beat {beat_id!r}: avg cut duration {avg:.1f}s vs "
+                f"editing_rhythm target {target_duration:.1f}s "
+                f"(difference {abs(avg - target_duration):.1f}s > {tolerance}s tolerance)"
+            )
+
+    return warnings
+
+
 def derive_tts_directive(intensity: float) -> dict[str, float]:
     """Map a beat's intensity (0..1) to a provider-agnostic TTS directive.
 

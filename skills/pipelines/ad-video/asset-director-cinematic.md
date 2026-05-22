@@ -8,7 +8,7 @@ For each scene in `scene_plan.scenes[]`:
 
 Provider: Flux (preferred) or DALL-E
 
-Prompt structure:
+Prompt structure (before `_wrap` is applied):
 ```
 {playbook.asset_generation.image_prompt_prefix}
 {scene.description}
@@ -17,6 +17,12 @@ lighting: cinematic, {motivated direction}
 color grade: {aligned to playbook primary palette}
 {playbook.asset_generation.image_negative_prompt} [negative]
 ```
+
+After constructing the prompt above, pass it through `_wrap()` from the base
+asset-director. `_wrap` appends:
+1. **Color palette** — from `production_bible.visual.color_direction`
+2. **Emotional mood** — from the matching beat's `emotional_target` and `intensity` (e.g. "Mood: intense electric, Momentum and capability.")
+3. **Resolution treatment** — only on the resolution-beat scene
 
 Output: `assets/scene_{id}_img.jpg`, 1920×1080, JPEG quality 95
 
@@ -69,7 +75,7 @@ do not present it as a finished asset.
 Provider: Wan 2.7 (Bailian/DashScope) — primary
 Fallback: Kling
 
-Prompt structure for **text_to_video** (no product in frame):
+Prompt structure for **text_to_video** (no product in frame, before `_wrap`):
 ```
 {scene.description}
 cinematic quality, {shot type} shot
@@ -79,7 +85,10 @@ aspect_ratio: {primary aspect ratio from production_bible.deliverables.primary}
 {playbook.asset_generation.image_negative_prompt} [negative]
 ```
 
-Prompt structure for **image_to_video** (product visible, reference image available):
+After constructing the prompt, pass it through `_wrap()` which appends emotional
+mood and color palette (see base asset-director).
+
+Prompt structure for **image_to_video** (product visible, reference image available, before `_wrap`):
 ```
 {scene.description}
 preserve the device geometry and brand markings from the reference image
@@ -89,6 +98,9 @@ duration: {scene.duration_seconds}s, 24fps
 aspect_ratio: {primary aspect ratio from production_bible.deliverables.primary}
 {playbook.asset_generation.image_negative_prompt} [negative]
 ```
+
+After constructing the prompt, pass it through `_wrap()` which appends emotional
+mood and color palette (see base asset-director).
 
 Output: `assets/scene_{id}_video.mp4`, dimensions matching aspect_ratio (1080×1920 for 9:16, 1920×1080 for 16:9)
 
