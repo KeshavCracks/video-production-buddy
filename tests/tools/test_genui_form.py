@@ -498,3 +498,116 @@ def test_tool_registry_discovers_genui_form():
     assert info["capability"] == "interaction"
     assert info["provider"] == "openmontage"
     assert info["runtime"] == "local"
+
+
+def test_check_availability_returns_structured_result():
+    from lib.genui import check_availability
+
+    result = check_availability()
+    assert "available" in result
+    assert "wsl2" in result
+    assert "browser_url_note" in result
+    assert isinstance(result["available"], bool)
+    assert isinstance(result["wsl2"], bool)
+
+
+def test_get_browser_url_adjusts_127_on_wsl2(monkeypatch):
+    from lib.genui import get_browser_url
+
+    monkeypatch.setattr("lib.genui.is_wsl2", lambda: True)
+    assert get_browser_url("http://127.0.0.1:8080/") == "http://localhost:8080/"
+
+    monkeypatch.setattr("lib.genui.is_wsl2", lambda: False)
+    assert get_browser_url("http://127.0.0.1:8080/") == "http://127.0.0.1:8080/"
+
+
+def test_cleanup_server_removes_orphaned_process(tmp_path: Path):
+    import subprocess
+    import sys
+
+    from lib.genui import cleanup_orphaned_servers, write_form_bundle
+
+    config = _sample_config(project_id="orphan-test")
+    project_dir = tmp_path / "projects" / "orphan-test"
+    bundle = write_form_bundle(project_dir, config)
+
+    port = 0
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = int(sock.getsockname()[1])
+
+    cmd = [
+        sys.executable, "-m", "lib.genui.server",
+        "--config-path", str(bundle.config_path),
+        "--response-path", str(bundle.response_path),
+        "--host", "127.0.0.1",
+        "--port", str(port),
+    ]
+    proc = subprocess.Popen(
+        cmd,
+        cwd=Path(__file__).resolve().parent.parent.parent,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    state_path = bundle.state_path
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text(json.dumps({"pid": proc.pid, "server_state": "running"}))
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=0.2).close()
+            break
+        except Exception:
+            time.sleep(0.05)
+
+    cleaned = cleanup_orphaned_servers(project_dir)
+    assert cleaned >= 1
+
+    try:
+        proc.wait(timeout=2.0)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+
+
+def test_wait_for_response_returns_parsed_json(tmp_path: Path):
+    from lib.genui import wait_for_response
+
+    response_path = tmp_path / "response.json"
+    response_path.write_text(json.dumps({
+        "version": "1.0",
+        "action": "approve",
+        "values": {"x": "y"},
+    }))
+
+    result = wait_for_response(response_path, timeout_seconds=1.0, poll_interval=0.1)
+    assert result is not None
+    assert result["action"] == "approve"
+
+
+def test_wait_for_response_returns_none_on_timeout(tmp_path: Path):
+    from lib.genui import wait_for_response
+
+    missing = tmp_path / "nope.json"
+    result = wait_for_response(missing, timeout_seconds=0.3, poll_interval=0.1)
+    assert result is None
+
+
+def test_genui_form_serve_mode_includes_wsl2_and_browser_url_fields(tmp_path: Path):
+    from tools.interaction.genui_form import GenUIForm
+
+    result = GenUIForm().execute(
+        {
+            "project_dir": str(tmp_path / "projects" / "demo-ad"),
+            "config": _sample_config(project_id="demo-ad"),
+            "mode": "serve",
+        }
+    )
+
+    assert result.success, result.error
+    assert "wsl2" in result.data
+    assert "browser_url" in result.data
+    assert isinstance(result.data["wsl2"], bool)
+    assert result.data["browser_url"] is not None

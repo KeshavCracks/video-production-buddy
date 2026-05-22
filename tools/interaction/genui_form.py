@@ -11,7 +11,13 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from lib.genui import render_form_html, write_form_bundle
+from lib.genui import (
+    cleanup_orphaned_servers,
+    get_browser_url,
+    is_wsl2,
+    render_form_html,
+    write_form_bundle,
+)
 from tools.base_tool import BaseTool, ToolResult, ToolRuntime, ToolStability, ToolTier
 
 
@@ -79,7 +85,10 @@ class GenUIForm(BaseTool):
             "response_path": {"type": "string"},
             "server_state": {"type": "string"},
             "url": {"type": ["string", "null"]},
+            "browser_url": {"type": ["string", "null"]},
             "pid": {"type": ["integer", "null"]},
+            "wsl2": {"type": "boolean"},
+            "browser_opened": {"type": "boolean"},
             "instructions": {"type": "string"},
         },
     }
@@ -91,6 +100,28 @@ class GenUIForm(BaseTool):
         "Open the returned localhost URL and submit the form.",
         "Confirm projects/<project>/artifacts/ui/<config_id>/response.json exists before mapping to canonical artifacts.",
     ]
+
+    def _try_open_browser(self, url: str) -> bool:
+        """Attempt to open the form URL in the user's default browser.
+
+        Returns True if a browser was opened, False otherwise.
+        On WSL2, tries Windows browser via cmd.exe; otherwise tries webbrowser.
+        """
+        import webbrowser
+
+        if is_wsl2():
+            try:
+                windows_url = url.replace("127.0.0.1", "localhost", 1)
+                subprocess.run(
+                    ["cmd.exe", "/c", "start", windows_url],
+                    check=False,
+                    capture_output=True,
+                    timeout=5,
+                )
+                return True
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                return False
+        return webbrowser.open(url)
 
     def _choose_port(self, host: str) -> int:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -171,6 +202,7 @@ class GenUIForm(BaseTool):
             if mode not in {"prepare", "serve"}:
                 raise ValueError("mode must be 'prepare' or 'serve'")
 
+            cleanup_orphaned_servers(project_dir)
             bundle = write_form_bundle(project_dir, config)
             data: dict[str, Any] = {
                 "config_id": config["config_id"],
@@ -179,7 +211,9 @@ class GenUIForm(BaseTool):
                 "response_path": str(bundle.response_path),
                 "server_state": "prepared",
                 "url": None,
+                "browser_url": None,
                 "pid": None,
+                "wsl2": is_wsl2(),
                 "instructions": (
                     f"Preview prepared at {bundle.html_path}. Run genui_form in serve mode "
                     f"to get a localhost URL, then wait while {bundle.response_path} is validated."
@@ -201,15 +235,21 @@ class GenUIForm(BaseTool):
                     if process.poll() is None:
                         process.terminate()
                     raise
+                localhost_url = f"http://{host}:{port}/"
+                browser_url = get_browser_url(localhost_url)
+                browser_opened = self._try_open_browser(browser_url)
                 data.update(
                     {
                         "server_state": "running",
-                        "url": f"http://{host}:{port}/",
+                        "url": localhost_url,
+                        "browser_url": browser_url,
                         "pid": process.pid,
+                        "browser_opened": browser_opened,
                         "instructions": (
-                            f"Open http://{host}:{port}/ in a local browser, submit the form, "
+                            f"Open {browser_url} in a local browser, submit the form, "
                             f"then wait while {bundle.response_path} is validated before any "
                             "canonical artifacts are updated."
+                            + (" (Browser should have opened automatically.)" if browser_opened else "")
                         ),
                     }
                 )

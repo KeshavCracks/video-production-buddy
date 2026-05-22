@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import signal
 import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -127,19 +129,38 @@ def main() -> None:
     with open(args.config_path) as f:
         config = json.load(f)
 
+    response_path = Path(args.response_path)
+
     handler = type(
         "BoundGenUIRequestHandler",
         (GenUIRequestHandler,),
         {
             "config": config,
-            "response_path": Path(args.response_path),
+            "response_path": response_path,
         },
     )
     server = ThreadingHTTPServer((args.host, args.port), handler)
+
+    shutdown_requested = threading.Event()
+
+    def _handle_signal(signum: int, frame: Any) -> None:
+        shutdown_requested.set()
+        threading.Thread(target=server.shutdown, daemon=True).start()
+
+    signal.signal(signal.SIGTERM, _handle_signal)
+    signal.signal(signal.SIGINT, _handle_signal)
+
+    pid_path = response_path.parent / "server.pid"
+    pid_path.write_text(str(os.getpid()))
+
     try:
         server.serve_forever()
     finally:
         server.server_close()
+        try:
+            pid_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":
