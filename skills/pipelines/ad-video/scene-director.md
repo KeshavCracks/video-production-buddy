@@ -118,6 +118,46 @@ If a beat's requested rhythm is impossible with the approved production plan
 (for example, only one generated clip exists for a rapid beat), send it back to
 EP before asset generation. Do not silently turn a rapid beat into a long hold.
 
+## Emotional Beat Description Contract
+
+Every scene's `description` must incorporate the emotional and visual treatment
+from its matched beat in `production_bible.narrative.emotional_beat_sequence`.
+
+For each scene, look up its `beat` (or `beat_id`) in the sequence. The beat
+carries:
+
+- **`emotional_target`** — the intended feeling (e.g. "Tension — building unease",
+  "Relief and confidence"). The scene description must convey this emotion through
+  concrete visual choices: lighting mood, color temperature, motion energy, camera
+  behavior — not by naming the emotion literally.
+
+- **`visual_constraint`** — the prescribed visual treatment (e.g. "rapid cuts with
+  desaturated palette", "tight close-ups with shallow depth of field"). This is
+  mandatory visual direction that the scene description must embed. For example,
+  if the constraint says "handheld camera energy", the description should include
+  language like "handheld camera, slight shake, raw urgency" rather than
+  "static wide shot".
+
+- **`intensity`** — the energy level (0.0-1.0). Higher intensity means more visual
+  dynamism: faster motion, tighter shots, more contrast. Lower intensity means
+  slower, wider, calmer. The description's language should match this energy.
+
+**Rule:** A scene description that describes only WHAT is shown (subject, product,
+environment) without HOW it should feel (emotion, visual treatment, energy) fails
+the emotional beat contract. Every generated-video scene must carry at least one
+concrete visual element derived from the beat's `emotional_target` or
+`visual_constraint`.
+
+This ensures that when the asset-director passes the description to a video
+generation model, the prompt already contains emotional direction in its body —
+not just in a mood suffix appended after the fact.
+
+**Structured fields:** In addition to embedding emotional direction in the
+description text, copy the beat's `emotional_target` and `visual_constraint`
+into the scene object's own `emotional_target` and `visual_constraint` fields.
+This makes the scene_plan self-describing for emotional context and gives the
+asset-director a structured per-scene reference when constructing prompts.
+
 ## Crop Regions
 
 When `derivative_variants` includes an aspect-ratio variant (`"9:16"` or

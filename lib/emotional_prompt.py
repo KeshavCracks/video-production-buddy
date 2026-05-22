@@ -23,8 +23,40 @@ from __future__ import annotations
 from typing import Any
 
 
+def _intensity_visual_directives(intensity: float) -> str:
+    """Map a beat's intensity (0..1) to concrete visual direction for generation models.
+
+    Returns a multi-part suffix with mood, camera, and motion cues that video
+    generation models (Wan, Kling) respond to more reliably than abstract mood
+    words alone.
+    """
+    if intensity < 0.3:
+        return (
+            "calm contemplative mood, slow gentle camera drift, "
+            "soft focus transitions, unhurried pacing"
+        )
+    if intensity < 0.6:
+        return (
+            "warm building mood, steady camera movement, "
+            "gradual energy rise, purposeful motion"
+        )
+    if intensity < 0.85:
+        return (
+            "dynamic driving mood, active camera tracking, "
+            "kinetic motion, quick purposeful cuts, rising tension"
+        )
+    return (
+        "intense electric mood, rapid handheld energy, "
+        "sharp kinetic motion, quick cuts, peak tension"
+    )
+
+
 def _intensity_descriptor(intensity: float) -> str:
-    """Map a beat's intensity (0..1) to a concise visual mood word pair."""
+    """Map a beat's intensity (0..1) to a concise visual mood word pair.
+
+    Kept for backward compatibility and internal use where the short form
+    is sufficient (e.g. TTS voice performance labels).
+    """
     if intensity < 0.3:
         return "calm contemplative"
     if intensity < 0.6:
@@ -78,10 +110,17 @@ def apply_emotional_mood(
         return prompt
 
     intensity = float(beat.get("intensity", 0.5))
-    mood_word = _intensity_descriptor(intensity)
     target = _condense_target(emotional_target.strip())
+    visual_directives = _intensity_visual_directives(intensity)
 
-    suffix = f"Mood: {mood_word}, {target}."
+    parts: list[str] = [f"Mood: {visual_directives}, {target}."]
+
+    visual_constraint = (beat.get("visual_constraint") or "").strip()
+    if visual_constraint:
+        condensed_vc = _condense_target(visual_constraint)
+        parts.append(f"Visual: {condensed_vc}.")
+
+    suffix = " ".join(parts)
 
     if suffix.lower() in prompt.lower():
         return prompt
@@ -121,3 +160,50 @@ def find_beat_for_scene(
             return b
 
     return None
+
+
+def apply_alignment_notes(
+    prompt: str,
+    scene: dict[str, Any],
+) -> str:
+    """Append trend and knowledge alignment creative direction to a prompt.
+
+    Reads ``trend_alignment_notes`` and ``knowledge_alignment_notes`` from the
+    scene and appends them as a ``Creative direction:`` suffix. These notes
+    contain concrete visual/pacing guidance derived from viral trend research
+    and professional advertising knowledge that should influence the generated
+    footage, not just serve as compliance metadata.
+
+    Returns ``prompt`` unchanged when the scene has no alignment notes.
+    Idempotent: skips if the suffix is already present.
+    """
+    parts: list[str] = []
+
+    trend_notes = (scene.get("trend_alignment_notes") or "").strip()
+    if trend_notes:
+        condensed = _condense_target(trend_notes)
+        if len(condensed) > 120:
+            condensed = condensed[:117] + "..."
+        parts.append(condensed)
+
+    knowledge_notes = (scene.get("knowledge_alignment_notes") or "").strip()
+    if knowledge_notes:
+        condensed = _condense_target(knowledge_notes)
+        if len(condensed) > 120:
+            condensed = condensed[:117] + "..."
+        parts.append(condensed)
+
+    if not parts:
+        return prompt
+
+    suffix = "Creative direction: " + "; ".join(parts) + "."
+
+    if suffix.lower() in prompt.lower():
+        return prompt
+
+    if not prompt:
+        return suffix
+
+    trimmed = prompt.rstrip().rstrip(",")
+    separator = " " if trimmed.endswith((".", "!", "?", ";")) else ". "
+    return f"{trimmed}{separator}{suffix}"

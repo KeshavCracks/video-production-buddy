@@ -27,7 +27,7 @@ For scenes requiring visual backgrounds (`motion_loop`, `split_screen`, `logo_re
 
 ### Image Generation (Flux or DALL-E)
 
-Prompt structure:
+Prompt structure (before `_wrap` is applied):
 ```
 {playbook.asset_generation.image_prompt_prefix}
 {scene.description} — flat vector illustration style, bold colors
@@ -35,6 +35,29 @@ Primary color: {playbook.visual_language.color_palette.primary[0]}
 Accent: {playbook.visual_language.color_palette.accent[0]}
 Background: {playbook.visual_language.color_palette.background}
 {playbook.asset_generation.image_negative_prompt} [negative]
+```
+
+After constructing the prompt above, pass it through `_wrap()` from the base
+asset-director. `_wrap` appends:
+- Color direction from the production bible
+- Emotional mood and visual constraint from the scene's beat in
+  `emotional_beat_sequence`
+- Trend and knowledge alignment creative direction from the scene's
+  `trend_alignment_notes` / `knowledge_alignment_notes`
+
+```python
+from lib.emotional_prompt import apply_emotional_mood, apply_alignment_notes, find_beat_for_scene
+from lib.color_direction import apply_color_direction
+
+beat_sequence = production_bible["narrative"].get("emotional_beat_sequence", [])
+scene_beat = find_beat_for_scene(beat_sequence, scene)
+color_direction = production_bible["visual"].get("color_direction")
+
+def _wrap(prompt, *, _beat=scene_beat, _scene=scene):
+    out = apply_color_direction(prompt, color_direction)
+    out = apply_emotional_mood(out, _beat)
+    out = apply_alignment_notes(out, _scene)
+    return out
 ```
 
 Output: `assets/scene_{id}_bg.png`, 1920×1080
@@ -68,13 +91,17 @@ before the asset can be shown as approved.
 Provider: Wan 2.7 (Bailian/DashScope) — primary
 Fallback: Kling
 
-Prompt structure:
+Prompt structure (before `_wrap` is applied):
 ```
 {scene.description}
 style: motion graphics, flat animation, bold colors
 duration: {scene.duration_seconds}s
 {playbook.asset_generation.image_negative_prompt} [negative]
 ```
+
+After constructing the prompt, pass it through `_wrap()` which appends emotional
+mood, visual constraint, color direction, and alignment creative direction —
+matching the base asset-director pattern.
 
 Output: `assets/scene_{id}_video.mp4`, 1920×1080, duration ≥ scene.duration_seconds
 

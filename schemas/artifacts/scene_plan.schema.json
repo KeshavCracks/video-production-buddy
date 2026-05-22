@@ -39,6 +39,14 @@
             "enum": ["talking_head", "broll", "animation", "character_scene", "diagram", "text_card", "transition", "generated", "screen_recording"]
           },
           "description": { "type": "string" },
+          "emotional_target": {
+            "type": "string",
+            "description": "The intended emotional register for this scene, copied from the matching beat in production_bible.narrative.emotional_beat_sequence"
+          },
+          "visual_constraint": {
+            "type": "string",
+            "description": "Mandatory visual treatment for this scene, copied from the matching beat in production_bible.narrative.emotional_beat_sequence"
+          },
           "start_seconds": { "type": "number", "minimum": 0 },
           "end_seconds": { "type": "number", "minimum": 0 },
           "script_section_id": { "type": "string" },

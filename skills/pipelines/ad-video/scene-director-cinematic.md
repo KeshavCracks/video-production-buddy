@@ -36,6 +36,22 @@ Cinematic ads follow an emotional arc, not just a logical one:
 | Reveal | Resolution or wonder | CU product hero, rising music |
 | CTA + Brand | Confidence and trust | brand_landing, WS with text |
 
+Each scene's `description` must embed the emotional goal and visual treatment
+from its matched beat in `production_bible.narrative.emotional_beat_sequence`.
+Read the beat's `emotional_target` and `visual_constraint` and translate them
+into concrete cinematic language in the description — camera behavior, lighting
+mood, motion energy — not just subject placement.
+
+For example, if the hook beat says `visual_constraint: "abrupt jarring camera
+to disrupt complacency"` and `emotional_target: "Disruption — snap the viewer
+out of autopilot"`, the scene description should read something like:
+"Sudden handheld close-up of a clock face, sharp rack focus, jarring edit-in
+camera — raw urgency" — not just "Clock on a desk."
+
+The `emotional_target` and `visual_constraint` fields must also be carried as
+structured data on each scene object so the asset-director can use them
+directly when constructing generation prompts.
+
 ## Asset Requirements per Scene Type
 
 | Scene Type | Required Assets |

@@ -21,8 +21,9 @@ color grade: {aligned to playbook primary palette}
 After constructing the prompt above, pass it through `_wrap()` from the base
 asset-director. `_wrap` appends:
 1. **Color palette** — from `production_bible.visual.color_direction`
-2. **Emotional mood** — from the matching beat's `emotional_target` and `intensity` (e.g. "Mood: intense electric, Momentum and capability.")
-3. **Resolution treatment** — only on the resolution-beat scene
+2. **Emotional mood** — from the matching beat's `emotional_target`, `intensity`, and `visual_constraint`
+3. **Trend and knowledge alignment** — from the scene's `trend_alignment_notes` / `knowledge_alignment_notes`
+4. **Resolution treatment** — only on the resolution-beat scene
 
 Output: `assets/scene_{id}_img.jpg`, 1920×1080, JPEG quality 95
 
@@ -86,7 +87,8 @@ aspect_ratio: {primary aspect ratio from production_bible.deliverables.primary}
 ```
 
 After constructing the prompt, pass it through `_wrap()` which appends emotional
-mood and color palette (see base asset-director).
+mood, visual constraint, color palette, and trend/knowledge alignment notes
+(see base asset-director).
 
 Prompt structure for **image_to_video** (product visible, reference image available, before `_wrap`):
 ```
@@ -100,7 +102,8 @@ aspect_ratio: {primary aspect ratio from production_bible.deliverables.primary}
 ```
 
 After constructing the prompt, pass it through `_wrap()` which appends emotional
-mood and color palette (see base asset-director).
+mood, visual constraint, color palette, and trend/knowledge alignment notes
+(see base asset-director).
 
 Output: `assets/scene_{id}_video.mp4`, dimensions matching aspect_ratio (1080×1920 for 9:16, 1920×1080 for 16:9)
 

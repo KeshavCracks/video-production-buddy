@@ -119,7 +119,7 @@ if result.error:
 # (legacy briefs).
 from lib.color_direction import apply_color_direction
 from lib.resolution_treatment import apply_resolution_treatment
-from lib.emotional_prompt import apply_emotional_mood, find_beat_for_scene
+from lib.emotional_prompt import apply_emotional_mood, apply_alignment_notes, find_beat_for_scene
 
 color_direction = production_bible["visual"].get("color_direction")
 resolution_type = production_bible["narrative"].get("resolution_type")
@@ -146,12 +146,13 @@ scene_beat = find_beat_for_scene(beat_sequence, scene)
 # refactored to define `_wrap` outside the per-scene loop. Without the
 # default-arg trick a closure would capture the loop variable's *final*
 # value for every scene.
-def _wrap(prompt: str, *, _is_resolution=is_resolution_scene, _beat=scene_beat) -> str:
-    """Apply color_direction and emotional mood to every scene; apply
-    resolution_treatment only on the resolution-beat scene so the emotional
-    register doesn't leak into other beats' generation."""
+def _wrap(prompt: str, *, _is_resolution=is_resolution_scene, _beat=scene_beat, _scene=scene) -> str:
+    """Apply color_direction, emotional mood, visual constraint, and alignment
+    notes to every scene; apply resolution_treatment only on the resolution-beat
+    scene so the emotional register doesn't leak into other beats' generation."""
     out = apply_color_direction(prompt, color_direction)
     out = apply_emotional_mood(out, _beat)
+    out = apply_alignment_notes(out, _scene)
     if _is_resolution:
         out = apply_resolution_treatment(out, resolution_type)
     return out
