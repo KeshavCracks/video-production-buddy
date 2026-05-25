@@ -760,6 +760,7 @@ def test_run_final_review_includes_transcript_comparison_section(tmp_path):
     the final_review output — even when the caller doesn't provide a
     transcript. A missing section = silent governance failure."""
     import subprocess
+    from schemas.artifacts import validate_artifact
 
     # Build a minimal MP4 so _run_final_review can probe it.
     mp4 = tmp_path / "out.mp4"
@@ -790,6 +791,7 @@ def test_run_final_review_includes_transcript_comparison_section(tmp_path):
     )
     tc = review["checks"]["transcript_comparison"]
     assert any("not provided" in i for i in tc["issues"])
+    validate_artifact("final_review", review)
 
 
 def test_final_review_flags_audio_truncation_as_rerender_issue(tmp_path):

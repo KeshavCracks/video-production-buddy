@@ -1600,7 +1600,6 @@ class VideoCompose(BaseTool):
         """
         result: dict[str, Any] = {
             "transcript_matches_script": False,
-            "word_accuracy": None,
             "script_word_count": 0,
             "transcript_word_count": 0,
             "spurious_punctuation_words": [],
