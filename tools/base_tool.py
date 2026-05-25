@@ -23,38 +23,11 @@ from typing import Any, Callable, Optional
 def _load_dotenv() -> None:
     """Load .env into os.environ once at import time.
 
-    This ensures API keys are available before any tool is instantiated,
-    even when tools are imported directly without going through the registry.
-    Only sets variables that are not already in the environment.
+    Delegates to the shared loader in lib/dotenv_loader.py.
     """
-    env_path = Path(__file__).resolve().parent.parent / ".env"
-    if not env_path.is_file():
-        return
-    with open(env_path, encoding="utf-8", errors="ignore") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, value = line.partition("=")
-            key = key.strip()
-            value = value.strip()
-            if value.startswith(("'", '"')):
-                # Quoted value: extract content between opening and closing quote.
-                # Discards any inline comment after the closing quote.
-                quote = value[0]
-                end = value.find(quote, 1)
-                value = value[1:end] if end > 0 else value.strip(quote)
-            else:
-                # Unquoted: strip inline comments (KEY=value  # comment or KEY=  # comment)
-                for sep in ("  #", "\t#", " #"):
-                    idx = value.find(sep)
-                    if idx != -1:
-                        value = value[:idx].rstrip()
-                        break
-                if value.startswith("#"):
-                    value = ""
-            if key and key not in os.environ:
-                os.environ[key] = value
+    from lib.dotenv_loader import load_dotenv as _load
+
+    _load(Path(__file__).resolve().parent.parent / ".env")
 
 
 _load_dotenv()

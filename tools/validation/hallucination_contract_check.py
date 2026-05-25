@@ -27,7 +27,6 @@ from typing import Any
 
 PRODUCT_VISIBLE_VALUES = {"background", "partial", "hero", "detail", "packshot"}
 VISUAL_ASSET_TYPES = {"image", "video", "animation"}
-NON_GENERATED_SCENE_TYPES = {"text_card", "transition", "diagram", "screen_recording"}
 WAIVER_DECISION_CATEGORY = "hallucination_review_waiver"
 WAIVER_SELECTED_VALUES = {"waive", "waiver", "human_waiver"}
 GENERATED_ASSET_SUBTYPES = {"generated", "ai_generated", "synthetic"}
@@ -121,6 +120,8 @@ def _scene_is_high_risk(
     *,
     has_generated_visual_asset: bool = False,
 ) -> bool:
+    # _scene_has_generated_visual_scope already checks type=="generated"
+    # and _required_assets_generate_visuals, so those don't need repeating.
     if not _scene_has_generated_visual_scope(
         scene,
         has_generated_visual_asset=has_generated_visual_asset,
@@ -132,15 +133,9 @@ def _scene_is_high_risk(
         return True
     if scene.get("product_reference_required") is True:
         return True
-    if scene.get("type") == "generated":
-        return True
-    if (
-        scene.get("motion_required") is True
-        and scene.get("type") not in NON_GENERATED_SCENE_TYPES
-        and _required_assets_generate_visuals(scene)
-    ):
-        return True
-    return False
+    # Scene has generated visual scope and no product-specific markers —
+    # it's high risk because generated visuals can hallucinate.
+    return True
 
 
 def _scene_checks(scene: dict[str, Any]) -> list[dict[str, Any]]:

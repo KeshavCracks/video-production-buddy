@@ -69,6 +69,7 @@ skills-lock.json
 logo_*.png
 generated_image.png
 wanx_*_output.png
+diagram.png
 
 # Downloaded music files (Pixabay, Freesound — not source code)
 pixabay_music_*
