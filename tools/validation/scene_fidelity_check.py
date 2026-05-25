@@ -29,6 +29,9 @@ REGISTRY_PATH_DEFAULT = (
     / "scene_type_registry.json"
 )
 
+VIDEO_CUT_EXTENSIONS = {".mp4", ".mov", ".webm", ".avi", ".mkv"}
+MEDIA_CUT_EXTENSIONS = VIDEO_CUT_EXTENSIONS | {".png", ".jpg", ".jpeg", ".webp"}
+
 
 def load_registry(registry_path: Path | None = None) -> dict[str, Any]:
     path = registry_path or REGISTRY_PATH_DEFAULT
@@ -50,6 +53,98 @@ def _scene_type(scene: dict[str, Any]) -> str | None:
     return scene.get("scene_type") or scene.get("type")
 
 
+def _is_plain_media_cut(scene: dict[str, Any], kind: str) -> bool:
+    if kind != "cut" or _scene_type(scene):
+        return False
+    source = scene.get("source")
+    if not isinstance(source, str) or not source:
+        return False
+    return Path(source).suffix.lower() in MEDIA_CUT_EXTENSIONS
+
+
+def _check_overlapping_source_reuse(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    """Flag repeated use of the same source-video time range.
+
+    Reusing one generated video as multiple non-overlapping trims is valid.
+    Reusing overlapping source windows makes the final render visibly repeat
+    footage even when the timeline itself has no gaps.
+    """
+    cuts = plan.get("cuts")
+    if not isinstance(cuts, list):
+        return []
+
+    render_runtime = str(plan.get("render_runtime", "")).lower()
+    default_source_start = 0.0 if render_runtime == "remotion" else None
+    ranges_by_source: dict[str, list[tuple[float, float, str]]] = {}
+    issues: list[dict[str, Any]] = []
+    tolerance = 0.05
+
+    for idx, cut in enumerate(cuts):
+        if not isinstance(cut, dict):
+            continue
+        source = cut.get("source")
+        if not isinstance(source, str) or not source:
+            continue
+        if source.startswith("remotion:"):
+            continue
+        if Path(source).suffix.lower() not in VIDEO_CUT_EXTENSIONS:
+            continue
+
+        try:
+            timeline_start = float(cut["in_seconds"])
+            timeline_end = float(cut["out_seconds"])
+        except (KeyError, TypeError, ValueError):
+            continue
+
+        duration = timeline_end - timeline_start
+        if duration <= 0:
+            continue
+
+        if "source_in_seconds" in cut:
+            try:
+                source_start = float(cut["source_in_seconds"])
+            except (TypeError, ValueError):
+                continue
+        else:
+            source_start = default_source_start if default_source_start is not None else timeline_start
+        source_end = source_start + duration
+        cut_id = str(cut.get("id", f"cut-{idx}"))
+
+        for prev_start, prev_end, prev_id in ranges_by_source.get(source, []):
+            overlap_start = max(source_start, prev_start)
+            overlap_end = min(source_end, prev_end)
+            if overlap_end - overlap_start > tolerance:
+                issues.append(
+                    {
+                        "severity": "critical",
+                        "scene_id": cut_id,
+                        "kind": "overlapping_source_reuse",
+                        "source": source,
+                        "overlaps_with": prev_id,
+                        "source_range_seconds": [
+                            round(source_start, 3),
+                            round(source_end, 3),
+                        ],
+                        "overlap_range_seconds": [
+                            round(overlap_start, 3),
+                            round(overlap_end, 3),
+                        ],
+                        "detail": (
+                            f"Cut {cut_id!r} reuses source range "
+                            f"{source_start:.2f}-{source_end:.2f}s from {source!r}, "
+                            f"overlapping cut {prev_id!r}. This creates repeated "
+                            "visible footage; use a non-overlapping source range, "
+                            "a single longer cut, or another asset."
+                        ),
+                    }
+                )
+                break
+
+        ranges_by_source.setdefault(source, []).append((source_start, source_end, cut_id))
+
+    return issues
+
+
 def check_plan(plan: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]:
     """Validate a scene_plan or edit_decisions dict against the registry."""
     types = registry.get("scene_types", {})
@@ -63,6 +158,8 @@ def check_plan(plan: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]
         st = _scene_type(scene)
 
         if not st:
+            if _is_plain_media_cut(scene, kind):
+                continue
             issues.append(
                 {
                     "severity": "critical",
@@ -125,6 +222,10 @@ def check_plan(plan: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]
                 }
             )
             failing_ids.add(scene_id)
+
+    for issue in _check_overlapping_source_reuse(plan):
+        issues.append(issue)
+        failing_ids.add(str(issue.get("scene_id", "unknown")))
 
     return {
         "ok": len(failing_ids) == 0,

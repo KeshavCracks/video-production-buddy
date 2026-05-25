@@ -450,9 +450,9 @@ class VideoCompose(BaseTool):
                     return ToolResult(success=False, error=f"Cut source not found: {source}")
 
                 seg_path = temp_dir / f"seg_{i:04d}.mp4"
-                in_s = cut["in_seconds"]
+                in_s = float(cut.get("source_in_seconds", cut["in_seconds"]))
                 out_s = cut["out_seconds"]
-                duration = out_s - in_s
+                duration = float(out_s) - float(cut["in_seconds"])
                 speed = cut.get("speed", 1.0)
 
                 if self._is_image(source):
@@ -881,6 +881,20 @@ class VideoCompose(BaseTool):
                 log.warning("Could not validate delivery promise: %s", e)
         else:
             warnings.append("No delivery_promise in edit_decisions — skipping promise validation")
+
+        # --- 1b. Scene/cut fidelity check ---
+        try:
+            from tools.validation.scene_fidelity_check import check_plan, load_registry
+
+            fidelity_input = dict(edit_decisions)
+            fidelity_input["cuts"] = resolved_cuts
+            fidelity_report = check_plan(fidelity_input, load_registry())
+            if not fidelity_report.get("ok"):
+                for issue in fidelity_report.get("issues", []):
+                    detail = issue.get("detail") or issue.get("kind") or str(issue)
+                    blocks.append(f"Scene fidelity violation: {detail}")
+        except Exception as e:
+            log.warning("Could not run scene fidelity check: %s", e)
 
         # --- 2. Slideshow risk check ---
         renderer_family = edit_decisions.get("renderer_family")
@@ -2295,15 +2309,37 @@ class VideoCompose(BaseTool):
                 bg = colors["background"]
                 resolved["back_color"] = bg
 
-        # Layer 2: edit_decisions subtitle style
+        # Layer 2: edit_decisions subtitle style. The artifact schema uses
+        # subtitles.style for a named mode string (sentence/karaoke/etc.) and
+        # keeps concrete style fields beside it, so accept both shapes.
         if edit_decisions:
-            ed_style = edit_decisions.get("subtitles", {}).get("style", {})
-            for k, v in ed_style.items():
-                if v is not None:
-                    resolved[k] = v
+            ed_subtitles = edit_decisions.get("subtitles", {})
+            if isinstance(ed_subtitles, dict):
+                for source_key, resolved_key in {
+                    "font": "font",
+                    "font_size": "font_size",
+                    "color": "primary_color",
+                    "outline_color": "outline_color",
+                }.items():
+                    value = ed_subtitles.get(source_key)
+                    if value is not None:
+                        resolved[resolved_key] = value
+
+                position = ed_subtitles.get("position")
+                if position == "top-center":
+                    resolved["alignment"] = 8
+                    resolved["margin_v"] = max(40, int(resolved.get("margin_v", 40)))
+                elif position == "bottom-center":
+                    resolved["alignment"] = 2
+
+                ed_style = ed_subtitles.get("style", {})
+                if isinstance(ed_style, dict):
+                    for k, v in ed_style.items():
+                        if v is not None:
+                            resolved[k] = v
 
         # Layer 3: Explicit override (highest priority)
-        if explicit_style:
+        if isinstance(explicit_style, dict):
             for k, v in explicit_style.items():
                 if v is not None:
                     resolved[k] = v
@@ -2313,16 +2349,35 @@ class VideoCompose(BaseTool):
     @staticmethod
     def _build_subtitle_style(style: dict) -> str:
         """Build ASS force_style string from style dict."""
+        def _ass_color(value: Any) -> str:
+            if not isinstance(value, str):
+                return str(value)
+            raw = value.strip()
+            if raw.startswith("&H"):
+                return raw
+            if raw.startswith("#") and len(raw) in {7, 9}:
+                hex_value = raw[1:]
+                if len(hex_value) == 6:
+                    css_alpha = 255
+                else:
+                    css_alpha = int(hex_value[6:8], 16)
+                rr = int(hex_value[0:2], 16)
+                gg = int(hex_value[2:4], 16)
+                bb = int(hex_value[4:6], 16)
+                ass_alpha = 255 - css_alpha
+                return f"&H{ass_alpha:02X}{bb:02X}{gg:02X}{rr:02X}"
+            return raw
+
         parts = []
         parts.append(f"FontName={style.get('font', 'Inter')}")
         parts.append(f"FontSize={style.get('font_size', 28)}")
         parts.append(f"Bold={1 if style.get('bold', True) else 0}")
         if style.get("primary_color"):
-            parts.append(f"PrimaryColour={style['primary_color']}")
+            parts.append(f"PrimaryColour={_ass_color(style['primary_color'])}")
         if style.get("outline_color"):
-            parts.append(f"OutlineColour={style['outline_color']}")
+            parts.append(f"OutlineColour={_ass_color(style['outline_color'])}")
         if style.get("back_color"):
-            parts.append(f"BackColour={style['back_color']}")
+            parts.append(f"BackColour={_ass_color(style['back_color'])}")
         border_style = style.get("border_style", 1)
         parts.append(f"BorderStyle={border_style}")
         parts.append(f"Outline={style.get('outline_width', 2)}")
