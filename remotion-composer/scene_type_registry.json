@@ -101,7 +101,7 @@
       "required_props": [],
       "required_cut_props": ["productImage"],
       "optional_props": ["productImage", "text", "subtitle", "banners", "sidebarItems", "animation", "accentColor", "backgroundColor", "sceneDurationSeconds", "styleLayers"],
-      "motion_primitives": ["product_scale_reveal", "timeline_playhead_sweep", "workflow_chip_orbit", "light_sweep", "panel_cascade", "progress_bar_race", "connection_line_draw", "product_parallax"],
+      "motion_primitives": ["product_scale_reveal", "timeline_playhead_sweep", "workflow_chip_orbit", "light_sweep", "panel_cascade", "progress_bar_race", "connection_line_draw", "product_parallax", "cursor_blink"],
       "recommended_for_beats": ["B1-hook", "B2-build", "B4-reveal"]
     },
     "dashboard_scene": {

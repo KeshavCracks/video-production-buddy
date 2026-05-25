@@ -188,6 +188,7 @@ export const CreatorWorkflowScene: React.FC<CreatorWorkflowSceneProps> = ({
     fps,
     config: { damping: 19, stiffness: 90 },
   });
+  const cursorVisible = Math.floor(frame / 16) % 2 === 0;
 
   return (
     <AbsoluteFill style={{ background: backgroundColor, overflow: "hidden" }}>
@@ -322,6 +323,38 @@ export const CreatorWorkflowScene: React.FC<CreatorWorkflowSceneProps> = ({
         </>
       ) : (
         <>
+          <div
+            style={{
+              position: "absolute",
+              right: 128,
+              top: 250,
+              width: 356,
+              padding: "17px 20px",
+              borderRadius: 18,
+              background: "rgba(255,255,255,0.085)",
+              border: `1px solid ${accentColor}55`,
+              color: "rgba(255,255,255,0.88)",
+              fontFamily: "Inter, system-ui, sans-serif",
+              fontSize: 22,
+              fontWeight: 650,
+              letterSpacing: 0,
+              boxShadow: `0 18px 44px ${accentColor}20`,
+            }}
+          >
+            Refine direction
+            <span
+              style={{
+                display: "inline-block",
+                width: 3,
+                height: 24,
+                marginLeft: 8,
+                verticalAlign: "-4px",
+                borderRadius: 2,
+                background: accentColor,
+                opacity: cursorVisible ? 1 : 0,
+              }}
+            />
+          </div>
           <div
             style={{
               position: "absolute",
