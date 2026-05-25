@@ -18,7 +18,7 @@ Common ad-video scene types (see registry for full prop schema and supported `mo
 | `checkmark_scene` | CheckmarkScene | B3 / B4 visual resolution moment | checkmark_draw, radial_ripple, spring_pop |
 | `line_connection_scene` | LineConnectionScene | B4 sync / data-flow | line_draw_between_anchors, mutual_highlight_pulse |
 | `stat_card` / `stat_roll_scene` | StatCard / StatRollScene | B4 reveal stats | digit_roll_up, comma_separators |
-| `brand_card` | BrandCardScene | B5 CTA | letter_spring, underline_draw, cta_appear, wordmark_pulse |
+| `brand_card` | BrandCardScene | B5 CTA | letter_spring, underline_draw, cta_appear, wordmark_pulse; product_scale_reveal only when `productImage` or `hardwareTreatment` is set |
 
 ## Required per-scene fields (fidelity gate enforces)
 
@@ -36,6 +36,11 @@ For every entry in `scene_plan.scenes[]`:
   ]
 }
 ```
+
+If a scene declares a motion primitive with registry-specific cut prop
+requirements (for example `brand_card` + `product_scale_reveal`), ensure the
+downstream `edit_decisions.cuts[]` entry carries the required prop. A text-only
+`brand_card` must not claim product-scale motion.
 
 ## KVM coverage (MANDATORY)
 

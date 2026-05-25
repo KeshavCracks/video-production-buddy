@@ -2425,6 +2425,10 @@ def test_product_visible_remotion_scene_registry_requires_approved_product_image
     brand = scene_types["brand_card"]
     assert "productImage" in brand["optional_props"]
     assert "hardwareTreatment" in brand["optional_props"]
+    assert brand["motion_required_cut_props"]["product_scale_reveal"]["any_of"] == [
+        "productImage",
+        "hardwareTreatment",
+    ]
     assert "Text-only by default" in brand["description"]
     assert "creator_workflow_scene" in VideoCompose._REMOTION_COMPONENTS
     assert "brand_card" in VideoCompose._REMOTION_COMPONENTS
@@ -2454,6 +2458,39 @@ def test_scene_fidelity_rejects_creator_workflow_without_product_image() -> None
     with_product["cuts"][0]["productImage"] = "reference_assets/product.png"
 
     assert check_plan(with_product, registry)["ok"] is True
+
+
+def test_scene_fidelity_rejects_brand_card_product_reveal_without_product_visual() -> None:
+    registry = _load_scene_type_registry()
+    missing_product_visual = {
+        "cuts": [
+            {
+                "id": "scene-cta",
+                "type": "brand_card",
+                "source": "remotion:brand_card",
+                "in_seconds": 0,
+                "out_seconds": 4,
+                "motion_specs": ["product_scale_reveal"],
+            }
+        ]
+    }
+
+    report = check_plan(missing_product_visual, registry)
+
+    assert report["ok"] is False
+    assert any(
+        issue["kind"] == "missing_motion_required_props" for issue in report["issues"]
+    )
+
+    with_product_image = deepcopy(missing_product_visual)
+    with_product_image["cuts"][0]["productImage"] = "reference_assets/product.png"
+
+    assert check_plan(with_product_image, registry)["ok"] is True
+
+    with_hardware_treatment = deepcopy(missing_product_visual)
+    with_hardware_treatment["cuts"][0]["hardwareTreatment"] = "synthetic_laptop"
+
+    assert check_plan(with_hardware_treatment, registry)["ok"] is True
 
 
 def test_remotion_product_components_do_not_render_synthetic_hardware_by_default() -> None:

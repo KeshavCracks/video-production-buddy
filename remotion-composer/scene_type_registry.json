@@ -117,7 +117,13 @@
       "description": "Animated end card: letter spring, accent underline draw, tagline fade, CTA, wordmark pulse. Use for CTA/brand beats. Text-only by default; render an approved product only when productImage is provided, and render synthetic laptop hardware only when hardwareTreatment is explicitly set.",
       "required_props": [],
       "optional_props": ["brandName", "tagline", "ctaText", "productImage", "hardwareTreatment", "accentColor", "backgroundColor", "sceneDurationSeconds", "styleLayers"],
-      "motion_primitives": ["letter_spring", "underline_draw", "tagline_fade", "cta_appear", "wordmark_pulse"],
+      "motion_required_cut_props": {
+        "product_scale_reveal": {
+          "any_of": ["productImage", "hardwareTreatment"],
+          "description": "BrandCardScene only renders product-scale motion when an approved product image or explicit hardware treatment is provided."
+        }
+      },
+      "motion_primitives": ["letter_spring", "underline_draw", "tagline_fade", "cta_appear", "wordmark_pulse", "product_scale_reveal"],
       "recommended_for_beats": ["B5-cta"]
     },
     "terminal_scene": {

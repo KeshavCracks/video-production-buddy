@@ -6,6 +6,8 @@ Reads scene_type_registry.json and validates that every scene/cut:
   - lists only motion_specs that the chosen component actually supports
   - includes any registry-required props, including cut-only props that are
     resolved after the asset stage (for example approved productImage paths)
+  - includes props required by a declared motion primitive when the registry
+    marks that primitive as prop-dependent
 
 Used by:
   - asset-director-animated.md before any asset is generated
@@ -51,6 +53,15 @@ def _scene_iter(plan: dict[str, Any]):
 
 def _scene_type(scene: dict[str, Any]) -> str | None:
     return scene.get("scene_type") or scene.get("type")
+
+
+def _has_prop_value(scene: dict[str, Any], prop: str) -> bool:
+    value = scene.get(prop)
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    return value != ""
 
 
 def _is_plain_media_cut(scene: dict[str, Any], kind: str) -> bool:
@@ -209,7 +220,7 @@ def check_plan(plan: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]
         required = list(type_def.get("required_props", []) or [])
         if kind == "cut":
             required.extend(type_def.get("required_cut_props", []) or [])
-        missing = [p for p in required if scene.get(p) in (None, "")]
+        missing = [p for p in required if not _has_prop_value(scene, p)]
         if missing:
             issues.append(
                 {
@@ -218,6 +229,41 @@ def check_plan(plan: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]
                     "kind": "missing_required_props",
                     "detail": (
                         f"scene_type {st!r} requires props {missing} but none were provided."
+                    ),
+                }
+            )
+            failing_ids.add(scene_id)
+
+        motion_required_props = dict(type_def.get("motion_required_props", {}) or {})
+        if kind == "cut":
+            motion_required_props.update(
+                type_def.get("motion_required_cut_props", {}) or {}
+            )
+        for primitive in requested:
+            requirement = motion_required_props.get(primitive)
+            if not isinstance(requirement, dict):
+                continue
+
+            all_of = requirement.get("all_of", []) or []
+            missing_all = [p for p in all_of if not _has_prop_value(scene, p)]
+            any_of = requirement.get("any_of", []) or []
+            missing_any = bool(any_of) and not any(
+                _has_prop_value(scene, p) for p in any_of
+            )
+            if not missing_all and not missing_any:
+                continue
+
+            issues.append(
+                {
+                    "severity": "major",
+                    "scene_id": scene_id,
+                    "kind": "missing_motion_required_props",
+                    "motion_spec": primitive,
+                    "required_props": missing_all,
+                    "required_any_props": any_of if missing_any else [],
+                    "detail": (
+                        f"scene_type {st!r} declares motion primitive {primitive!r}, "
+                        "but the props required to render that motion were not provided."
                     ),
                 }
             )

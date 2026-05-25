@@ -138,7 +138,7 @@ For each scene in `scene_plan.scenes[]`:
    match the rhythm entry for that beat. Split or combine scene-level material
    as needed before asset generation; do not let rapid beats collapse into long
    holds.
-7. Copy registry props from the scene into the cut (`text`, `subtitle`, `brandName`, `ctaText`, `productImage`, `hardwareTreatment`, `banners`, `sidebarItems`, etc.). For `creator_workflow_scene`, `productImage` must be the approved `product_identity_reference.selected_reference_image_path`; do not leave it blank and do not substitute generic laptop hardware.
+7. Copy registry props from the scene into the cut (`text`, `subtitle`, `brandName`, `ctaText`, `productImage`, `hardwareTreatment`, `banners`, `sidebarItems`, etc.). For `creator_workflow_scene`, `productImage` must be the approved `product_identity_reference.selected_reference_image_path`; do not leave it blank and do not substitute generic laptop hardware. For `brand_card` cuts that declare `motion_specs: ["product_scale_reveal"]`, include either `productImage` or an explicitly approved `hardwareTreatment`; otherwise leave `product_scale_reveal` out of `motion_specs`.
 8. Put narration timing under `audio.narration.segments[]` using asset IDs from `asset_manifest`.
 9. Verify: each narration segment duration is ≤ its scene duration.
 
