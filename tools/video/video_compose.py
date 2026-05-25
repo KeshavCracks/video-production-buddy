@@ -886,19 +886,22 @@ class VideoCompose(BaseTool):
         else:
             warnings.append("No delivery_promise in edit_decisions — skipping promise validation")
 
-        # --- 1b. Scene/cut fidelity check ---
-        try:
-            from tools.validation.scene_fidelity_check import check_plan, load_registry
+        # --- 1b. Scene/cut fidelity check (Remotion/FFmpeg only) ---
+        # Hyperframes manages its own scene system; the registry only covers
+        # Remotion component scene types and plain media cuts.
+        if edit_decisions.get("render_runtime") != "hyperframes":
+            try:
+                from tools.validation.scene_fidelity_check import check_plan, load_registry
 
-            fidelity_input = dict(edit_decisions)
-            fidelity_input["cuts"] = resolved_cuts
-            fidelity_report = check_plan(fidelity_input, load_registry())
-            if not fidelity_report.get("ok"):
-                for issue in fidelity_report.get("issues", []):
-                    detail = issue.get("detail") or issue.get("kind") or str(issue)
-                    blocks.append(f"Scene fidelity violation: {detail}")
-        except Exception as e:
-            log.warning("Could not run scene fidelity check: %s", e)
+                fidelity_input = dict(edit_decisions)
+                fidelity_input["cuts"] = resolved_cuts
+                fidelity_report = check_plan(fidelity_input, load_registry())
+                if not fidelity_report.get("ok"):
+                    for issue in fidelity_report.get("issues", []):
+                        detail = issue.get("detail") or issue.get("kind") or str(issue)
+                        blocks.append(f"Scene fidelity violation: {detail}")
+            except Exception as e:
+                log.warning("Could not run scene fidelity check: %s", e)
 
         # --- 2. Slideshow risk check ---
         renderer_family = edit_decisions.get("renderer_family")
