@@ -385,14 +385,14 @@ stages:
   review_focus:
   - Timeline covers 0 to total_duration with no gaps
   - Every cut source, narration/music/SFX/overlay asset_id, and enabled subtitle source resolves through asset_manifest
-  - render_runtime and music_strategy match production_proposal exactly
+  - render_runtime and music_strategy match production_proposal unless an approved decision_log substitution selects the edit value
   - Music ducking set to -18 dB during all narration segments
   - Subtitle burn configured
   - Derivative edit specs present and renderable when production_proposal.derivatives_added is non-empty (aspect variants need crop_regions; duration variants need a <=15s scene selection)
   success_criteria:
   - edit_decisions artifact produced
-  - edit_decisions.render_runtime == production_proposal.render_runtime
-  - edit_decisions.music_strategy == production_proposal.music_strategy
+  - edit_decisions.render_runtime == production_proposal.render_runtime unless an approved render_runtime_selection decision selects the edit runtime
+  - edit_decisions.music_strategy == production_proposal.music_strategy unless an approved music_strategy_selection decision selects the edit strategy
   - cut sources, audio/overlay asset IDs, and enabled subtitle sources resolve to asset_manifest entries
   - audio.target_db == -18 for all narration windows
   - edit_decisions.subtitles.enabled captured (user opt-in, not forced)
@@ -442,12 +442,12 @@ stages:
   - 'Audio channels: stereo'
   - final_review.status == pass after inspecting actual rendered outputs
   - final_review.output_path and probe/runtime evidence match render_report.outputs
-  - final_review subtitle and music presence evidence matches production_proposal
+  - final_review subtitle evidence matches production_proposal and music presence evidence matches the approved music_strategy
   - final_review.reviewed_outputs covers every render_report.outputs file when derivative outputs exist
   success_criteria:
   - render_report artifact produced
   - final_review artifact produced with status pass
-  - final_review music/subtitle evidence matches production_proposal
+  - final_review subtitle evidence matches production_proposal and music evidence matches the approved music_strategy
   - ad_video_planning_chain_check passed before video_compose
   - provider_consistency_check confirmed narration coverage and visual provider locks before video_compose
   - provider_consistency_check confirmed library_locked/search_align music_alignment evidence before video_compose when strict music sync is selected

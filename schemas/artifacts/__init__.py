@@ -668,6 +668,37 @@ def _find_ad_video_approved_decision_selection(
     return None
 
 
+def _ad_video_effective_edit_value(
+    *,
+    production_proposal: dict[str, Any],
+    edit_decisions: dict[str, Any] | None,
+    decision_log: dict[str, Any] | None,
+    proposal_field: str,
+    decision_category: str,
+) -> Any:
+    """Return the approved edit-stage value, or the proposal lock."""
+    proposal_value = production_proposal.get(proposal_field)
+    if not isinstance(edit_decisions, dict):
+        return proposal_value
+
+    edit_value = edit_decisions.get(proposal_field)
+    if edit_value == proposal_value:
+        return edit_value
+
+    if (
+        isinstance(edit_value, str)
+        and _find_ad_video_approved_decision_selection(
+            decision_log,
+            category=decision_category,
+            selected=edit_value,
+        )
+        is not None
+    ):
+        return edit_value
+
+    return proposal_value
+
+
 def _validate_ad_video_edit_matches_production_proposal(
     edit_decisions: dict[str, Any],
     production_proposal: dict[str, Any],
@@ -694,14 +725,7 @@ def _validate_ad_video_edit_matches_production_proposal(
             "render_runtime_selection decision selects the edit runtime"
         )
 
-    metadata = (
-        edit_decisions.get("metadata")
-        if isinstance(edit_decisions.get("metadata"), dict)
-        else {}
-    )
-    actual_music_strategy = (
-        edit_decisions.get("music_strategy") or metadata.get("music_strategy")
-    )
+    actual_music_strategy = edit_decisions.get("music_strategy")
     expected_music_strategy = production_proposal.get("music_strategy")
     if (
         isinstance(expected_music_strategy, str)
@@ -1044,8 +1068,7 @@ def _validate_ad_video_edit_decisions(
     audio = data.get("audio")
     music = audio.get("music") if isinstance(audio, dict) else None
     schedule = music.get("volume_schedule") if isinstance(music, dict) else None
-    metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
-    music_strategy = data.get("music_strategy") or metadata.get("music_strategy")
+    music_strategy = data.get("music_strategy")
     if not isinstance(music_strategy, str) or not music_strategy.strip():
         raise jsonschema.ValidationError(
             "ad-video edit_decisions.music_strategy is required"
@@ -1608,7 +1631,15 @@ def _validate_ad_video_render_report(
 
     production_proposal = related_artifacts.get("production_proposal")
     if isinstance(production_proposal, dict):
-        expected_runtime = production_proposal.get("render_runtime")
+        edit_decisions = related_artifacts.get("edit_decisions")
+        decision_log = related_artifacts.get("decision_log")
+        expected_runtime = _ad_video_effective_edit_value(
+            production_proposal=production_proposal,
+            edit_decisions=edit_decisions if isinstance(edit_decisions, dict) else None,
+            decision_log=decision_log if isinstance(decision_log, dict) else None,
+            proposal_field="render_runtime",
+            decision_category="render_runtime_selection",
+        )
         if (
             isinstance(expected_runtime, str)
             and expected_runtime.strip()
@@ -1616,7 +1647,7 @@ def _validate_ad_video_render_report(
         ):
             raise jsonschema.ValidationError(
                 "ad-video render_report.renderer must match "
-                "production_proposal.render_runtime"
+                "the approved render_runtime"
             )
 
         expected_derivatives = {
@@ -1837,6 +1868,8 @@ def _validate_ad_video_final_review_matches_render_report(
 def _validate_ad_video_final_review_matches_production_proposal(
     final_review: dict[str, Any],
     production_proposal: dict[str, Any],
+    edit_decisions: dict[str, Any] | None = None,
+    decision_log: dict[str, Any] | None = None,
 ) -> None:
     checks = (
         final_review.get("checks")
@@ -1844,7 +1877,13 @@ def _validate_ad_video_final_review_matches_production_proposal(
         else {}
     )
 
-    music_strategy = production_proposal.get("music_strategy")
+    music_strategy = _ad_video_effective_edit_value(
+        production_proposal=production_proposal,
+        edit_decisions=edit_decisions,
+        decision_log=decision_log,
+        proposal_field="music_strategy",
+        decision_category="music_strategy_selection",
+    )
     audio_spotcheck = (
         checks.get("audio_spotcheck") if isinstance(checks, dict) else None
     )
@@ -1854,7 +1893,7 @@ def _validate_ad_video_final_review_matches_production_proposal(
             if music_strategy != "none" and not music_present:
                 raise jsonschema.ValidationError(
                     "ad-video final_review.checks.audio_spotcheck.music_present "
-                    "must be true when production_proposal.music_strategy "
+                    "must be true when approved music_strategy "
                     "is not 'none'"
                 )
 
@@ -2094,9 +2133,13 @@ def _validate_ad_video_final_review(
             _validate_ad_video_final_review_matches_render_report(data, render_report)
         production_proposal = related_artifacts.get("production_proposal")
         if isinstance(production_proposal, dict):
+            edit_decisions = related_artifacts.get("edit_decisions")
+            decision_log = related_artifacts.get("decision_log")
             _validate_ad_video_final_review_matches_production_proposal(
                 data,
                 production_proposal,
+                edit_decisions if isinstance(edit_decisions, dict) else None,
+                decision_log if isinstance(decision_log, dict) else None,
             )
 
 

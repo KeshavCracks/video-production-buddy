@@ -368,6 +368,33 @@ def _render_report_with_vertical_derivative() -> dict:
     return report
 
 
+def _approved_decision_log(category: str, selected: str) -> dict:
+    return {
+        "version": "1.0",
+        "project_id": "ad-test",
+        "decisions": [
+            {
+                "decision_id": f"d-{category}",
+                "stage": "edit",
+                "category": category,
+                "subject": f"Approved {category}",
+                "options_considered": [
+                    {
+                        "option_id": selected,
+                        "label": selected,
+                        "score": 0.8,
+                        "reason": "User-approved downstream selection.",
+                    }
+                ],
+                "selected": selected,
+                "reason": "User approved the downstream selection before compose.",
+                "user_visible": True,
+                "user_approved": True,
+            }
+        ],
+    }
+
+
 def _valid_final_review() -> dict:
     return {
         "version": "1.0",
@@ -633,6 +660,13 @@ class TestEditDecisionsVolumeSchedule:
         del ed["audio"]["music"]["volume_schedule"]
         validate_artifact("edit_decisions", ed, pipeline_type="ad-video")
 
+    def test_music_strategy_must_be_top_level_not_metadata_only(self) -> None:
+        ed = _valid_edit_decisions()
+        ed["metadata"] = {"music_strategy": ed.pop("music_strategy")}
+
+        with pytest.raises(ValidationError, match="music_strategy"):
+            validate_artifact("edit_decisions", ed, pipeline_type="ad-video")
+
     def test_speed_adjusted_cuts_preserve_timeline_total_duration(self) -> None:
         ed = _valid_edit_decisions()
         ed["total_duration_seconds"] = 10
@@ -786,6 +820,43 @@ class TestRenderReportOutputCoverage:
                 _valid_render_report(),
                 pipeline_type="ad-video",
                 related_artifacts={"production_proposal": proposal},
+            )
+
+    def test_render_report_honors_approved_runtime_selection_change(self) -> None:
+        proposal = _minimal_production_proposal()
+        proposal["render_runtime"] = "remotion"
+        edit_decisions = _valid_edit_decisions()
+        edit_decisions["render_runtime"] = "ffmpeg"
+
+        validate_artifact(
+            "render_report",
+            _valid_render_report(),
+            pipeline_type="ad-video",
+            related_artifacts={
+                "production_proposal": proposal,
+                "edit_decisions": edit_decisions,
+                "decision_log": _approved_decision_log(
+                    "render_runtime_selection",
+                    "ffmpeg",
+                ),
+            },
+        )
+
+    def test_render_report_rejects_unapproved_runtime_selection_change(self) -> None:
+        proposal = _minimal_production_proposal()
+        proposal["render_runtime"] = "remotion"
+        edit_decisions = _valid_edit_decisions()
+        edit_decisions["render_runtime"] = "ffmpeg"
+
+        with pytest.raises(ValidationError, match="renderer"):
+            validate_artifact(
+                "render_report",
+                _valid_render_report(),
+                pipeline_type="ad-video",
+                related_artifacts={
+                    "production_proposal": proposal,
+                    "edit_decisions": edit_decisions,
+                },
             )
 
     def test_render_report_must_cover_bible_primary_aspect_ratio(self) -> None:
@@ -1034,6 +1105,53 @@ class TestRenderToFinalReviewConsistency:
                 related_artifacts={
                     "render_report": _valid_render_report(),
                     "production_proposal": proposal,
+                },
+            )
+
+    def test_final_review_honors_approved_music_strategy_change_to_none(self) -> None:
+        proposal = _minimal_production_proposal()
+        proposal["music_strategy"] = "generative_loose"
+        edit_decisions = _valid_edit_decisions()
+        edit_decisions["music_strategy"] = "none"
+        edit_decisions["audio"]["music"].pop("volume_schedule", None)
+        review = _valid_final_review()
+        review["checks"]["audio_spotcheck"]["music_present"] = False
+
+        validate_artifact(
+            "final_review",
+            review,
+            pipeline_type="ad-video",
+            related_artifacts={
+                "render_report": _valid_render_report(),
+                "production_proposal": proposal,
+                "edit_decisions": edit_decisions,
+                "decision_log": _approved_decision_log(
+                    "music_strategy_selection",
+                    "none",
+                ),
+            },
+        )
+
+    def test_final_review_honors_approved_music_strategy_change_to_music(self) -> None:
+        proposal = _minimal_production_proposal()
+        proposal["music_strategy"] = "none"
+        edit_decisions = _valid_edit_decisions()
+        review = _valid_final_review()
+        review["checks"]["audio_spotcheck"]["music_present"] = False
+
+        with pytest.raises(ValidationError, match="music_present"):
+            validate_artifact(
+                "final_review",
+                review,
+                pipeline_type="ad-video",
+                related_artifacts={
+                    "render_report": _valid_render_report(),
+                    "production_proposal": proposal,
+                    "edit_decisions": edit_decisions,
+                    "decision_log": _approved_decision_log(
+                        "music_strategy_selection",
+                        "generative_loose",
+                    ),
                 },
             )
 
