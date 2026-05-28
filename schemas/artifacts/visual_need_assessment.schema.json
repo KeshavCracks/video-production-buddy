@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "video-production-buddy/artifacts/visual_need_assessment",
+  "title": "GenUI Visual Need Assessment",
+  "description": "Agent-side decision for whether one interaction round needs a browser GenUI workspace instead of linear chat.",
+  "type": "object",
+  "required": [
+    "recommended_mode",
+    "recommended_tool",
+    "linear_chat_sufficient",
+    "reasons",
+    "required_ui_primitives",
+    "confidence",
+    "fallback"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "recommended_mode": {
+      "type": "string",
+      "enum": ["cli", "gate_workspace", "media_review_room", "project_cockpit", "background_status"]
+    },
+    "recommended_tool": {
+      "type": ["string", "null"],
+      "enum": ["genui_session", "genui_interaction", null]
+    },
+    "linear_chat_sufficient": { "type": "boolean" },
+    "interaction_kind": { "type": "string" },
+    "reasons": {
+      "type": "array",
+      "maxItems": 32,
+      "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+      "uniqueItems": true
+    },
+    "required_ui_primitives": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "enum": [
+          "media_player",
+          "audio_player",
+          "keyframe_strip",
+          "scene_rail",
+          "transcript_panel",
+          "side_by_side_comparison",
+          "structured_fields",
+          "timecoded_annotation",
+          "frame_region_annotation",
+          "issue_tracker",
+          "approval_attestation",
+          "artifact_trace",
+          "budget_panel",
+          "status_timeline"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "fallback": {
+      "type": "string",
+      "enum": [
+        "cli",
+        "cli_only_when_browser_fails_or_user_declines",
+        "compatibility_surface_fallback"
+      ]
+    }
+  }
+}

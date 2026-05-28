@@ -1,0 +1,6 @@
+allowBuilds:
+  esbuild: true
+peerDependencyRules:
+  allowAny:
+    - zod
+    - "@a2ui/web_core"

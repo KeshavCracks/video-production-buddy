@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "video-production-buddy/artifacts/ui_interaction_journal",
+  "title": "GenUI Interaction Journal",
+  "description": "Agent-owned GenUI journal for every CLI-vs-GenUI interaction decision, session lifecycle state, validation result, operation summary, and fallback reason. The browser/server must not use this artifact for direct canonical writes.",
+  "type": "object",
+  "required": ["contract", "project_id", "pipeline_type", "created_at", "updated_at", "interactions"],
+  "additionalProperties": false,
+  "properties": {
+    "contract": { "type": "string", "const": "genui_interaction_journal" },
+    "project_id": { "type": "string", "minLength": 1 },
+    "pipeline_type": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "interactions": {
+      "type": "array",
+      "maxItems": 2000,
+      "items": { "$ref": "#/$defs/interaction" }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "interaction": {
+      "type": "object",
+      "required": [
+        "interaction_id",
+        "routing_decision_id",
+        "request_id",
+        "project_id",
+        "pipeline_type",
+        "stage",
+        "gate",
+        "interaction_kind",
+        "mode",
+        "linear_chat_sufficient",
+        "reasons",
+        "required_ui_primitives",
+        "status",
+        "validation"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "interaction_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$" },
+        "routing_decision_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$" },
+        "request_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "project_id": { "type": "string", "minLength": 1 },
+        "pipeline_type": { "type": "string", "minLength": 1 },
+        "stage": { "type": "string", "minLength": 1 },
+        "gate": { "type": "string", "minLength": 1 },
+        "interaction_kind": { "type": "string", "minLength": 1 },
+        "mode": {
+          "type": "string",
+          "enum": ["cli", "gate_workspace", "media_review_room", "project_cockpit", "background_status", "genui"]
+        },
+        "recommended_tool": {
+          "type": ["string", "null"],
+          "enum": ["genui_interaction", "genui_session", "genui_surface", null]
+        },
+        "linear_chat_sufficient": { "type": "boolean" },
+        "reasons": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "uniqueItems": true
+        },
+        "required_ui_primitives": {
+          "type": "array",
+          "maxItems": 64,
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "uniqueItems": true
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "cli_recommended",
+            "prepared",
+            "running",
+            "submitted",
+            "validated",
+            "blocked",
+            "summarized",
+            "replay_prepared",
+            "failed",
+            "fallback"
+          ]
+        },
+        "stage_policy_id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+\\.[A-Za-z0-9_.-]+$" },
+        "schema_strategy": { "type": "string", "enum": ["fixed", "dynamic"] },
+        "decision_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$" },
+        "operation_event_summary": {
+          "type": "object",
+          "required": ["event_count"],
+          "additionalProperties": false,
+          "properties": {
+            "event_count": { "type": "integer", "minimum": 0, "maximum": 10000 },
+            "last_event_type": { "type": "string", "maxLength": 256 },
+            "event_cursor": { "type": ["string", "null"], "maxLength": 256 },
+            "tool_call_count": { "type": "integer", "minimum": 0, "maximum": 10000 }
+          }
+        },
+        "pending_response": { "type": "boolean" },
+        "stale_session": { "type": "boolean" },
+        "session_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$" },
+        "session_contract": { "type": "string", "enum": ["genui_session"] },
+        "surface_contract": { "type": "string", "enum": ["genui_surface"] },
+        "renderer": { "type": ["string", "null"] },
+        "framework": { "type": ["string", "null"] },
+        "framework_renderer": { "type": ["string", "null"] },
+        "protocol": { "type": ["string", "null"] },
+        "config_path": { "type": "string", "minLength": 1 },
+        "view_spec_path": { "type": "string", "minLength": 1 },
+        "response_path": { "type": "string", "minLength": 1 },
+        "events_path": { "type": "string", "minLength": 1 },
+        "state_path": { "type": "string", "minLength": 1 },
+        "url": { "type": ["string", "null"] },
+        "browser_url": { "type": ["string", "null"] },
+        "session_url": { "type": ["string", "null"] },
+        "replay_path": { "type": "string", "minLength": 1 },
+        "replay_url": { "type": ["string", "null"] },
+        "status_url": { "type": ["string", "null"] },
+        "fallback_reason": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "submitted_at": { "type": "string", "format": "date-time" },
+        "validated_at": { "type": "string", "format": "date-time" },
+        "validation": {
+          "type": "object",
+          "required": ["status", "errors"],
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["not_required", "pending", "ready_for_agent_review", "blocked", "valid", "invalid"]
+            },
+            "errors": {
+              "type": "array",
+              "maxItems": 200,
+              "items": { "type": "string", "maxLength": 1000 }
+            }
+          }
+        },
+        "patch_plan_count": { "type": "integer", "minimum": 0 },
+        "blocking_issue_ids": {
+          "type": "array",
+          "maxItems": 500,
+          "items": { "type": "string", "maxLength": 256 }
+        }
+      }
+    }
+  }
+}

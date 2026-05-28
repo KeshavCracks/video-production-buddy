@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "video-production-buddy/genui/interaction_request",
+  "title": "Dynamic GenUI Interaction Request",
+  "description": "Agent-authored request describing one human interaction round before routing to CLI or GenUI.",
+  "type": "object",
+  "required": [
+    "request_id",
+    "project_id",
+    "pipeline_type",
+    "stage",
+    "gate",
+    "title",
+    "prompt",
+    "interaction_kind"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "request_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$" },
+    "config_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$" },
+    "project_id": { "type": "string", "minLength": 1 },
+    "pipeline_type": { "type": "string", "minLength": 1 },
+    "stage": { "type": "string", "minLength": 1 },
+    "gate": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "prompt": { "type": "string", "minLength": 1 },
+    "interaction_kind": {
+      "type": "string",
+      "enum": [
+        "clarification",
+        "approval",
+        "option_comparison",
+        "media_review",
+        "multi_axis_selection",
+        "structured_revision",
+        "project_cockpit",
+        "background_status",
+        "dynamic_genui"
+      ]
+    },
+    "capabilities_needed": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "visual_demonstration",
+          "media_review",
+          "side_by_side_comparison",
+          "multi_axis_selection",
+          "matrix_review",
+          "ranked_selection",
+          "structured_revision_capture",
+          "multi_field_editing",
+          "approval_gate",
+          "status_timeline",
+          "artifact_trace",
+          "budget_panel"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "surface_mode": {
+      "type": "string",
+      "enum": ["gate_workspace", "media_review_room", "project_cockpit", "background_status"]
+    },
+    "force_genui": { "type": "boolean" },
+    "browser_available": { "type": "boolean" },
+    "user_declined_browser": { "type": "boolean" },
+    "previous_genui_failed": { "type": "boolean" },
+    "requires_visual_demonstration": { "type": "boolean" },
+    "requires_multi_axis_selection": { "type": "boolean" },
+    "requires_structured_revision_capture": { "type": "boolean" },
+    "media_items": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/media_item" }
+    },
+    "review_title": { "type": "string" },
+    "review_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": {
+          "type": ["string", "number", "boolean", "null"]
+        }
+      }
+    },
+    "selection_field_id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+    "selection_label": { "type": "string" },
+    "selection_binding": { "$ref": "#/$defs/binding" },
+    "allow_multiple": { "type": "boolean" },
+    "choices": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/choice" }
+    },
+    "fields": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/field" }
+    },
+    "submit_actions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/submit_action" }
+    },
+    "source_artifact_hashes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[A-Fa-f0-9]{64}$"
+      }
+    }
+  },
+  "$defs": {
+    "media_item": {
+      "type": "object",
+      "required": ["id", "title", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "title": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "enum": ["text", "image", "video", "audio", "path"] },
+        "path": { "$ref": "#/$defs/media_path" },
+        "text": { "type": "string" },
+        "alt": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "text" } } },
+          "then": { "required": ["text"] }
+        },
+        {
+          "if": { "properties": { "kind": { "enum": ["image", "video", "audio", "path"] } } },
+          "then": { "required": ["path"] }
+        }
+      ]
+    },
+    "binding": {
+      "type": "object",
+      "required": ["artifact", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "artifact": { "type": "string", "minLength": 1 },
+        "path": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$"
+        }
+      }
+    },
+    "choice": {
+      "type": "object",
+      "required": ["value", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "value": { "type": "string" },
+        "label": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "recommended": { "type": "boolean" },
+        "preview": { "$ref": "#/$defs/preview_hint" }
+      }
+    },
+    "field": {
+      "type": "object",
+      "required": ["id", "label", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "label": { "type": "string", "minLength": 1 },
+        "type": {
+          "type": "string",
+          "enum": ["text", "textarea", "select", "radio", "multiselect", "checkbox", "number", "file_path", "url", "approval"]
+        },
+        "required": { "type": "boolean" },
+        "default": {},
+        "recommended": { "type": "string" },
+        "help_text": { "type": "string" },
+        "placeholder": { "type": "string" },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "display": { "$ref": "#/$defs/display_hint" },
+        "visible_if": { "$ref": "#/$defs/visible_if" },
+        "binding": { "$ref": "#/$defs/binding" },
+        "choices": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/choice" }
+        }
+      }
+    },
+    "display_hint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "component": { "type": "string", "minLength": 1 },
+        "width": { "type": "string", "enum": ["full", "half", "third"] },
+        "emphasis": { "type": "string", "enum": ["normal", "recommended", "warning"] }
+      }
+    },
+    "visible_if": {
+      "type": "object",
+      "required": ["field", "operator"],
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "operator": {
+          "type": "string",
+          "enum": ["equals", "not_equals", "not_empty", "empty"]
+        },
+        "value": {}
+      }
+    },
+    "preview_hint": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["text", "image", "video", "audio", "path"] },
+        "text": { "type": "string" },
+        "path": { "$ref": "#/$defs/media_path" },
+        "alt": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "text" } } },
+          "then": { "required": ["text"] }
+        },
+        {
+          "if": { "properties": { "kind": { "enum": ["image", "video", "audio", "path"] } } },
+          "then": { "required": ["path"] }
+        }
+      ]
+    },
+    "media_path": {
+      "oneOf": [
+        { "$ref": "#/$defs/browser_media_path" },
+        { "$ref": "#/$defs/project_relative_media_path" }
+      ]
+    },
+    "browser_media_path": {
+      "type": "string",
+      "pattern": "^/media/(?:[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*)(?:/(?:[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*))*$"
+    },
+    "project_relative_media_path": {
+      "type": "string",
+      "pattern": "^(?:assets|media|outputs|reference_assets|renders)/(?:[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*)(?:/(?:[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*))*$"
+    },
+    "submit_action": {
+      "type": "object",
+      "required": ["id", "label", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "label": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "enum": ["submit", "approve", "revise", "abort"] },
+        "recommended": { "type": "boolean" }
+      }
+    }
+  }
+}

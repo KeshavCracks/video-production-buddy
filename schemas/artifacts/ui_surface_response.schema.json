@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "video-production-buddy/artifacts/ui_surface_response",
+  "title": "GenUI Surface Response",
+  "description": "Human submission captured from a GenUI compatibility surface. The agent validates this artifact before updating canonical pipeline artifacts.",
+  "type": "object",
+  "required": [
+    "contract",
+    "response_id",
+    "surface_id",
+    "project_id",
+    "pipeline_type",
+    "stage",
+    "gate",
+    "submitted_at",
+    "action",
+    "values"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "contract": { "type": "string", "const": "genui_surface_response" },
+    "response_id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+    "surface_id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+    "config_id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+    "project_id": { "type": "string", "minLength": 1 },
+    "pipeline_type": { "type": "string", "minLength": 1 },
+    "stage": { "type": "string", "minLength": 1 },
+    "gate": { "type": "string", "minLength": 1 },
+    "submitted_at": { "type": "string", "format": "date-time" },
+    "action": { "type": "string", "enum": ["submit", "approve", "revise", "abort", "open_gate", "refresh"] },
+    "values": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "annotations": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "type": "object",
+        "required": ["block_id", "target_ref", "comment"],
+        "additionalProperties": false,
+        "properties": {
+          "block_id": { "type": "string", "maxLength": 256 },
+          "target_ref": { "type": "string", "maxLength": 256 },
+          "comment": { "type": "string", "maxLength": 10000 },
+          "timestamp_seconds": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "selected_refs": {
+      "type": "array",
+      "maxItems": 500,
+      "items": { "type": "string", "maxLength": 256 }
+    },
+    "revision_patches": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "required": ["artifact", "path", "value"],
+        "additionalProperties": false,
+        "properties": {
+          "artifact": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "pattern": "^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$" },
+          "value": {}
+        }
+      }
+    },
+    "approval_attestations": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "approved"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "maxLength": 256 },
+          "label": { "type": "string", "maxLength": 512 },
+          "approved": { "type": "boolean" }
+        }
+      }
+    },
+    "event_summary": {
+      "type": "object",
+      "required": ["event_count"],
+      "additionalProperties": false,
+      "properties": {
+        "event_count": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "last_event_type": { "type": "string", "maxLength": 256 }
+      }
+    },
+    "browser_events": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": { "type": "string", "maxLength": 256 },
+          "timestamp": { "type": "string", "maxLength": 256 },
+          "action": { "type": "string", "maxLength": 256 },
+          "field_count": { "type": "integer", "minimum": 0, "maximum": 1000 }
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "required": ["status", "errors"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string", "enum": ["pending", "valid", "invalid"] },
+        "errors": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

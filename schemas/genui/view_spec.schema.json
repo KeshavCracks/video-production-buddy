@@ -1,0 +1,283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "video-production-buddy/genui/view_spec",
+  "title": "GenUI View Spec",
+  "description": "Renderer-only GenUI spec. Standard sessions use A2UI/CopilotKit with AG-UI transport; json-render specs remain available for compatibility surfaces. This is not a canonical pipeline artifact and must not encode direct canonical writes.",
+  "oneOf": [
+    { "$ref": "#/$defs/a2ui_session_spec" },
+    { "$ref": "#/$defs/json_render_spec" }
+  ],
+  "$defs": {
+    "a2ui_session_spec": {
+      "type": "object",
+      "required": ["contract", "renderer", "root", "a2ui", "state", "metadata"],
+      "additionalProperties": false,
+      "properties": {
+        "contract": { "type": "string", "const": "genui_session_view" },
+        "renderer": { "type": "string", "const": "a2ui" },
+        "root": { "type": "string", "minLength": 1 },
+        "a2ui": { "$ref": "#/$defs/a2ui_session" },
+        "state": {
+          "type": "object",
+          "required": ["session"],
+          "additionalProperties": true,
+          "properties": {
+            "session": {
+              "type": "object",
+              "required": ["id", "mode", "title", "project_id", "pipeline_type", "stage", "gate"],
+              "additionalProperties": true,
+              "properties": {
+                "id": { "type": "string", "minLength": 1 },
+                "mode": {
+                  "type": "string",
+                  "enum": ["gate_workspace", "media_review_room", "project_cockpit", "background_status"]
+                },
+                "title": { "type": "string", "minLength": 1 },
+                "project_id": { "type": "string", "minLength": 1 },
+                "pipeline_type": { "type": "string", "minLength": 1 },
+                "stage": { "type": "string", "minLength": 1 },
+                "gate": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "required": [
+            "session_id",
+            "config_id",
+            "project_id",
+            "pipeline_type",
+            "stage",
+            "gate",
+            "mode",
+            "framework",
+            "transport"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "session_id": { "type": "string", "minLength": 1 },
+            "config_id": { "type": "string", "minLength": 1 },
+            "project_id": { "type": "string", "minLength": 1 },
+            "pipeline_type": { "type": "string", "minLength": 1 },
+            "stage": { "type": "string", "minLength": 1 },
+            "gate": { "type": "string", "minLength": 1 },
+            "mode": {
+              "type": "string",
+              "enum": ["gate_workspace", "media_review_room", "project_cockpit", "background_status"]
+            },
+            "framework": {
+              "type": "object",
+              "required": ["name", "renderer", "packages"],
+              "additionalProperties": true,
+              "properties": {
+                "name": { "type": "string", "const": "a2ui" },
+                "renderer": { "type": "string", "const": "@copilotkit/a2ui-renderer" },
+                "packages": {
+                  "type": "array",
+                  "contains": { "const": "@a2ui/react" },
+                  "items": { "type": "string" }
+                }
+              }
+            },
+            "transport": {
+              "type": "object",
+              "required": ["name", "thread_id", "run_id"],
+              "additionalProperties": true,
+              "properties": {
+                "name": { "type": "string", "const": "ag-ui" },
+                "thread_id": { "type": "string", "minLength": 1 },
+                "run_id": { "type": "string", "minLength": 1 }
+              }
+            },
+            "submit_url": { "type": ["string", "null"] },
+            "submit_nonce": { "type": ["string", "null"] },
+            "preview_only": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "a2ui_session": {
+      "type": "object",
+      "required": ["surface_id", "operations", "components", "data_model"],
+      "additionalProperties": false,
+      "properties": {
+        "surface_id": { "type": "string", "minLength": 1 },
+        "operations": {
+          "type": "array",
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "allOf": [
+                { "$ref": "#/$defs/a2ui_operation" },
+                {
+                  "type": "object",
+                  "required": ["type"],
+                  "properties": { "type": { "const": "surfaceUpdate" } }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                { "$ref": "#/$defs/a2ui_operation" },
+                {
+                  "type": "object",
+                  "required": ["type"],
+                  "properties": { "type": { "const": "dataModelUpdate" } }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                { "$ref": "#/$defs/a2ui_operation" },
+                {
+                  "type": "object",
+                  "required": ["type"],
+                  "properties": { "type": { "const": "beginRendering" } }
+                }
+              ]
+            }
+          ],
+          "items": { "$ref": "#/$defs/a2ui_operation" }
+        },
+        "components": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/a2ui_component" }
+        },
+        "data_model": {
+          "type": "object",
+          "required": ["session"],
+          "additionalProperties": true
+        }
+      }
+    },
+    "a2ui_operation": {
+      "type": "object",
+      "required": ["type", "surfaceId"],
+      "additionalProperties": true,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["surfaceUpdate", "dataModelUpdate", "beginRendering", "componentUpdate", "statePatch"]
+        },
+        "surfaceId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "a2ui_component": {
+      "type": "object",
+      "required": ["id", "type", "props"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "minLength": 1 },
+        "props": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "children": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "json_render_spec": {
+      "type": "object",
+      "required": ["contract", "renderer", "root", "elements", "state", "metadata"],
+      "additionalProperties": false,
+      "properties": {
+        "contract": { "type": "string", "const": "genui_surface_view" },
+        "renderer": { "type": "string", "const": "json-render" },
+        "root": { "type": "string", "minLength": 1 },
+        "elements": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/json_render_element" }
+        },
+        "state": {
+          "type": "object",
+          "required": ["values", "status"],
+          "additionalProperties": true,
+          "properties": {
+            "values": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "status": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "required": ["surface_id", "config_id", "project_id", "pipeline_type", "stage", "gate"],
+          "additionalProperties": true,
+          "properties": {
+            "surface_id": { "type": "string", "minLength": 1 },
+            "config_id": { "type": "string", "minLength": 1 },
+            "project_id": { "type": "string", "minLength": 1 },
+            "pipeline_type": { "type": "string", "minLength": 1 },
+            "stage": { "type": "string", "minLength": 1 },
+            "gate": { "type": "string", "minLength": 1 },
+            "submit_url": { "type": ["string", "null"] },
+            "submit_nonce": { "type": ["string", "null"] },
+            "preview_only": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "json_render_element": {
+      "type": "object",
+      "required": ["type", "props"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "WorkspaceShell",
+            "CockpitShell",
+            "Section",
+            "InfoCard",
+            "TextInputField",
+            "TextAreaField",
+            "SelectField",
+            "ChoiceGroupField",
+            "CheckboxField",
+            "NumberField",
+            "UrlField",
+            "FilePathField",
+            "ApprovalField",
+            "MediaPreviewCard",
+            "ReviewGrid",
+            "BriefWorksheet",
+            "EvidenceAlignment",
+            "ConceptComparison",
+            "RuntimeComparison",
+            "ScriptReview",
+            "ScenePlanReview",
+            "ProductReferencePicker",
+            "MediaCompare",
+            "AssetAnnotation",
+            "MusicReview",
+            "ApprovalChecklist",
+            "RevisionPatch",
+            "ArtifactTracePanel",
+            "CockpitTimeline",
+            "CockpitArtifactGallery",
+            "ActionBar"
+          ]
+        },
+        "props": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "children": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "visible": {}
+      }
+    }
+  }
+}

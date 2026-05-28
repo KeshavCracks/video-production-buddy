@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "video-production-buddy/artifacts/ui_surface_config",
+  "title": "GenUI Surface Config",
+  "description": "Project-scoped GenUI compatibility surface configuration. The browser renders and collects review input only; canonical artifacts remain agent-owned.",
+  "type": "object",
+  "required": [
+    "contract",
+    "surface_id",
+    "project_id",
+    "pipeline_type",
+    "stage",
+    "gate",
+    "mode",
+    "title",
+    "blocks",
+    "actions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "contract": { "type": "string", "const": "genui_surface" },
+    "surface_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$" },
+    "config_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$" },
+    "project_id": { "type": "string", "minLength": 1 },
+    "pipeline_type": { "type": "string", "minLength": 1 },
+    "stage": { "type": "string", "minLength": 1 },
+    "gate": { "type": "string", "minLength": 1 },
+    "mode": { "type": "string", "enum": ["gate_workspace", "project_cockpit"] },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "ag_ui": { "$ref": "#/$defs/ag_ui" },
+    "media_refs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/media_ref" },
+      "default": []
+    },
+    "artifact_refs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/artifact_ref" },
+      "default": []
+    },
+    "trace_refs": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/trace_ref" },
+      "default": []
+    },
+    "blocks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/block" }
+    },
+    "actions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/action" }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "ag_ui": {
+      "type": "object",
+      "required": ["thread_id", "run_id"],
+      "additionalProperties": false,
+      "properties": {
+        "thread_id": { "type": "string", "minLength": 1 },
+        "run_id": { "type": "string", "minLength": 1 }
+      }
+    },
+    "media_ref": {
+      "type": "object",
+      "required": ["id", "kind", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "kind": { "type": "string", "enum": ["text", "image", "video", "audio", "path"] },
+        "title": { "type": "string", "minLength": 1 },
+        "path": { "$ref": "#/$defs/media_path" },
+        "text": { "type": "string" },
+        "alt": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "text" } } },
+          "then": { "required": ["text"] }
+        },
+        {
+          "if": { "properties": { "kind": { "enum": ["image", "video", "audio", "path"] } } },
+          "then": { "required": ["path"] }
+        }
+      ]
+    },
+    "artifact_ref": {
+      "type": "object",
+      "required": ["id", "artifact", "path", "label"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "artifact": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "pattern": "^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$" },
+        "label": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string" }
+      }
+    },
+    "trace_ref": {
+      "type": "object",
+      "required": ["id", "label", "source", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "label": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "required": ["artifact", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "artifact": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "pattern": "^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$" }
+      }
+    },
+    "option": {
+      "type": "object",
+      "required": ["label"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "value": { "type": "string" },
+        "label": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string" },
+        "description": { "type": "string" },
+        "tradeoff": { "type": "string" },
+        "recommended": { "type": "boolean" },
+        "preview": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "field": {
+      "type": "object",
+      "required": ["id", "label", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "label": { "type": "string", "minLength": 1 },
+        "type": { "type": "string", "enum": ["text", "textarea", "select", "radio", "multiselect", "checkbox", "number", "file_path", "url", "approval"] },
+        "required": { "type": "boolean" },
+        "default": {},
+        "recommended": { "type": "string" },
+        "target_ref": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "help_text": { "type": "string" },
+        "placeholder": { "type": "string" },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "choices": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/option" }
+        },
+        "binding": { "$ref": "#/$defs/binding" }
+        ,
+        "display": { "$ref": "#/$defs/display_hint" },
+        "visible_if": { "$ref": "#/$defs/visible_if" }
+      }
+    },
+    "display_hint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "component": { "type": "string", "minLength": 1 },
+        "width": { "type": "string", "enum": ["full", "half", "third"] },
+        "emphasis": { "type": "string", "enum": ["normal", "recommended", "warning"] }
+      }
+    },
+    "visible_if": {
+      "type": "object",
+      "required": ["field", "operator"],
+      "additionalProperties": false,
+      "properties": {
+        "field": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "operator": { "type": "string", "enum": ["equals", "not_equals", "not_empty", "empty"] },
+        "value": {}
+      }
+    },
+    "block": {
+      "type": "object",
+      "required": ["id", "type", "title"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "type": {
+          "type": "string",
+          "enum": [
+            "BriefWorksheet",
+            "EvidenceAlignment",
+            "ConceptComparison",
+            "RuntimeComparison",
+            "ScriptReview",
+            "ScenePlanReview",
+            "ProductReferencePicker",
+            "MediaCompare",
+            "AssetAnnotation",
+            "MusicReview",
+            "ApprovalChecklist",
+            "RevisionPatch",
+            "ArtifactTracePanel",
+            "CockpitTimeline",
+            "CockpitArtifactGallery"
+          ]
+        },
+        "title": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "binding": { "$ref": "#/$defs/binding" },
+        "options": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/option" }
+        },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/field" }
+        },
+        "annotation_fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/field" }
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "media_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" }
+        },
+        "artifact_ref_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" }
+        },
+        "trace_ref_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" }
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["id", "label", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "label": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "enum": ["submit", "approve", "revise", "abort", "open_gate", "refresh"] },
+        "recommended": { "type": "boolean" },
+        "target_surface_id": { "type": "string" }
+      }
+    },
+    "media_path": {
+      "type": "string",
+      "pattern": "^/media/(?:[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*)(?:/(?:[A-Za-z0-9_-]+(?:\\.[A-Za-z0-9_-]+)*))*$"
+    }
+  }
+}

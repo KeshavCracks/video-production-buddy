@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "video-production-buddy/artifacts/ui_session_response",
+  "title": "GenUI Session Response",
+  "description": "Human submission from a GenUI A2UI session. The agent validates this response and converts it to a patch plan before canonical writes.",
+  "type": "object",
+  "required": [
+    "contract",
+    "response_id",
+    "session_id",
+    "project_id",
+    "pipeline_type",
+    "stage",
+    "gate",
+    "submitted_at",
+    "action",
+    "values",
+    "issues",
+    "interaction_evidence",
+    "validation"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "contract": { "type": "string", "const": "genui_session_response" },
+    "response_id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+    "session_id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+    "config_id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+    "routing_decision_id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+    "project_id": { "type": "string", "minLength": 1 },
+    "pipeline_type": { "type": "string", "minLength": 1 },
+    "stage": { "type": "string", "minLength": 1 },
+    "gate": { "type": "string", "minLength": 1 },
+    "submitted_at": { "type": "string", "format": "date-time" },
+    "action": { "type": "string", "enum": ["submit", "approve", "revise", "abort", "open_gate", "refresh"] },
+    "values": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["string", "number", "boolean", "array", "object", "null"]
+      }
+    },
+    "annotations": {
+      "type": "array",
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/annotation" }
+    },
+    "selected_refs": {
+      "type": "array",
+      "maxItems": 500,
+      "items": { "type": "string", "maxLength": 256 }
+    },
+    "issues": {
+      "type": "array",
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/issue" }
+    },
+    "revision_patches": {
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/revision_patch" }
+    },
+    "approval_attestations": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "approved"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "maxLength": 256 },
+          "label": { "type": "string", "maxLength": 512 },
+          "approved": { "type": "boolean" }
+        }
+      }
+    },
+    "resume_decision": {
+      "type": "object",
+      "required": ["decision_id", "resume_token", "action"],
+      "additionalProperties": false,
+      "properties": {
+        "decision_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$" },
+        "resume_token": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,191}$" },
+        "action": { "type": "string", "enum": ["submit", "approve", "revise", "abort", "open_gate", "refresh"] }
+      }
+    },
+    "review_completion": {
+      "type": "object",
+      "required": ["status", "missing_required_evidence"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string", "enum": ["complete", "incomplete", "not_required"] },
+        "missing_required_evidence": {
+          "type": "array",
+          "maxItems": 500,
+          "items": { "type": "string", "maxLength": 256 }
+        },
+        "blocking_issue_ids": {
+          "type": "array",
+          "maxItems": 500,
+          "items": { "type": "string", "maxLength": 256 }
+        }
+      }
+    },
+    "conflict_status": {
+      "type": "object",
+      "required": ["status"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string", "enum": ["not_checked", "clean", "conflict"] },
+        "source_artifact_hashes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[A-Fa-f0-9]{64}$"
+          }
+        },
+        "conflicting_artifacts": {
+          "type": "array",
+          "maxItems": 200,
+          "items": { "type": "string", "maxLength": 256 }
+        }
+      }
+    },
+    "interaction_evidence": {
+      "type": "object",
+      "required": ["media_opened", "timeline_inspected", "seconds_watched"],
+      "additionalProperties": false,
+      "properties": {
+        "media_opened": {
+          "type": "array",
+          "maxItems": 500,
+          "items": { "type": "string", "maxLength": 256 }
+        },
+        "timeline_inspected": {
+          "type": "array",
+          "maxItems": 500,
+          "items": { "type": "string", "maxLength": 256 }
+        },
+        "seconds_watched": { "type": "number", "minimum": 0 }
+      }
+    },
+    "evidence_status": {
+      "type": "object",
+      "required": ["media_opened_count", "timeline_inspected_count", "approval_attestation_count"],
+      "additionalProperties": false,
+      "properties": {
+        "media_opened_count": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "timeline_inspected_count": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "approval_attestation_count": { "type": "integer", "minimum": 0, "maximum": 200 },
+        "required_media_opened": {
+          "type": "array",
+          "maxItems": 500,
+          "items": { "type": "string", "maxLength": 256 }
+        },
+        "required_timeline_inspected": {
+          "type": "array",
+          "maxItems": 500,
+          "items": { "type": "string", "maxLength": 256 }
+        }
+      }
+    },
+    "event_summary": {
+      "type": "object",
+      "required": ["event_count"],
+      "additionalProperties": false,
+      "properties": {
+        "event_count": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "last_event_type": { "type": "string", "maxLength": 256 }
+      }
+    },
+    "browser_events": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": { "type": "string", "maxLength": 256 },
+          "target_ref": { "type": "string", "maxLength": 256 },
+          "timestamp": { "type": "string", "maxLength": 256 },
+          "timestamp_seconds": { "type": "number", "minimum": 0 },
+          "action": { "type": "string", "maxLength": 256 },
+          "field_count": { "type": "integer", "minimum": 0, "maximum": 1000 }
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "required": ["status", "errors"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string", "enum": ["pending", "valid", "invalid"] },
+        "errors": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "annotation": {
+      "type": "object",
+      "required": ["surface_id", "target_ref", "comment"],
+      "additionalProperties": false,
+      "properties": {
+        "surface_id": { "type": "string", "maxLength": 256 },
+        "target_ref": { "type": "string", "maxLength": 256 },
+        "comment": { "type": "string", "maxLength": 10000 },
+        "timestamp_seconds": { "type": "number", "minimum": 0 },
+        "time_range": {
+          "type": "object",
+          "required": ["start_seconds", "end_seconds"],
+          "additionalProperties": false,
+          "properties": {
+            "start_seconds": { "type": "number", "minimum": 0 },
+            "end_seconds": { "type": "number", "minimum": 0 }
+          }
+        },
+        "region": {
+          "type": "object",
+          "required": ["x", "y", "width", "height"],
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "number", "minimum": 0, "maximum": 1 },
+            "y": { "type": "number", "minimum": 0, "maximum": 1 },
+            "width": { "type": "number", "minimum": 0, "maximum": 1 },
+            "height": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      }
+    },
+    "issue_status": {
+      "type": "string",
+      "enum": ["open", "accepted", "rejected", "resolved", "needs_recheck", "waived"]
+    },
+    "issue": {
+      "type": "object",
+      "required": ["id", "target_ref", "status", "severity", "requested_change"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" },
+        "target_ref": { "type": "string", "maxLength": 256 },
+        "status": { "$ref": "#/$defs/issue_status" },
+        "severity": { "type": "string", "enum": ["blocking", "major", "minor", "note"] },
+        "requested_change": { "type": "string", "minLength": 1, "maxLength": 10000 },
+        "artifact": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "pattern": "^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$" }
+      }
+    },
+    "revision_patch": {
+      "type": "object",
+      "required": ["artifact", "path", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "artifact": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "pattern": "^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$" },
+        "value": {}
+      }
+    }
+  }
+}
