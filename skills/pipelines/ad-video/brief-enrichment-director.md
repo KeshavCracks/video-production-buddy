@@ -227,6 +227,7 @@ Use markdown headers. Include the [HYPOTHESIS] label on the Narrative Arc sectio
 
 ## Product Brief
 
+**Brand Name:** [brand name that must appear in final frame and metadata]
 **Product Name:** [full name]
 **Product Type:** [category / primary function]
 **Tagline:** [punchy, designed — not generic]

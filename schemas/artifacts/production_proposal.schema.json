@@ -60,8 +60,8 @@
       "properties": {
         "mode": {
           "type": "string",
-          "enum": ["off", "burnt-in", "sidecar"],
-          "description": "off = no subtitles; burnt-in = ASS burned via ffmpeg subtitles filter; sidecar = separate ASS file."
+          "enum": ["off", "burnt-in"],
+          "description": "off = no subtitles; burnt-in = ASS burned via ffmpeg subtitles filter."
         },
         "language": {
           "type": "string",

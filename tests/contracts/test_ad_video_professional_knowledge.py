@@ -201,6 +201,113 @@ def test_intelligence_brief_rejects_duplicate_trend_ids_when_present() -> None:
         validate_artifact("intelligence_brief", brief)
 
 
+def test_ad_video_intelligence_verdicts_cover_enriched_brief_hypotheses() -> None:
+    from tests.qa.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
+    from tests.qa.test_schemas_preproduction import _minimal_enriched_brief
+
+    enriched = _minimal_enriched_brief()
+    enriched["user_approved"] = True
+    brief = deepcopy(INTELLIGENCE_BRIEF_VALID)
+
+    with pytest.raises(Exception, match="dimension_verdicts"):
+        validate_artifact(
+            "intelligence_brief",
+            brief,
+            pipeline_type="ad-video",
+            related_artifacts={"enriched_brief": enriched},
+        )
+
+    brief["dimension_verdicts"] = [
+        {
+            "dimension": "arc_type",
+            "confidence": "pattern-inferred",
+            "verdict": "SUPPORTED",
+        },
+        {
+            "dimension": "music_direction",
+            "confidence": "pattern-inferred",
+            "verdict": "SUPPORTED",
+        },
+        {
+            "dimension": "visual_approach",
+            "confidence": "pattern-inferred",
+            "verdict": "SUPPORTED",
+        },
+    ]
+    validate_artifact(
+        "intelligence_brief",
+        brief,
+        pipeline_type="ad-video",
+        related_artifacts={"enriched_brief": enriched},
+    )
+
+
+def test_ad_video_intelligence_verdicts_do_not_challenge_from_brief_dimensions() -> None:
+    from tests.qa.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
+    from tests.qa.test_schemas_preproduction import _minimal_enriched_brief
+
+    enriched = _minimal_enriched_brief()
+    enriched["user_approved"] = True
+    brief = deepcopy(INTELLIGENCE_BRIEF_VALID)
+    brief["dimension_verdicts"] = [
+        {
+            "dimension": "arc_type",
+            "confidence": "pattern-inferred",
+            "verdict": "SUPPORTED",
+        },
+        {
+            "dimension": "music_direction",
+            "confidence": "pattern-inferred",
+            "verdict": "SUPPORTED",
+        },
+        {
+            "dimension": "visual_approach",
+            "confidence": "pattern-inferred",
+            "verdict": "SUPPORTED",
+        },
+        {
+            "dimension": "target_demographic",
+            "confidence": "research-grounded",
+            "verdict": "CONTRADICTED",
+            "challenge_evidence": "Example Report 2026: a cited demographic note.",
+        },
+    ]
+
+    with pytest.raises(Exception, match="FROM BRIEF"):
+        validate_artifact(
+            "intelligence_brief",
+            brief,
+            pipeline_type="ad-video",
+            related_artifacts={"enriched_brief": enriched},
+        )
+
+
+def test_ad_video_intelligence_rejects_from_brief_verdicts_even_without_hypotheses() -> None:
+    from tests.qa.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
+    from tests.qa.test_schemas_preproduction import _minimal_enriched_brief
+
+    enriched = _minimal_enriched_brief()
+    enriched["user_approved"] = True
+    for flag in enriched["hypothesis_flags"]:
+        flag["status"] = "FROM BRIEF"
+    brief = deepcopy(INTELLIGENCE_BRIEF_VALID)
+    brief["dimension_verdicts"] = [
+        {
+            "dimension": "arc_type",
+            "confidence": "research-grounded",
+            "verdict": "SUPPORTED",
+        },
+    ]
+
+    with pytest.raises(Exception, match="FROM BRIEF"):
+        validate_artifact(
+            "intelligence_brief",
+            brief,
+            pipeline_type="ad-video",
+            related_artifacts={"enriched_brief": enriched},
+        )
+
+
 def test_production_bible_schema_requires_knowledge_alignment_block() -> None:
     from tests.qa.test_artifact_chain import PRODUCTION_BIBLE_VALID
 
@@ -303,6 +410,7 @@ def test_knowledge_alignment_rejects_mismatched_nested_source_refs() -> None:
 def test_scene_plan_rejects_bare_knowledge_alignment_refs() -> None:
     scene_plan = {
         "version": "1.0",
+        "user_approved": True,
         "style_mode": "animated",
         "total_duration_seconds": 4,
         "scenes": [

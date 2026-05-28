@@ -151,6 +151,17 @@ def _load_checkpoint_schema() -> dict[str, Any]:
         return json.load(f)
 
 
+def _decision_option_ids(decision: dict[str, Any]) -> set[str]:
+    options = decision.get("options_considered")
+    if not isinstance(options, list):
+        return set()
+    return {
+        option.get("option_id")
+        for option in options
+        if isinstance(option, dict) and isinstance(option.get("option_id"), str)
+    }
+
+
 def _validate_artifacts_for_stage(
     stage: str,
     status: str,
@@ -222,6 +233,19 @@ def _validate_artifacts_for_stage(
                         f"{category!r} selected {selected!r}, but "
                         f"production_proposal.{proposal_field} is {expected!r}"
                     )
+                if category == "render_runtime_selection":
+                    runtime_options = _decision_option_ids(decision)
+                    required_runtime_options = {"remotion", "hyperframes"}
+                    missing_runtime_options = sorted(
+                        required_runtime_options - runtime_options
+                    )
+                    if missing_runtime_options:
+                        raise CheckpointValidationError(
+                            "Ad-video proposal checkpoint "
+                            "render_runtime_selection decision must include "
+                            "Remotion and HyperFrames in options_considered; "
+                            f"missing: {missing_runtime_options}"
+                        )
 
     for artifact_name, artifact_data in artifacts.items():
         if artifact_name not in ARTIFACT_NAMES:
@@ -236,6 +260,10 @@ def _validate_artifacts_for_stage(
                 artifact_data,
                 pipeline_type=pipeline_type,
                 related_artifacts=artifacts,
+                validation_context={
+                    "checkpoint_stage": stage,
+                    "checkpoint_status": status,
+                },
             )
         except Exception as exc:
             raise CheckpointValidationError(

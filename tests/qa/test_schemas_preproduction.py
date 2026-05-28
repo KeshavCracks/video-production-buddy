@@ -210,6 +210,7 @@ def _minimal_enriched_brief() -> dict:
     return {
         "creative_requirements": _minimal_creative_requirements(),
         "product_brief": {
+            "brand_name": "Acme",
             "product_name": "Acme Floral Water",
             "product_type": "Personal care / mosquito-repellent floral water",
             "tagline": "Cool. Calm. Protected.",

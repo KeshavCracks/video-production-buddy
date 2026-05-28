@@ -18,9 +18,29 @@ from tests.contracts.conftest import (
 )
 
 
+def _valid_idea_concept(concept_id: str, *, selected: bool) -> dict:
+    return {
+        "id": concept_id,
+        "name": f"Concept {concept_id}",
+        "scenario": f"A concrete execution scenario for {concept_id}.",
+        "selected": selected,
+        "hook_execution": "Open on a visible before/after gap in the first three seconds.",
+        "visual_metaphor": "A messy launch board snapping into a clean launch line.",
+        "beat_mapping": {
+            "hook": "Show the before/after contrast immediately.",
+            "build": "Prove the workflow through a concrete use moment.",
+            "reveal": "Reveal the product benefit in one readable action.",
+            "cta_brand": "Land the brand and CTA without reopening the premise.",
+        },
+        "why_this_works": "It turns the approved strategy into concrete visual proof.",
+        "knowledge_alignment_refs": ["knowledge_alignment:hook.visual-contrast.001"],
+    }
+
+
 def _valid_ad_video_scene_plan() -> dict:
     return {
         "version": "1.0",
+        "user_approved": True,
         "style_mode": "cinematic",
         "total_duration_seconds": 10,
         "scenes": [
@@ -148,20 +168,44 @@ def _valid_ad_video_script() -> dict:
         "sections": [
             {
                 "id": "hook",
+                "beat": "hook",
                 "text": "The first proof lands fast.",
                 "start_seconds": 0,
-                "end_seconds": 4,
-                "duration_estimate_seconds": 4,
+                "end_seconds": 2,
+                "duration_estimate_seconds": 2,
                 "speaker_directions": "Measured opening with clean emphasis.",
                 "voice_performance": dict(voice_performance),
                 "tts_directive": {"speed_mult": 0.96},
             },
             {
+                "id": "build",
+                "beat": "build",
+                "text": "The middle proof shows the product solving a real friction point.",
+                "start_seconds": 2,
+                "end_seconds": 6,
+                "duration_estimate_seconds": 4,
+                "speaker_directions": "Confident proof without hype.",
+                "voice_performance": dict(voice_performance),
+                "tts_directive": {"speed_mult": 0.98},
+            },
+            {
+                "id": "reveal",
+                "beat": "reveal",
+                "text": "Then the product lands as the obvious next move.",
+                "start_seconds": 6,
+                "end_seconds": 8,
+                "duration_estimate_seconds": 2,
+                "speaker_directions": "Warmer reveal with controlled lift.",
+                "voice_performance": dict(voice_performance),
+                "tts_directive": {"speed_mult": 0.94},
+            },
+            {
                 "id": "cta_brand",
+                "beat": "cta_brand",
                 "text": "Choose Flowcut today. Flowcut.",
-                "start_seconds": 4,
+                "start_seconds": 8,
                 "end_seconds": 10,
-                "duration_estimate_seconds": 6,
+                "duration_estimate_seconds": 2,
                 "speaker_directions": "Confident low-pressure close.",
                 "voice_performance": dict(voice_performance),
                 "tts_directive": {"speed_mult": 0.96},
@@ -221,6 +265,15 @@ def test_ad_video_proposal_requires_user_confirmed_budget_and_subtitles() -> Non
             missing_subtitle_confirmation,
             pipeline_type="ad-video",
         )
+
+
+def test_ad_video_proposal_rejects_unimplemented_subtitle_sidecar_mode() -> None:
+    """Do not offer subtitle sidecars until publish/render delivery models them."""
+    proposal = _minimal_production_proposal()
+    proposal["subtitles"]["mode"] = "sidecar"
+
+    with pytest.raises(Exception, match="subtitles"):
+        validate_artifact("production_proposal", proposal, pipeline_type="ad-video")
 
 
 def test_ad_video_proposal_requires_locked_music_strategy() -> None:
@@ -359,18 +412,8 @@ def test_idea_options_requires_exactly_one_matching_selected_concept() -> None:
     idea_options = {
         "version": "1.0",
         "concepts": [
-            {
-                "id": "C1",
-                "name": "Quiet Proof",
-                "scenario": "A compact product proof story.",
-                "selected": False,
-            },
-            {
-                "id": "C2",
-                "name": "Tactile Reveal",
-                "scenario": "A tactile reveal with the product in use.",
-                "selected": True,
-            },
+            _valid_idea_concept("C1", selected=False),
+            _valid_idea_concept("C2", selected=True),
         ],
         "selected_concept_id": "C2",
     }
@@ -392,7 +435,8 @@ def test_idea_options_requires_exactly_one_matching_selected_concept() -> None:
         validate_artifact("idea_options", mismatched_id)
 
 
-def test_idea_options_rejects_duplicate_concept_ids() -> None:
+def test_idea_options_requires_execution_details_for_each_concept() -> None:
+    """Idea concepts need enough substance for proposal and scene planning."""
     idea_options = {
         "version": "1.0",
         "concepts": [
@@ -403,11 +447,42 @@ def test_idea_options_rejects_duplicate_concept_ids() -> None:
                 "selected": True,
             },
             {
-                "id": "C1",
+                "id": "C2",
                 "name": "Tactile Reveal",
                 "scenario": "A tactile reveal with the product in use.",
                 "selected": False,
             },
+        ],
+        "selected_concept_id": "C1",
+    }
+
+    with pytest.raises(Exception, match="hook_execution"):
+        validate_artifact("idea_options", idea_options)
+
+    for concept in idea_options["concepts"]:
+        concept.update(
+            {
+                "hook_execution": "Open on a visible before/after gap in the first three seconds.",
+                "visual_metaphor": "A messy launch board snapping into a clean launch line.",
+                "beat_mapping": {
+                    "hook": "Show the before/after contrast immediately.",
+                    "build": "Prove the workflow through a concrete use moment.",
+                    "reveal": "Reveal the product benefit in one readable action.",
+                    "cta_brand": "Land the brand and CTA without reopening the premise.",
+                },
+                "why_this_works": "It turns the approved strategy into concrete visual proof.",
+                "knowledge_alignment_refs": ["knowledge_alignment:hook.visual-contrast.001"],
+            }
+        )
+    validate_artifact("idea_options", idea_options)
+
+
+def test_idea_options_rejects_duplicate_concept_ids() -> None:
+    idea_options = {
+        "version": "1.0",
+        "concepts": [
+            _valid_idea_concept("C1", selected=True),
+            _valid_idea_concept("C1", selected=False),
         ],
         "selected_concept_id": "C1",
     }
@@ -491,10 +566,45 @@ def test_ad_video_script_validation_requires_section_voice_cues() -> None:
         validate_artifact("script", script, pipeline_type="ad-video")
 
     script["sections"][0]["tts_directive"] = {"speed_mult": 0.94}
+    script = _valid_ad_video_script()
+    del script["user_approved"]
     with pytest.raises(Exception, match="user_approved"):
         validate_artifact("script", script, pipeline_type="ad-video")
 
     script["user_approved"] = True
+    validate_artifact("script", script, pipeline_type="ad-video")
+
+
+def test_ad_video_script_requires_complete_four_beat_sequence() -> None:
+    """A valid ad script must preserve hook/build/reveal/cta structure."""
+    script = _valid_ad_video_script()
+
+    missing_reveal = deepcopy(script)
+    missing_reveal["sections"] = [
+        section
+        for section in missing_reveal["sections"]
+        if section["beat"] != "reveal"
+    ]
+    missing_reveal["sections"][2]["start_seconds"] = 6
+    missing_reveal["sections"][2]["end_seconds"] = 10
+    missing_reveal["sections"][2]["duration_estimate_seconds"] = 4
+    with pytest.raises(Exception, match="required beats"):
+        validate_artifact("script", missing_reveal, pipeline_type="ad-video")
+
+    wrong_order = deepcopy(script)
+    wrong_order["sections"][2], wrong_order["sections"][3] = (
+        wrong_order["sections"][3],
+        wrong_order["sections"][2],
+    )
+    wrong_order["sections"][2]["start_seconds"] = 6
+    wrong_order["sections"][2]["end_seconds"] = 8
+    wrong_order["sections"][2]["duration_estimate_seconds"] = 2
+    wrong_order["sections"][3]["start_seconds"] = 8
+    wrong_order["sections"][3]["end_seconds"] = 10
+    wrong_order["sections"][3]["duration_estimate_seconds"] = 2
+    with pytest.raises(Exception, match="beat order"):
+        validate_artifact("script", wrong_order, pipeline_type="ad-video")
+
     validate_artifact("script", script, pipeline_type="ad-video")
 
 
@@ -519,7 +629,7 @@ def test_ad_video_script_rejects_non_positive_section_duration() -> None:
 def test_ad_video_script_rejects_overlapping_sections() -> None:
     """Script timing must be ordered and non-overlapping."""
     script = _valid_ad_video_script()
-    script["sections"][1]["start_seconds"] = 3.5
+    script["sections"][1]["start_seconds"] = 1.5
 
     with pytest.raises(Exception, match="overlaps previous section"):
         validate_artifact("script", script, pipeline_type="ad-video")
@@ -577,6 +687,7 @@ def test_scene_plan_schema_accepts_animated_scene_contract_fields() -> None:
     """Animated scene-director fields must validate under scene_plan.schema.json."""
     scene_plan = {
         "version": "1.0",
+        "user_approved": True,
         "style_mode": "animated",
         "total_duration_seconds": 5,
         "scenes": [
@@ -607,6 +718,7 @@ def test_scene_plan_schema_accepts_animated_scene_contract_fields() -> None:
 def test_ad_video_animated_scene_plan_requires_scene_type() -> None:
     scene_plan = {
         "version": "1.0",
+        "user_approved": True,
         "style_mode": "animated",
         "total_duration_seconds": 5,
         "scenes": [
@@ -693,6 +805,7 @@ def test_ad_video_scene_plan_requires_product_metadata_without_style_mode() -> N
     """Pipeline context, not optional style_mode, must trigger ad-video product metadata."""
     scene_plan = {
         "version": "1.0",
+        "user_approved": True,
         "total_duration_seconds": 5,
         "scenes": [
             {
@@ -884,6 +997,24 @@ def test_enriched_brief_schema_requires_truth_and_safety_constraints_dimension()
     bad["creative_requirements"]["truth_and_safety_constraints"]["source"] = "INFERRED"
     with pytest.raises(Exception):
         validate_artifact("enriched_brief", bad)
+
+
+def test_enriched_brief_schema_requires_explicit_brand_name() -> None:
+    """Brand identity must survive separately from product/model naming."""
+    from tests.qa.test_schemas_preproduction import _minimal_enriched_brief
+
+    brief = _minimal_enriched_brief()
+    brief["product_brief"]["brand_name"] = "Acme"
+    validate_artifact("enriched_brief", brief)
+
+    del brief["product_brief"]["brand_name"]
+    with pytest.raises(Exception, match="brand_name"):
+        validate_artifact("enriched_brief", brief)
+
+    brief = _minimal_enriched_brief()
+    brief["product_brief"]["brand_name"] = ""
+    with pytest.raises(Exception, match="brand_name"):
+        validate_artifact("enriched_brief", brief)
 
 
 def test_ad_video_enriched_brief_requires_explicit_user_approval() -> None:
@@ -1258,10 +1389,27 @@ def test_ad_video_scene_plan_schema_requires_scene_governance_fields() -> None:
         validate_artifact("scene_plan", scene_plan)
 
 
+def test_ad_video_scene_plan_validation_requires_user_approval() -> None:
+    """Approved ad-video scene plans are the final human visual gate before assets."""
+    scene_plan = _valid_ad_video_scene_plan()
+    scene_plan.pop("user_approved")
+
+    with pytest.raises(Exception, match="user_approved"):
+        validate_artifact("scene_plan", scene_plan, pipeline_type="ad-video")
+
+    scene_plan["user_approved"] = False
+    with pytest.raises(Exception, match="user_approved"):
+        validate_artifact("scene_plan", scene_plan, pipeline_type="ad-video")
+
+    scene_plan["user_approved"] = True
+    validate_artifact("scene_plan", scene_plan, pipeline_type="ad-video")
+
+
 def test_ad_video_scene_plan_rejects_duplicate_scene_ids() -> None:
     """Scene ids must be unique because asset/review gates key by scene_id."""
     scene_plan = {
         "version": "1.0",
+        "user_approved": True,
         "style_mode": "cinematic",
         "total_duration_seconds": 10,
         "scenes": [

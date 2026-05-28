@@ -53,6 +53,23 @@ def load_schema(name: str) -> dict:
         return json.load(f)
 
 
+AD_VIDEO_SCRIPT_BEAT_ORDER = ("hook", "build", "reveal", "cta_brand")
+
+
+def _normalize_ad_video_script_beat(section: dict[str, Any]) -> str | None:
+    raw = section.get("beat") or section.get("id")
+    if not isinstance(raw, str):
+        return None
+    value = raw.strip().lower().replace("-", "_").replace(" ", "_")
+    if value.startswith("build"):
+        return "build"
+    if value in {"cta", "cta_brand", "cta_and_brand", "cta_brand_landing"}:
+        return "cta_brand"
+    if value in {"hook", "reveal"}:
+        return value
+    return None
+
+
 def _validate_ad_video_script(data: dict[str, Any]) -> None:
     """Enforce ad-video script requirements that need pipeline context."""
     required_voice_performance = [
@@ -65,6 +82,7 @@ def _validate_ad_video_script(data: dict[str, Any]) -> None:
     seen_section_ids: set[str] = set()
     previous_end: float | None = None
     timeline_end = 0.0
+    section_beats: list[str] = []
     for idx, section in enumerate(data.get("sections", []) or []):
         section_id = section.get("id", f"section-{idx}")
         if section_id in seen_section_ids:
@@ -143,12 +161,40 @@ def _validate_ad_video_script(data: dict[str, Any]) -> None:
                 f"{section_id!r} must include tts_directive"
             )
 
+        section_beat = _normalize_ad_video_script_beat(section)
+        if section_beat is None:
+            raise jsonschema.ValidationError(
+                "ad-video script section "
+                f"{section_id!r} must map to one of the required beats: "
+                + ", ".join(AD_VIDEO_SCRIPT_BEAT_ORDER)
+            )
+        section_beats.append(section_beat)
+
     total_duration = data.get("total_duration_seconds")
     if total_duration is not None and abs(float(total_duration) - timeline_end) > 0.5:
         raise jsonschema.ValidationError(
             "ad-video script total_duration_seconds must match the final "
             "section end_seconds within +/-0.5s"
         )
+
+    missing_beats = [
+        beat for beat in AD_VIDEO_SCRIPT_BEAT_ORDER if beat not in set(section_beats)
+    ]
+    if missing_beats:
+        raise jsonschema.ValidationError(
+            "ad-video script required beats missing from sections: "
+            + ", ".join(missing_beats)
+        )
+
+    beat_positions = {beat: idx for idx, beat in enumerate(AD_VIDEO_SCRIPT_BEAT_ORDER)}
+    latest_position = -1
+    for beat in section_beats:
+        position = beat_positions[beat]
+        if position < latest_position:
+            raise jsonschema.ValidationError(
+                "ad-video script beat order must be hook -> build -> reveal -> cta_brand"
+            )
+        latest_position = max(latest_position, position)
 
     if data.get("user_approved") is not True:
         raise jsonschema.ValidationError(
@@ -164,7 +210,11 @@ def _validate_ad_video_enriched_brief(data: dict[str, Any]) -> None:
         )
 
 
-def _validate_intelligence_brief(data: dict[str, Any]) -> None:
+def _validate_intelligence_brief(
+    data: dict[str, Any],
+    related_artifacts: dict[str, Any] | None = None,
+    pipeline_type: str | None = None,
+) -> None:
     """Enforce semantic references inside intelligence research output."""
     professional_knowledge = data.get("professional_knowledge") or {}
     card_ids: set[str] = set()
@@ -205,6 +255,65 @@ def _validate_intelligence_brief(data: dict[str, Any]) -> None:
                 f"trend_id {trend_id!r} at index {idx}"
             )
         seen_trend_ids.add(trend_id)
+
+    if pipeline_type != "ad-video" or not isinstance(related_artifacts, dict):
+        return
+
+    enriched_brief = related_artifacts.get("enriched_brief")
+    if not isinstance(enriched_brief, dict):
+        return
+
+    hypothesis_flags = enriched_brief.get("hypothesis_flags")
+    if not isinstance(hypothesis_flags, list):
+        return
+
+    required_dimensions = {
+        str(flag.get("dimension") or "").strip()
+        for flag in hypothesis_flags
+        if isinstance(flag, dict)
+        and flag.get("status") in {"INFERRED", "DELEGATED"}
+        and str(flag.get("dimension") or "").strip()
+    }
+    from_brief_dimensions = {
+        str(flag.get("dimension") or "").strip()
+        for flag in hypothesis_flags
+        if isinstance(flag, dict)
+        and flag.get("status") == "FROM BRIEF"
+        and str(flag.get("dimension") or "").strip()
+    }
+    if not required_dimensions and not from_brief_dimensions:
+        return
+
+    verdicts = data.get("dimension_verdicts")
+    if not isinstance(verdicts, list):
+        if not required_dimensions:
+            return
+        raise jsonschema.ValidationError(
+            "ad-video intelligence_brief.dimension_verdicts must cover every "
+            "INFERRED or DELEGATED enriched_brief.hypothesis_flags dimension"
+        )
+
+    verdict_dimensions = {
+        str(verdict.get("dimension") or "").strip()
+        for verdict in verdicts
+        if isinstance(verdict, dict)
+        and str(verdict.get("dimension") or "").strip()
+    }
+    unexpected_dimensions = sorted(verdict_dimensions & from_brief_dimensions)
+    if unexpected_dimensions:
+        raise jsonschema.ValidationError(
+            "ad-video intelligence_brief.dimension_verdicts must not include "
+            "FROM BRIEF enriched_brief dimensions: "
+            + ", ".join(repr(dimension) for dimension in unexpected_dimensions)
+        )
+
+    missing_dimensions = sorted(required_dimensions - verdict_dimensions)
+    if missing_dimensions:
+        raise jsonschema.ValidationError(
+            "ad-video intelligence_brief.dimension_verdicts missing verdicts "
+            "for enriched_brief hypothesis dimension(s): "
+            + ", ".join(repr(dimension) for dimension in missing_dimensions)
+        )
 
 
 def _validate_ad_video_production_proposal(data: dict[str, Any]) -> None:
@@ -431,8 +540,17 @@ def _validate_alignment_block(
         )
 
 
-def _validate_ad_video_scene_plan(data: dict[str, Any]) -> None:
+def _validate_ad_video_scene_plan(
+    data: dict[str, Any],
+    *,
+    require_user_approval: bool = True,
+) -> None:
     """Enforce ad-video scene metadata that needs pipeline context."""
+    if require_user_approval and data.get("user_approved") is not True:
+        raise jsonschema.ValidationError(
+            "ad-video scene_plan.user_approved must be true"
+        )
+
     animated = data.get("style_mode") == "animated"
     seen_scene_ids: set[str] = set()
     previous_end: float | None = None
@@ -761,6 +879,24 @@ def _validate_ad_video_edit_matches_production_proposal(
             "production_proposal.music_strategy unless an approved "
             "music_strategy_selection decision selects the edit strategy"
         )
+
+    subtitles = production_proposal.get("subtitles")
+    if isinstance(subtitles, dict):
+        subtitle_mode = subtitles.get("mode")
+        edit_subtitles = edit_decisions.get("subtitles")
+        edit_subtitles_enabled = (
+            edit_subtitles.get("enabled") if isinstance(edit_subtitles, dict) else False
+        )
+        if subtitle_mode == "off" and edit_subtitles_enabled is True:
+            raise jsonschema.ValidationError(
+                "ad-video edit_decisions.subtitles.enabled must be false "
+                "when production_proposal.subtitles.mode is 'off'"
+            )
+        if subtitle_mode == "burnt-in" and edit_subtitles_enabled is not True:
+            raise jsonschema.ValidationError(
+                "ad-video edit_decisions.subtitles.enabled must be true "
+                "when production_proposal.subtitles.mode is 'burnt-in'"
+            )
 
     derivative_variants = [
         variant
@@ -1926,7 +2062,7 @@ def _validate_ad_video_final_review_matches_production_proposal(
         return
 
     mode = subtitles.get("mode")
-    if mode not in {"off", "burnt-in", "sidecar"}:
+    if mode not in {"off", "burnt-in"}:
         return
 
     subtitle_check = (
@@ -2265,6 +2401,7 @@ def validate_artifact(
     *,
     pipeline_type: str | None = None,
     related_artifacts: dict[str, Any] | None = None,
+    validation_context: dict[str, Any] | None = None,
 ) -> None:
     """Validate artifact data against its schema. Raises on failure."""
     schema = load_schema(name)
@@ -2272,7 +2409,11 @@ def validate_artifact(
     if name == "enriched_brief" and _is_ad_video_enriched_brief(pipeline_type):
         _validate_ad_video_enriched_brief(data)
     if name == "intelligence_brief":
-        _validate_intelligence_brief(data)
+        _validate_intelligence_brief(
+            data,
+            related_artifacts=related_artifacts,
+            pipeline_type=pipeline_type,
+        )
     if name == "production_proposal" and _is_ad_video_production_proposal(pipeline_type):
         _validate_ad_video_production_proposal(data)
     if name == "idea_options":
@@ -2282,7 +2423,23 @@ def validate_artifact(
     if name == "script" and _is_ad_video_script(data, pipeline_type):
         _validate_ad_video_script(data)
     if name == "scene_plan" and _is_ad_video_scene_plan(pipeline_type):
-        _validate_ad_video_scene_plan(data)
+        checkpoint_stage = (
+            validation_context.get("checkpoint_stage")
+            if isinstance(validation_context, dict)
+            else None
+        )
+        checkpoint_status = (
+            validation_context.get("checkpoint_status")
+            if isinstance(validation_context, dict)
+            else None
+        )
+        _validate_ad_video_scene_plan(
+            data,
+            require_user_approval=not (
+                checkpoint_stage == "scene_plan"
+                and checkpoint_status == "awaiting_human"
+            ),
+        )
     if name == "edit_decisions" and _is_ad_video_edit_decisions(pipeline_type):
         _validate_ad_video_edit_decisions(data, related_artifacts=related_artifacts)
     if name == "asset_manifest" and _is_ad_video_asset_manifest(pipeline_type):

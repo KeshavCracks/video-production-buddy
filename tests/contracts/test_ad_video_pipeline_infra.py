@@ -371,6 +371,29 @@ def _minimal_ad_video_proposal_with_decisions() -> dict[str, Any]:
     return proposal
 
 
+def _minimal_ad_video_scene_plan(*, user_approved: bool) -> dict[str, Any]:
+    return {
+        "version": "1.0",
+        "user_approved": user_approved,
+        "style_mode": "cinematic",
+        "total_duration_seconds": 5,
+        "scenes": [
+            {
+                "id": "scene-1",
+                "type": "text_card",
+                "description": "Opening product promise.",
+                "start_seconds": 0,
+                "end_seconds": 5,
+                "duration_seconds": 5,
+                "core": True,
+                "motion_required": False,
+                "product_visibility": "none",
+                "product_reference_required": False,
+            }
+        ],
+    }
+
+
 def _decision_log_with_approved_runtime_and_product_ref() -> dict[str, Any]:
     return {
         "version": "1.0",
@@ -382,7 +405,24 @@ def _decision_log_with_approved_runtime_and_product_ref() -> dict[str, Any]:
                 "category": "render_runtime_selection",
                 "subject": "Select render runtime",
                 "options_considered": [
-                    {"option_id": "ffmpeg", "label": "FFmpeg", "score": 0.9, "reason": "Best for cinematic"},
+                    {
+                        "option_id": "remotion",
+                        "label": "Remotion",
+                        "score": 0.5,
+                        "reason": "Available alternative for motion graphics.",
+                    },
+                    {
+                        "option_id": "hyperframes",
+                        "label": "HyperFrames",
+                        "score": 0.5,
+                        "reason": "Available alternative for HTML/GSAP composition.",
+                    },
+                    {
+                        "option_id": "ffmpeg",
+                        "label": "FFmpeg",
+                        "score": 0.9,
+                        "reason": "Best for cinematic source-footage assembly.",
+                    },
                 ],
                 "selected": "ffmpeg",
                 "reason": "Best for cinematic style",
@@ -489,6 +529,47 @@ class TestCheckpointWriteReadRoundtrip:
         cp = read_checkpoint(tmp_path, "test-proj", "intake")
         assert cp is not None
         assert cp["cost_snapshot"]["total_usd"] == 1.23
+
+    def test_scene_plan_awaiting_human_allows_pending_user_approval(
+        self, tmp_path: Path
+    ) -> None:
+        artifacts = {
+            "scene_plan": _minimal_ad_video_scene_plan(user_approved=False),
+        }
+
+        path = write_checkpoint(
+            tmp_path,
+            "test-proj",
+            "scene_plan",
+            "awaiting_human",
+            artifacts,
+            pipeline_type="ad-video",
+            human_approval_required=True,
+            human_approved=False,
+        )
+
+        assert path.exists()
+        cp = read_checkpoint(tmp_path, "test-proj", "scene_plan")
+        assert cp is not None
+        assert cp["status"] == "awaiting_human"
+        assert cp["artifacts"]["scene_plan"]["user_approved"] is False
+
+    def test_scene_plan_completed_checkpoint_requires_user_approval(
+        self, tmp_path: Path
+    ) -> None:
+        artifacts = {
+            "scene_plan": _minimal_ad_video_scene_plan(user_approved=False),
+        }
+
+        with pytest.raises(CheckpointValidationError, match="user_approved"):
+            write_checkpoint(
+                tmp_path,
+                "test-proj",
+                "scene_plan",
+                "completed",
+                artifacts,
+                pipeline_type="ad-video",
+            )
 
     def test_ad_video_proposal_with_decision_log_merge(self, tmp_path: Path) -> None:
         proposal = _minimal_ad_video_proposal_with_decisions()

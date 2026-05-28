@@ -28,7 +28,7 @@ blocker to EP.
    bible's declared primary. Write only those exact selected variant ids to
    `production_proposal.derivatives_added`; do not mutate the bible's optional
    derivatives audit copy.
-2. **Subtitle configuration** — burnt-in ASS / ASS sidecar / none + language.
+2. **Subtitle configuration** — burnt-in ASS or none + language.
 3. **Dubbing preferences** — additional language tracks.
 4. **Music strategy** — confirm the approved music path:
    `generative_loose`, `library_locked`, `search_align`, or `none`. Record the
@@ -39,8 +39,10 @@ blocker to EP.
    Animated mode can use `"remotion"` or `"hyperframes"` when available; cinematic
    mode must include `"ffmpeg"` and should normally lock `"ffmpeg"`. HARD RULE
    from AGENT_GUIDE: present both Remotion and HyperFrames when both are available,
-   include any applicable FFmpeg option, and never silently default. Record the
-   user's choice in `decision_log` under category `render_runtime_selection`.
+   include any applicable FFmpeg option, and never silently default. If one runtime
+   is unavailable, keep it in `options_considered` with `rejected_because` instead
+   of omitting it. Record the user's choice in `decision_log` under category
+   `render_runtime_selection`.
 7. **Product reference strategy** — lock `product_reference_strategy` before assets:
    `not_applicable`, `use_provided_reference`, `generate_concept_reference`, or
    `risk_accepted`. For physical/product-visible ads, default to
@@ -103,7 +105,7 @@ DERIVATIVES (optional — primary is [aspect_ratio] [duration]s)
   • [other relevant options based on platform]
 
 SUBTITLES
-  • Burnt-in ASS / ASS sidecar file / None
+  • Burnt-in ASS / None
   • Language: [default from platform locale]
 
 DUBBING
@@ -123,7 +125,8 @@ RENDER ENGINE
   Options available:
   • Remotion — [brief pro/con for this concept]
   • HyperFrames — [brief pro/con for this concept]
-  • FFmpeg — [for cinematic/source-footage concepts; brief pro/con]
+      • FFmpeg — [for cinematic/source-footage concepts; brief pro/con]
+      (If Remotion or HyperFrames is unavailable, still list it with why rejected.)
   Which do you prefer?
 
 PRODUCT IDENTITY REFERENCE
@@ -142,6 +145,8 @@ ESTIMATED COST
 
 Parse response. Populate:
 - `production_proposal.derivatives_added[]` with user-selected variants
+- `production_proposal.subtitles.mode`, `production_proposal.subtitles.language`,
+  and `production_proposal.subtitles.user_confirmed: true` after explicit user choice
 - Lock `production_proposal.style_mode`
 - Lock `production_proposal.music_strategy`
 - Lock `production_proposal.render_runtime`
@@ -152,6 +157,9 @@ Create a `music_strategy_selection` decision containing all options considered,
 the selected strategy, and `user_approved: true` after the user approves it.
 Create a `product_identity_reference_selection` decision containing all options considered,
 the selected strategy, and `user_approved: true` after the user approves it.
+Create a `render_runtime_selection` decision whose `options_considered` contains
+at least `remotion` and `hyperframes` option ids, plus `ffmpeg` when applicable.
+Unavailable runtimes stay in the list with `rejected_because`.
 
 Do not require `production_bible.visual.render_runtime` before this point. The
 bible stage runs before proposal approval, so its `visual.render_runtime` field
@@ -256,7 +264,7 @@ Write `production_proposal` artifact to
   "style_mode": "animated",
   "render_runtime": "remotion",
   "product_reference_strategy": "generate_concept_reference",
-  "subtitles": { "mode": "burnt-in", "language": "en" },
+  "subtitles": { "mode": "burnt-in", "language": "en", "user_confirmed": true },
   "dubbing": [],
   "derivatives_added": ["9:16", "15s_short"],
   "budget_confirmed": true,

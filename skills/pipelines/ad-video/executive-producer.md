@@ -147,7 +147,7 @@ CHECK: Primary aspect ratio
 - production_bible.deliverables.primary.aspect_ratio present? ("16:9" or "9:16")
 - Store in EP_STATE.aspect_ratio_primary (LOCKED — do NOT change downstream)
 CHECK: Subtitle & dubbing explicitly captured
-- production_proposal.subtitles.mode present (burnt-in / srt_only / none)
+- production_proposal.subtitles.mode present (burnt-in / off)
 - If missing: REVISE proposal
 ```
 
@@ -238,9 +238,9 @@ CHECK: Timeline completeness
 - All asset references point to existing files
 CHECK: Music ducking
 - target_db == -18 for all narration windows (playbook requirement)
-CHECK: Subtitle opt-in captured
-- edit_decisions.subtitles.enabled is present (value may be true or false — both are valid)
-- Do NOT require enabled == true; subtitle burn-in is user opt-in
+CHECK: Subtitle mode carried from proposal
+- edit_decisions.subtitles.enabled is false when production_proposal.subtitles.mode == "off"
+- edit_decisions.subtitles.enabled is true when production_proposal.subtitles.mode == "burnt-in"
 - If enabled == true: verify subtitle source file exists on disk
 ```
 

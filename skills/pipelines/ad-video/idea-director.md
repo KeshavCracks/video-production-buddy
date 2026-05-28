@@ -83,9 +83,40 @@ Record `selected_concept_id`.
 Write `idea_options` artifact to `projects/<project-name>/artifacts/idea_options.json`:
 ```json
 {
+  "version": "1.0",
   "concepts": [
-    { "id": "C1", "name": "...", "scenario": "...", "selected": false },
-    { "id": "C2", "name": "...", "scenario": "...", "selected": true }
+    {
+      "id": "C1",
+      "name": "...",
+      "scenario": "...",
+      "selected": false,
+      "hook_execution": "...",
+      "visual_metaphor": "...",
+      "beat_mapping": {
+        "hook": "...",
+        "build": "...",
+        "reveal": "...",
+        "cta_brand": "..."
+      },
+      "why_this_works": "...",
+      "knowledge_alignment_refs": ["knowledge_alignment:hook.visual-contrast.001"]
+    },
+    {
+      "id": "C2",
+      "name": "...",
+      "scenario": "...",
+      "selected": true,
+      "hook_execution": "...",
+      "visual_metaphor": "...",
+      "beat_mapping": {
+        "hook": "...",
+        "build": "...",
+        "reveal": "...",
+        "cta_brand": "..."
+      },
+      "why_this_works": "...",
+      "knowledge_alignment_refs": ["knowledge_alignment:hook.visual-contrast.001"]
+    }
   ],
   "selected_concept_id": "C2"
 }

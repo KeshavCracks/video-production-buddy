@@ -184,7 +184,7 @@ def _valid_script() -> dict:
                 "beat": "hook",
                 "text": "What if your widget worked this fast?",
                 "start_seconds": 0,
-                "end_seconds": 8,
+                "end_seconds": 4,
                 "speaker_directions": "Measured, intriguing.",
                 "voice_performance": {
                     "emotion": "intrigue",
@@ -199,8 +199,8 @@ def _valid_script() -> dict:
                 "id": "build",
                 "beat": "build",
                 "text": "The Widget Pro handles everything.",
-                "start_seconds": 8,
-                "end_seconds": 16,
+                "start_seconds": 4,
+                "end_seconds": 8,
                 "speaker_directions": "Confident proof.",
                 "voice_performance": {
                     "emotion": "confidence",
@@ -210,6 +210,38 @@ def _valid_script() -> dict:
                     "pause_after_seconds": 0.2,
                 },
                 "tts_directive": {"speed_mult": 1.0},
+            },
+            {
+                "id": "reveal",
+                "beat": "reveal",
+                "text": "Then the product reveal makes the speed obvious.",
+                "start_seconds": 8,
+                "end_seconds": 12,
+                "speaker_directions": "Lift into the reveal without shouting.",
+                "voice_performance": {
+                    "emotion": "relief",
+                    "intonation": "gentle lift then resolve",
+                    "rhythm": "open phrase with a clear landing",
+                    "pace": "conversational",
+                    "pause_after_seconds": 0.25,
+                },
+                "tts_directive": {"speed_mult": 0.96},
+            },
+            {
+                "id": "cta_brand",
+                "beat": "cta_brand",
+                "text": "Try Widget Pro today. Widget Pro.",
+                "start_seconds": 12,
+                "end_seconds": 16,
+                "speaker_directions": "Clean brand landing.",
+                "voice_performance": {
+                    "emotion": "confidence",
+                    "intonation": "settled final resolve",
+                    "rhythm": "short CTA, breath, brand signature",
+                    "pace": "measured",
+                    "pause_after_seconds": 0.35,
+                },
+                "tts_directive": {"speed_mult": 0.96},
             },
         ],
     }
@@ -238,7 +270,7 @@ def _valid_edit_decisions() -> dict:
                 ],
             },
         },
-        "subtitles": {"enabled": False},
+        "subtitles": {"enabled": True, "source": "sub-1"},
     }
 
 
@@ -603,6 +635,7 @@ class TestScenePlanAnimatedSceneType:
     def test_animated_scene_without_scene_type_rejected(self) -> None:
         plan = {
             "version": "1.0",
+            "user_approved": True,
             "style_mode": "animated",
             "scenes": [
                 {
@@ -624,6 +657,7 @@ class TestScenePlanAnimatedSceneType:
     def test_cinematic_scene_without_scene_type_passes(self) -> None:
         plan = {
             "version": "1.0",
+            "user_approved": True,
             "style_mode": "cinematic",
             "scenes": [
                 {
@@ -1423,6 +1457,45 @@ class TestRuntimePropagation:
                 related_artifacts={"production_proposal": proposal},
             )
 
+    def test_edit_decisions_cannot_reenable_subtitles_after_proposal_opt_out(self) -> None:
+        proposal = _minimal_production_proposal()
+        proposal["subtitles"] = {
+            "mode": "off",
+            "language": "en",
+            "user_confirmed": True,
+        }
+        ed = _valid_edit_decisions()
+        ed["subtitles"] = {"enabled": True, "source": "sub-1"}
+
+        with pytest.raises(ValidationError, match="subtitles.enabled"):
+            validate_artifact(
+                "edit_decisions",
+                ed,
+                pipeline_type="ad-video",
+                related_artifacts={
+                    "production_proposal": proposal,
+                    "asset_manifest": _valid_asset_manifest_for_edit(),
+                },
+            )
+
+    def test_edit_decisions_must_enable_subtitles_for_burnt_in_proposal(self) -> None:
+        proposal = _minimal_production_proposal()
+        proposal["subtitles"] = {
+            "mode": "burnt-in",
+            "language": "en",
+            "user_confirmed": True,
+        }
+        ed = _valid_edit_decisions()
+        ed["subtitles"] = {"enabled": False}
+
+        with pytest.raises(ValidationError, match="subtitles.enabled"):
+            validate_artifact(
+                "edit_decisions",
+                ed,
+                pipeline_type="ad-video",
+                related_artifacts={"production_proposal": proposal},
+            )
+
     def test_edit_decisions_accepts_user_approved_music_strategy_change(self) -> None:
         proposal = _minimal_production_proposal()
         proposal["music_strategy"] = "none"
@@ -2082,6 +2155,16 @@ class TestIdeaOptionsSelection:
             "name": f"Concept {cid}",
             "scenario": f"A compelling scenario for {cid}.",
             "selected": selected,
+            "hook_execution": "Open on a concrete before/after gap in the first three seconds.",
+            "visual_metaphor": "A messy launch board resolving into a clean route.",
+            "beat_mapping": {
+                "hook": "Show the before/after contrast immediately.",
+                "build": "Demonstrate a concrete use moment.",
+                "reveal": "Reveal the product benefit in a single readable action.",
+                "cta_brand": "Land the CTA and brand without adding a new claim.",
+            },
+            "why_this_works": "It converts the approved strategy into visible proof.",
+            "knowledge_alignment_refs": ["knowledge_alignment:hook.visual-contrast.001"],
         }
 
     def test_no_selected_concept_rejected(self) -> None:
@@ -2141,6 +2224,7 @@ class TestScenePlanProductVisibility:
     def test_scene_without_product_visibility_rejected(self) -> None:
         plan = {
             "version": "1.0",
+            "user_approved": True,
             "style_mode": "cinematic",
             "scenes": [
                 {
@@ -2160,6 +2244,7 @@ class TestScenePlanProductVisibility:
     def test_scene_without_product_reference_required_rejected(self) -> None:
         plan = {
             "version": "1.0",
+            "user_approved": True,
             "style_mode": "cinematic",
             "scenes": [
                 {
@@ -2180,6 +2265,7 @@ class TestScenePlanProductVisibility:
     def test_generated_non_packshot_scene_requires_motion(self) -> None:
         plan = {
             "version": "1.0",
+            "user_approved": True,
             "style_mode": "cinematic",
             "scenes": [
                 {
@@ -2202,6 +2288,7 @@ class TestScenePlanProductVisibility:
     def test_packshot_scene_may_be_still(self) -> None:
         plan = {
             "version": "1.0",
+            "user_approved": True,
             "style_mode": "cinematic",
             "scenes": [
                 {

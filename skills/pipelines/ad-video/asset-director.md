@@ -244,12 +244,8 @@ These are REQUIRED for ALL style modes and ALL ads:
    - Voice style: `EP_STATE.playbook.audio.voice_style`
    - Hero moment variation: apply `playbook.audio.hero_moment_voice_shift` on `cta_brand` section
 
-2. **Subtitle file** — one file covering all narration
-   - Format: ASS with explicit PlayResX/PlayResY matching the output resolution
-   - Timecodes must align to TTS audio files (use actual TTS durations)
-   - Must be legible at 720p on mobile (minimum 24px equivalent)
-
-Missing either of these is a CRITICAL failure. Abort and alert the EP.
+Subtitles are conditional on `production_proposal.subtitles.mode`; see Step 3.
+Missing required narration is a CRITICAL failure. Abort and alert the EP.
 
 ## Product Reference Sub-Stage (Before Sample)
 
@@ -362,7 +358,16 @@ For each `script.sections[]` item not yet generated, call `CosyVoiceTTS().execut
 Delegate to mode supplement for all visual asset generation (images, video clips). The supplement specifies per-scene-type which tool class to use (`WanxImage` for stills, `WanVideoAPI` for motion clips, `PexelsVideo` for free stock). All calls follow the Tool Call Pattern above.
 
 ### Step 3: Subtitle File
-Generate subtitle file from actual TTS durations.
+Read `production_proposal.subtitles.mode` before generating anything.
+
+- If `production_proposal.subtitles.mode == "off"`, do not generate a subtitle
+  file, do not add subtitle assets to `asset_manifest`, and carry the no-subtitle
+  choice forward so edit/compose keep subtitles disabled.
+- If `production_proposal.subtitles.mode != "off"`, generate an ASS subtitle file
+  from actual TTS durations.
+  - Format: ASS with explicit PlayResX/PlayResY matching the output resolution
+  - Timecodes must align to TTS audio files (use actual TTS durations)
+  - Must be legible at 720p on mobile (minimum 24px equivalent)
 
 **CRITICAL: Generate ASS format, NOT SRT.** When ffmpeg's `subtitles=` filter renders an SRT file, it uses libass's internal default resolution (~384×288) to interpret font sizes and margins, making them scale up massively and appear at wrong positions. An ASS file with explicit `PlayResX`/`PlayResY` headers forces exact pixel-level sizing.
 
@@ -403,7 +408,8 @@ ass_content = build_ass(narration_cues, video_w, video_h, font_size, margin_v)
 Path("assets/subtitles.ass").write_text(ass_content, encoding="utf-8")
 ```
 
-Store: `subtitles.ass` (not `subtitles.srt`). Pass this path to `video_compose` as `subtitle_path`.
+When subtitles are enabled, store: `subtitles.ass` (not `subtitles.srt`). Pass
+this path to `video_compose` as `subtitle_path`.
 
 ### Step 4: Music
 
@@ -782,7 +788,7 @@ The EP will read `asset_manifest.total_cost_usd` and update `EP_STATE.budget_spe
       `production_bible`, `script`, `scene_plan`, and `decision_log` alongside
       `asset_manifest` and `product_identity_reference`; checkpoint validation
       re-runs provider, product-identity, and hallucination gates before compose
-- [ ] ASS `subtitle_file` present in asset_manifest
+- [ ] ASS `subtitle_file` present in asset_manifest when `production_proposal.subtitles.mode != "off"`; omitted when `production_proposal.subtitles.mode == "off"`
 - [ ] All visual assets listed in asset_manifest exist on disk
 - [ ] `narration_durations` populated for all sections
 - [ ] Budget not exceeded

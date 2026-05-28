@@ -49,9 +49,14 @@
     "product_brief": {
       "type": "object",
       "description": "Core product identity section.",
-      "required": ["product_name", "product_type", "tagline", "product_description", "target_demographic"],
+      "required": ["brand_name", "product_name", "product_type", "tagline", "product_description", "target_demographic"],
       "additionalProperties": false,
       "properties": {
+        "brand_name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Brand name that must appear in the final frame and publish metadata."
+        },
         "product_name": {
           "type": "string",
           "description": "Full product name including edition or variant."

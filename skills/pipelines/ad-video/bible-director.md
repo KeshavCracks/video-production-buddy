@@ -106,12 +106,12 @@ rules.
 
 **Start from `enriched_brief`** as the baseline, not from scratch.
 
-- `product_brief.product_name`, `product_brief.tagline`, `product_brief.target_demographic`,
+- `product_brief.brand_name`, `product_brief.product_name`, `product_brief.tagline`, `product_brief.target_demographic`,
   `narration_notes.voice_description` → use directly from enriched_brief
 - `key_message` → use `enriched_brief.product_brief.product_description` as seed;
   refine with `intelligence_brief.audience_psychographics.core_pain_point` if SUPPORTED
 - `cta` → check `intake_brief.cta`; if null, flag as "pending — must be collected at Round 2b"
-- `brand_name` → from `enriched_brief.product_brief.product_name`; flag for confirmation at Round 2b if not stated by user
+- `brand_name` → from `enriched_brief.product_brief.brand_name`; flag for confirmation at Round 2b if not stated by user
 
 **Override rule:** only replace an enriched_brief field when
 `intelligence_brief.dimension_verdicts` contains an entry for that dimension with

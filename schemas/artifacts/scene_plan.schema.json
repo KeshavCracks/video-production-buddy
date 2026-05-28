@@ -7,6 +7,10 @@
   "required": ["version", "scenes"],
   "properties": {
     "version": { "type": "string", "const": "1.0" },
+    "user_approved": {
+      "type": "boolean",
+      "description": "Ad-video scene-plan approval flag. Must be true before asset generation begins."
+    },
     "style_playbook": { "type": "string", "description": "Name of the active style playbook" },
     "style_mode": {
       "type": "string",

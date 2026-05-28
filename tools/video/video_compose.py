@@ -440,7 +440,7 @@ class VideoCompose(BaseTool):
         inputs["subtitle_style"] = resolved_sub_style
 
         ed_subs = edit_decisions.get("subtitles", {})
-        if ed_subs.get("source") and not subtitle_path:
+        if ed_subs.get("enabled") and ed_subs.get("source") and not subtitle_path:
             subtitle_path = ed_subs["source"]
 
         temp_dir = output_path.parent / ".compose_tmp"

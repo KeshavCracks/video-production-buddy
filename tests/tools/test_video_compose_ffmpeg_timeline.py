@@ -97,6 +97,54 @@ def test_ffmpeg_compose_normalizes_segments_to_selected_profile(monkeypatch, tmp
     assert "fps=30" in vf
 
 
+def test_ffmpeg_compose_does_not_burn_disabled_subtitles(monkeypatch, tmp_path):
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"stub-video")
+    subtitle = tmp_path / "subtitles.ass"
+    subtitle.write_text(
+        "[Script Info]\nPlayResX: 1920\nPlayResY: 1080\n", encoding="utf-8"
+    )
+    output = tmp_path / "out.mp4"
+    commands: list[list[str]] = []
+
+    composer = VideoCompose()
+    monkeypatch.setattr(composer, "_has_audio_stream", lambda _path: False)
+
+    def fake_run_command(cmd, *args, **kwargs):
+        commands.append(list(cmd))
+        out = Path(cmd[-1])
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(b"stub-output")
+        return SimpleNamespace(stdout="")
+
+    monkeypatch.setattr(composer, "run_command", fake_run_command)
+
+    result = composer.execute(
+        {
+            "operation": "compose",
+            "edit_decisions": {
+                "version": "1.0",
+                "render_runtime": "ffmpeg",
+                "cuts": [
+                    {
+                        "id": "cut-1",
+                        "source": str(source),
+                        "in_seconds": 0.0,
+                        "out_seconds": 2.0,
+                    }
+                ],
+                "subtitles": {"enabled": False, "source": str(subtitle)},
+            },
+            "output_path": str(output),
+        }
+    )
+
+    assert result.success, result.error
+    assert not any(
+        "subtitles=" in str(part) for command in commands for part in command
+    )
+
+
 def test_scene_fidelity_accepts_plain_media_cut_without_component_type():
     registry = load_registry()
 

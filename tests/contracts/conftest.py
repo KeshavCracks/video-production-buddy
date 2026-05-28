@@ -186,7 +186,7 @@ def _trend_threaded_script(source_ref: str = "trend_alignment:trend-tiktok-lofi-
     return {
         "version": "1.0",
         "title": "Trend Threaded Script",
-        "total_duration_seconds": 8,
+        "total_duration_seconds": 12,
         "user_approved": True,
         "sections": [
             {
@@ -209,9 +209,29 @@ def _trend_threaded_script(source_ref: str = "trend_alignment:trend-tiktok-lofi-
                 "beat": "build",
                 "text": "Then prove the change before attention drops.",
                 "start_seconds": 3,
-                "end_seconds": 8,
+                "end_seconds": 7,
                 "source_ref": source_ref,
                 "speaker_directions": "Confident proof, no hype.",
+                "voice_performance": voice_performance,
+                "tts_directive": tts_directive,
+            },
+            {
+                "id": "reveal",
+                "beat": "reveal",
+                "text": "The product reveal makes the proof feel immediate.",
+                "start_seconds": 7,
+                "end_seconds": 10,
+                "speaker_directions": "Warmer reveal, still restrained.",
+                "voice_performance": voice_performance,
+                "tts_directive": tts_directive,
+            },
+            {
+                "id": "cta_brand",
+                "beat": "cta_brand",
+                "text": "Try Flowcut today. Flowcut.",
+                "start_seconds": 10,
+                "end_seconds": 12,
+                "speaker_directions": "Clean brand signature.",
                 "voice_performance": voice_performance,
                 "tts_directive": tts_directive,
             },
@@ -222,6 +242,7 @@ def _trend_threaded_script(source_ref: str = "trend_alignment:trend-tiktok-lofi-
 def _trend_threaded_scene_plan(source_ref: str = "trend_alignment:trend-tiktok-lofi-hook") -> dict:
     return {
         "version": "1.0",
+        "user_approved": True,
         "style_mode": "animated",
         "total_duration_seconds": 4,
         "scenes": [
@@ -437,6 +458,7 @@ def _approved_product_identity_reference(source_type: str = "generated") -> dict
 def _product_visible_scene_plan() -> dict:
     return {
         "version": "1.0",
+        "user_approved": True,
         "style_mode": "cinematic",
         "scenes": [
             {

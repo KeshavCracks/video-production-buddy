@@ -237,6 +237,7 @@ if not report["ok"]:
 ```json
 {
   "version": "1.0",
+  "user_approved": true,
   "style_mode": "animated",
   "total_duration_seconds": 60,
   "derivative_variants": ["9:16"],
@@ -289,6 +290,7 @@ After reading this base document:
 ## Validation Before Submitting
 
 - [ ] `sum(scene.duration_seconds)` within ±0.5s of script's total `duration_estimate_seconds`
+- [ ] User has reviewed and approved the full scene plan (`user_approved: true`) before asset generation begins
 - [ ] Every scene has `core` field
 - [ ] Every scene has `product_visibility` and `product_reference_required`
 - [ ] Every product-visible scene has `product_reference_required: true`

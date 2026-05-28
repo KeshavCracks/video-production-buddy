@@ -74,7 +74,7 @@ def test_script_schema_accepts_multiple_source_refs_per_section() -> None:
     script = {
         "version": "1.0",
         "title": "Multi Trend Script",
-        "total_duration_seconds": 3,
+        "total_duration_seconds": 8,
         "user_approved": True,
         "sections": [
             {
@@ -82,12 +82,42 @@ def test_script_schema_accepts_multiple_source_refs_per_section() -> None:
                 "beat": "hook",
                 "text": "Three seconds decide the scroll.",
                 "start_seconds": 0,
-                "end_seconds": 3,
+                "end_seconds": 2,
                 "source_refs": [
                     "trend_alignment:trend-tiktok-text-hooks",
                     "trend_alignment:trend-mute-friendly-format",
                 ],
                 "speaker_directions": "Measured and immediate.",
+                "voice_performance": voice_performance,
+                "tts_directive": {"speed_mult": 0.96},
+            },
+            {
+                "id": "build",
+                "beat": "build",
+                "text": "Then prove it before the viewer asks why.",
+                "start_seconds": 2,
+                "end_seconds": 5,
+                "speaker_directions": "Confident proof, no hype.",
+                "voice_performance": voice_performance,
+                "tts_directive": {"speed_mult": 0.98},
+            },
+            {
+                "id": "reveal",
+                "beat": "reveal",
+                "text": "The product lands as the simple answer.",
+                "start_seconds": 5,
+                "end_seconds": 7,
+                "speaker_directions": "Warmer reveal with a clean lift.",
+                "voice_performance": voice_performance,
+                "tts_directive": {"speed_mult": 0.94},
+            },
+            {
+                "id": "cta_brand",
+                "beat": "cta_brand",
+                "text": "Try it today. Flowcut.",
+                "start_seconds": 7,
+                "end_seconds": 8,
+                "speaker_directions": "Short, confident brand landing.",
                 "voice_performance": voice_performance,
                 "tts_directive": {"speed_mult": 0.96},
             }
@@ -179,7 +209,7 @@ def _trend_threaded_script(source_ref: str = "trend_alignment:trend-tiktok-lofi-
     return {
         "version": "1.0",
         "title": "Trend Threaded Script",
-        "total_duration_seconds": 8,
+        "total_duration_seconds": 12,
         "user_approved": True,
         "sections": [
             {
@@ -202,9 +232,29 @@ def _trend_threaded_script(source_ref: str = "trend_alignment:trend-tiktok-lofi-
                 "beat": "build",
                 "text": "Then prove the change before attention drops.",
                 "start_seconds": 3,
-                "end_seconds": 8,
+                "end_seconds": 7,
                 "source_ref": source_ref,
                 "speaker_directions": "Confident proof, no hype.",
+                "voice_performance": voice_performance,
+                "tts_directive": tts_directive,
+            },
+            {
+                "id": "reveal",
+                "beat": "reveal",
+                "text": "The product reveal makes the proof feel immediate.",
+                "start_seconds": 7,
+                "end_seconds": 10,
+                "speaker_directions": "Warmer reveal, still restrained.",
+                "voice_performance": voice_performance,
+                "tts_directive": tts_directive,
+            },
+            {
+                "id": "cta_brand",
+                "beat": "cta_brand",
+                "text": "Try Flowcut today. Flowcut.",
+                "start_seconds": 10,
+                "end_seconds": 12,
+                "speaker_directions": "Clean brand signature.",
                 "voice_performance": voice_performance,
                 "tts_directive": tts_directive,
             },
@@ -215,6 +265,7 @@ def _trend_threaded_script(source_ref: str = "trend_alignment:trend-tiktok-lofi-
 def _trend_threaded_scene_plan(source_ref: str = "trend_alignment:trend-tiktok-lofi-hook") -> dict:
     return {
         "version": "1.0",
+        "user_approved": True,
         "style_mode": "animated",
         "total_duration_seconds": 4,
         "scenes": [
@@ -458,6 +509,19 @@ def test_ad_video_manifest_and_skills_require_professional_knowledge_retrieval()
     assert "check_scene_plan_knowledge_alignment" in scene_director
 
 
+def test_ad_video_intelligence_manifest_requires_hypothesis_verdict_coverage() -> None:
+    manifest = _load_ad_video_manifest()
+    intelligence_stage = next(stage for stage in manifest["stages"] if stage["name"] == "intelligence")
+    contract_text = "\n".join(
+        intelligence_stage.get("review_focus", [])
+        + intelligence_stage.get("success_criteria", [])
+    )
+
+    assert "dimension_verdicts" in contract_text
+    assert "INFERRED or DELEGATED" in contract_text
+    assert "FROM BRIEF" in contract_text
+
+
 def test_ad_video_manifest_declares_genui_form_for_form_first_gates() -> None:
     """Form-first human gates must make genui_form visible to preflight audits."""
     manifest = load_pipeline("ad-video")
@@ -568,6 +632,17 @@ def test_ad_video_contract_mentions_trend_alignment_flow() -> None:
     assert "check_script_trend_alignment" in script
     assert "`trend_alignment_refs`" in scene
     assert "check_scene_plan_trend_alignment" in scene
+
+
+def test_ad_video_scene_plan_requires_human_approval_checkpoint_before_assets() -> None:
+    """Scene planning locks visual execution and must be approved before asset spend."""
+    manifest = _load_ad_video_manifest()
+    scene_stage = next(stage for stage in manifest["stages"] if stage["name"] == "scene_plan")
+
+    assert scene_stage["checkpoint_required"] is True
+    assert scene_stage["human_approval_default"] is True
+    assert any("User has approved the scene plan" in item for item in scene_stage["review_focus"])
+    assert any("scene_plan.user_approved == true" in item for item in scene_stage["success_criteria"])
 
 
 def test_trend_alignment_guard_rejects_missing_block() -> None:
@@ -869,10 +944,12 @@ def test_ad_video_manifest_brief_enrichment_review_focus_checks_creative_require
     manifest = _load_ad_video_manifest()
     brief_enrichment_stage = next(stage for stage in manifest["stages"] if stage["name"] == "brief_enrichment")
     focus_text = "\n".join(brief_enrichment_stage.get("review_focus", []))
+    success_text = "\n".join(brief_enrichment_stage.get("success_criteria", []))
 
     assert "creative_requirements" in focus_text
     assert "FROM BRIEF or DELEGATED" in focus_text
     assert "No required worksheet dimension is INFERRED" in focus_text
+    assert "enriched_brief.product_brief.brand_name" in success_text
 
 
 def test_ad_video_manifest_proposal_success_criteria_use_proposal_locks() -> None:
@@ -885,6 +962,33 @@ def test_ad_video_manifest_proposal_success_criteria_use_proposal_locks() -> Non
     assert "production_proposal.derivatives_added" in success_text
     assert "production_bible.visual.render_runtime" not in success_text
     assert "deliverables.derivatives populated in production_bible" not in success_text
+
+
+def test_ad_video_proposal_director_teaches_confirmed_subtitle_lock() -> None:
+    """Proposal guidance must match schema's explicit subtitle confirmation gate."""
+    manifest = _load_ad_video_manifest()
+    proposal_stage = next(stage for stage in manifest["stages"] if stage["name"] == "proposal")
+    success_text = "\n".join(proposal_stage.get("success_criteria", []))
+    proposal = _read_skill("proposal-director.md")
+
+    assert "production_proposal.subtitles.user_confirmed == true" in success_text
+    assert "subtitles.user_confirmed" in proposal
+    assert '"subtitles": { "mode": "burnt-in", "language": "en", "user_confirmed": true }' in proposal
+
+
+def test_ad_video_directors_do_not_offer_unimplemented_subtitle_sidecars() -> None:
+    """Sidecar subtitle delivery must not be offered without render/publish support."""
+    proposal = _read_skill("proposal-director.md")
+    ep = _read_skill("executive-producer.md")
+    proposal_schema = (
+        ROOT / "schemas" / "artifacts" / "production_proposal.schema.json"
+    ).read_text(encoding="utf-8")
+
+    assert '"sidecar"' not in proposal_schema
+    assert "ASS sidecar" not in proposal
+    assert "sidecar file" not in proposal
+    assert "srt_only" not in ep
+    assert "burnt-in / off" in ep
 
 
 def test_executive_producer_script_gate_uses_locked_audio_contract_rate() -> None:
@@ -1290,6 +1394,38 @@ def _music_strategy_decision(selected: str = "generative_loose") -> dict:
     }
 
 
+def _runtime_selection_decision(
+    *,
+    selected: str = "ffmpeg",
+    options: list[str] | None = None,
+) -> dict:
+    options = options or ["remotion", "hyperframes", "ffmpeg"]
+    labels = {
+        "remotion": "Remotion",
+        "hyperframes": "HyperFrames",
+        "ffmpeg": "FFmpeg",
+    }
+    return {
+        "decision_id": "d-runtime",
+        "stage": "proposal",
+        "category": "render_runtime_selection",
+        "subject": "Composition runtime",
+        "options_considered": [
+            {
+                "option_id": option,
+                "label": labels.get(option, option),
+                "score": 0.9 if option == selected else 0.65,
+                "reason": "Presented to the user before locking render_runtime.",
+            }
+            for option in options
+        ],
+        "selected": selected,
+        "reason": "Approved runtime for this ad.",
+        "user_visible": True,
+        "user_approved": True,
+    }
+
+
 def test_ad_video_proposal_checkpoint_requires_decision_log_lock_entries(tmp_path: Path) -> None:
     from lib.checkpoint import CheckpointValidationError, write_checkpoint
 
@@ -1319,24 +1455,7 @@ def test_ad_video_proposal_checkpoint_requires_decision_log_lock_entries(tmp_pat
         "version": "1.0",
         "project_id": "ad-proposal-audit",
         "decisions": [
-            {
-                "decision_id": "d-runtime",
-                "stage": "proposal",
-                "category": "render_runtime_selection",
-                "subject": "Composition runtime",
-                "options_considered": [
-                    {
-                        "option_id": "ffmpeg",
-                        "label": "FFmpeg",
-                        "score": 0.9,
-                        "reason": "Best fit for cinematic clip assembly.",
-                    }
-                ],
-                "selected": "ffmpeg",
-                "reason": "Approved runtime for this ad.",
-                "user_visible": True,
-                "user_approved": True,
-            },
+            _runtime_selection_decision(),
             {
                 "decision_id": "d-product-reference",
                 "stage": "proposal",
@@ -1368,6 +1487,49 @@ def test_ad_video_proposal_checkpoint_requires_decision_log_lock_entries(tmp_pat
     )
 
 
+def test_ad_video_proposal_checkpoint_requires_full_runtime_shortlist(tmp_path: Path) -> None:
+    """Runtime choice must prove Remotion and HyperFrames were both presented."""
+    from lib.checkpoint import CheckpointValidationError, write_checkpoint
+
+    proposal = _minimal_production_proposal()
+    decision_log = {
+        "version": "1.0",
+        "project_id": "ad-proposal-runtime-shortlist",
+        "decisions": [
+            _runtime_selection_decision(options=["ffmpeg"]),
+            {
+                "decision_id": "d-product-reference",
+                "stage": "proposal",
+                "category": "product_identity_reference_selection",
+                "subject": "Product reference strategy",
+                "options_considered": [
+                    {
+                        "option_id": "generate_concept_reference",
+                        "label": "Generate concept reference",
+                        "score": 0.8,
+                        "reason": "No user product image was provided.",
+                    }
+                ],
+                "selected": "generate_concept_reference",
+                "reason": "Matches the approved product reference strategy.",
+                "user_visible": True,
+                "user_approved": True,
+            },
+            _music_strategy_decision(),
+        ],
+    }
+
+    with pytest.raises(CheckpointValidationError, match="Remotion and HyperFrames"):
+        write_checkpoint(
+            tmp_path,
+            "ad-proposal-runtime-shortlist",
+            "proposal",
+            "completed",
+            {"production_proposal": proposal, "decision_log": decision_log},
+            pipeline_type="ad-video",
+        )
+
+
 def test_ad_video_proposal_checkpoint_requires_music_strategy_decision(tmp_path: Path) -> None:
     from lib.checkpoint import CheckpointValidationError, write_checkpoint
 
@@ -1376,24 +1538,7 @@ def test_ad_video_proposal_checkpoint_requires_music_strategy_decision(tmp_path:
         "version": "1.0",
         "project_id": "ad-proposal-music-missing",
         "decisions": [
-            {
-                "decision_id": "d-runtime",
-                "stage": "proposal",
-                "category": "render_runtime_selection",
-                "subject": "Composition runtime",
-                "options_considered": [
-                    {
-                        "option_id": "ffmpeg",
-                        "label": "FFmpeg",
-                        "score": 0.9,
-                        "reason": "Best fit for cinematic clip assembly.",
-                    }
-                ],
-                "selected": "ffmpeg",
-                "reason": "Approved runtime for this ad.",
-                "user_visible": True,
-                "user_approved": True,
-            },
+            _runtime_selection_decision(),
             {
                 "decision_id": "d-product-reference",
                 "stage": "proposal",
@@ -1435,30 +1580,7 @@ def test_ad_video_proposal_checkpoint_decisions_must_match_locked_proposal(tmp_p
         "version": "1.0",
         "project_id": "ad-proposal-mismatch",
         "decisions": [
-            {
-                "decision_id": "d-runtime",
-                "stage": "proposal",
-                "category": "render_runtime_selection",
-                "subject": "Composition runtime",
-                "options_considered": [
-                    {
-                        "option_id": "remotion",
-                        "label": "Remotion",
-                        "score": 0.9,
-                        "reason": "Best fit for React scene stack.",
-                    },
-                    {
-                        "option_id": "hyperframes",
-                        "label": "HyperFrames",
-                        "score": 0.8,
-                        "reason": "Good fit for GSAP typography.",
-                    },
-                ],
-                "selected": "remotion",
-                "reason": "Approved runtime for this ad.",
-                "user_visible": True,
-                "user_approved": True,
-            },
+            _runtime_selection_decision(selected="remotion"),
             {
                 "decision_id": "d-product-reference",
                 "stage": "proposal",
@@ -1501,24 +1623,7 @@ def test_ad_video_proposal_checkpoint_music_decision_must_match_locked_strategy(
         "version": "1.0",
         "project_id": "ad-proposal-music-mismatch",
         "decisions": [
-            {
-                "decision_id": "d-runtime",
-                "stage": "proposal",
-                "category": "render_runtime_selection",
-                "subject": "Composition runtime",
-                "options_considered": [
-                    {
-                        "option_id": "ffmpeg",
-                        "label": "FFmpeg",
-                        "score": 0.9,
-                        "reason": "Best fit for cinematic clip assembly.",
-                    }
-                ],
-                "selected": "ffmpeg",
-                "reason": "Approved runtime for this ad.",
-                "user_visible": True,
-                "user_approved": True,
-            },
+            _runtime_selection_decision(),
             {
                 "decision_id": "d-product-reference",
                 "stage": "proposal",
@@ -1559,24 +1664,7 @@ def test_ad_video_production_proposal_checkpoint_records_decision_log_ref(tmp_pa
         "version": "1.0",
         "project_id": "ad-proposal-ref",
         "decisions": [
-            {
-                "decision_id": "d-runtime",
-                "stage": "proposal",
-                "category": "render_runtime_selection",
-                "subject": "Composition runtime",
-                "options_considered": [
-                    {
-                        "option_id": "ffmpeg",
-                        "label": "FFmpeg",
-                        "score": 0.9,
-                        "reason": "Best fit for cinematic clip assembly.",
-                    }
-                ],
-                "selected": "ffmpeg",
-                "reason": "Approved runtime for this ad.",
-                "user_visible": True,
-                "user_approved": True,
-            },
+            _runtime_selection_decision(),
             {
                 "decision_id": "d-product-reference",
                 "stage": "proposal",
@@ -1667,6 +1755,22 @@ def test_ad_video_subtitle_contract_uses_ass_not_srt_examples() -> None:
     assert '"subtitle_path": "assets/subtitles.srt"' not in compose
 
 
+def test_ad_video_asset_subtitle_generation_respects_proposal_off_mode() -> None:
+    """Asset guidance must not regenerate subtitles after the user opts out."""
+    manifest = _load_ad_video_manifest()
+    asset_stage = next(stage for stage in manifest["stages"] if stage["name"] == "assets")
+    asset_contract_lines = asset_stage.get("review_focus", []) + asset_stage.get("success_criteria", [])
+    for sub_stage in asset_stage.get("sub_stages", []):
+        asset_contract_lines.extend(sub_stage.get("review_focus", []))
+        asset_contract_lines.extend(sub_stage.get("success_criteria", []))
+    asset_contract = "\n".join(asset_contract_lines)
+    asset = _read_skill("asset-director.md")
+
+    assert 'production_proposal.subtitles.mode == "off"' in asset
+    assert 'production_proposal.subtitles.mode != "off"' in asset_contract
+    assert "Subtitle file" not in asset.split("These are REQUIRED for ALL style modes and ALL ads:", maxsplit=1)[1].split("## Product Reference Sub-Stage", maxsplit=1)[0]
+
+
 def test_ad_video_manifest_uses_render_report_outputs_contract_name() -> None:
     manifest = _load_ad_video_manifest()
     compose_stage = next(stage for stage in manifest["stages"] if stage["name"] == "compose")
@@ -1692,6 +1796,7 @@ def test_ad_video_manifest_threads_final_review_from_compose_to_publish() -> Non
     assert "final_review" in publish_stage.get("required_artifacts_in", [])
     assert any("final_review" in item for item in compose_stage.get("success_criteria", []))
     assert any("final_review" in item for item in publish_stage.get("review_focus", []))
+    assert any("final_review" in item for item in publish_stage.get("success_criteria", []))
     assert "final_review" in compose_director
     assert "final_review" in publish_director
 

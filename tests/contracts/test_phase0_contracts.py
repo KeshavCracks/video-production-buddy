@@ -300,17 +300,39 @@ def ad_video_assets_checkpoint_context() -> dict:
         "sections": [
             {
                 "id": "hook",
+                "beat": "hook",
                 "text": "Meet the workflow that keeps every launch on track.",
                 "start_seconds": 0,
-                "end_seconds": 4,
+                "end_seconds": 2,
                 "speaker_directions": "Open with understated confidence.",
                 "voice_performance": voice_performance,
                 "tts_directive": {"speed_mult": 1.0},
             },
             {
-                "id": "cta",
-                "text": "Start your next campaign with fewer handoffs.",
-                "start_seconds": 4,
+                "id": "build",
+                "beat": "build",
+                "text": "The proof removes messy handoffs from the launch path.",
+                "start_seconds": 2,
+                "end_seconds": 5,
+                "speaker_directions": "Explain the proof without hype.",
+                "voice_performance": voice_performance,
+                "tts_directive": {"speed_mult": 1.0},
+            },
+            {
+                "id": "reveal",
+                "beat": "reveal",
+                "text": "Then the product makes the clean path visible.",
+                "start_seconds": 5,
+                "end_seconds": 7,
+                "speaker_directions": "Lift into a clear reveal.",
+                "voice_performance": voice_performance,
+                "tts_directive": {"speed_mult": 1.0},
+            },
+            {
+                "id": "cta_brand",
+                "beat": "cta_brand",
+                "text": "Start your next campaign with Acme.",
+                "start_seconds": 7,
                 "end_seconds": 8,
                 "speaker_directions": "Close with a precise CTA.",
                 "voice_performance": voice_performance,
@@ -320,6 +342,7 @@ def ad_video_assets_checkpoint_context() -> dict:
     }
     scene_plan = {
         "version": "1.0",
+        "user_approved": True,
         "style_mode": "cinematic",
         "total_duration_seconds": 8,
         "scenes": [
@@ -405,7 +428,9 @@ def ad_video_assets_checkpoint_context() -> dict:
     }
 
 
-def ad_video_assets_manifest_with_narration_inventory(section_ids=("hook", "cta")) -> dict:
+def ad_video_assets_manifest_with_narration_inventory(
+    section_ids=("hook", "build", "reveal", "cta_brand")
+) -> dict:
     assets = [
         {
             "id": f"narr-{section_id}",
@@ -459,6 +484,7 @@ def ad_video_assets_checkpoint_artifacts(product_identity_reference: dict) -> di
 def ad_video_scene_plan_for_edit() -> dict:
     return {
         "version": "1.0",
+        "user_approved": True,
         "style_mode": "cinematic",
         "total_duration_seconds": 1.2,
         "scenes": [
@@ -1287,6 +1313,7 @@ class TestCheckpoint:
         proposal = _minimal_production_proposal()
         proposal["music_strategy"] = "none"
         proposal["render_runtime"] = "remotion"
+        proposal["subtitles"]["mode"] = "off"
 
         path = write_checkpoint(
             tmp_path,
@@ -1464,6 +1491,7 @@ class TestCheckpoint:
     def test_ad_video_edit_checkpoint_rejects_unresolved_cut_source(self, tmp_path):
         proposal = _minimal_production_proposal()
         proposal["music_strategy"] = "none"
+        proposal["subtitles"]["mode"] = "off"
 
         with pytest.raises(CheckpointValidationError, match="cut source"):
             write_checkpoint(
@@ -1606,6 +1634,7 @@ class TestCheckpoint:
         proposal = _minimal_production_proposal()
         proposal["music_strategy"] = "none"
         proposal["derivatives_added"] = ["9:16"]
+        proposal["subtitles"]["mode"] = "off"
 
         with pytest.raises(CheckpointValidationError, match="derivative_specs"):
             write_checkpoint(
