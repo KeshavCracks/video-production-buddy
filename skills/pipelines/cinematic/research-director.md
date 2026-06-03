@@ -14,7 +14,7 @@ Unlike explainer research (which focuses on facts, data, and content gaps), cine
 |-------|----------|---------|
 | Schema | `schemas/artifacts/research_brief.schema.json` | Artifact validation |
 | User input | Subject, mood hints, footage situation, references | Research scope |
-| Tools | Web search, web fetch | Research execution |
+| Sources | User references, source-media review, reference-video analysis, and browser research when available | Research execution |
 
 ## Process
 
@@ -28,7 +28,7 @@ riff on.
 
 1. Read it thoroughly. Extract:
    - `content_analysis.topics` — research these topics for accuracy
-   - `content_analysis.key_claims` — verify these claims via web search
+   - `content_analysis.key_claims` — verify these claims through available source material or browser research
    - `style_profile` — note the cinematic language (color palette, camera movements, lighting)
    - `structure_analysis.scenes` — understand the shot language and emotional arc
    - `replication_guidance.creative_differentiation_seeds` — these are your concept seeds
@@ -54,7 +54,7 @@ riff on.
 
 ### Step 1: Classify the Brief
 
-Before searching, extract from the user's request:
+Before researching, extract from the user's request:
 
 - **Subject**: What is this video about?
 - **Source reality**: Does the user have footage, stills, audio, or nothing?
@@ -68,7 +68,7 @@ Before searching, extract from the user's request:
 **Goal:** Find real cinematic precedents that match the mood and subject.
 
 ```
-SEARCH BATCH 1 — Visual References (run all in parallel)
+RESEARCH PROBE SET 1 — Visual References (run all in parallel when browser research is available)
 
 Q1: "[subject] cinematic [mood hint]" site:youtube.com
     → Find: Existing trailers, brand films, or mood pieces for this subject.
@@ -94,7 +94,7 @@ Q4: "[subject] [mood hint]" (short film OR brand film OR trailer) award OR festi
 **Goal:** Understand the audio palette for this mood.
 
 ```
-SEARCH BATCH 2 — Audio References (run in parallel)
+RESEARCH PROBE SET 2 — Audio References (run in parallel when browser research is available)
 
 Q5: "[mood hint] [subject] soundtrack" OR "[mood hint] film score reference"
     → Find: Music mood references.
@@ -113,7 +113,7 @@ Q6: "[mood hint] sound design" (cinematic OR film OR trailer)
 **Goal:** Gather factual or contextual depth that grounds the visual choices.
 
 ```
-SEARCH BATCH 3 — Subject Depth (run in parallel)
+RESEARCH PROBE SET 3 — Subject Depth (run in parallel when browser research is available)
 
 Q7: "[subject]" (story OR history OR origin OR significance)
     → Find: Narrative depth that can inform visual decisions.
@@ -130,7 +130,7 @@ Q9: "[subject]" "[current year]" (trend OR development OR news)
 **Goal:** Find specific cinematic techniques that suit this mood.
 
 ```
-SEARCH BATCH 4 — Technique Research (run in parallel)
+RESEARCH PROBE SET 4 — Technique Research (run in parallel when browser research is available)
 
 Q10: "[mood hint] camera movement" (technique OR cinematography)
      → Find: Which camera movements suit this mood (handheld for raw, steadicam for contemplative, whip pans for energy).
@@ -145,7 +145,7 @@ Q12: "[delivery shape] structure" (beat sheet OR pacing OR breakdown)
 ### Step 6: Audience and Distribution Context
 
 ```
-SEARCH BATCH 5 — Audience (run in parallel)
+RESEARCH PROBE SET 5 — Audience (run in parallel when browser research is available)
 
 Q13: "[subject] [platform]" (best OR viral OR most watched)
      → Find: What performs well on the target platform for this subject.
@@ -178,7 +178,7 @@ For each direction, specify:
 
 ### Step 8: Source Bibliography
 
-Compile all URLs used. Minimum 5 sources.
+Compile the sources used. Target at least 5 sources when source URLs or reference artifacts are available.
 
 ### Step 9: Assemble and Submit
 
@@ -194,9 +194,9 @@ Validate against `schemas/artifacts/research_brief.schema.json` before submittin
 | Constraint | Value | Why |
 |------------|-------|-----|
 | Max time on research | 3-5 minutes | Research is valuable but has diminishing returns |
-| Max searches | 20 | Prevent infinite rabbit holes |
-| Min searches | 8 | Ensure adequate coverage |
-| No paid tools | — | Research uses web search only — zero cost |
+| Max research probes | 20 | Prevent infinite rabbit holes |
+| Min research probes | 8 when enough source material exists | Ensure adequate coverage without requiring an unavailable tool |
+| No paid tools | — | Research must not use paid generation tools |
 
 ## Common Pitfalls
 

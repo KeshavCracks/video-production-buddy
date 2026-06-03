@@ -1,4 +1,4 @@
-# Image Provider Usage for OpenMontage
+# Image Provider Usage for Video Production Buddy
 
 > How to choose between image generation and stock providers, and how to use each effectively.
 > Supplements the existing `image-gen-usage.md` (which covers FLUX prompting in depth).
@@ -13,6 +13,7 @@
 | `grok_image` | Grok Imagine Image (xAI) | $0.02/output + $0.002/input edit image | ~5-15s | Image edits, style transfer, multi-image compositing |
 | `openai_image` | GPT Image 1 (OpenAI) | ~$0.01-0.17 | ~5-15s | Complex instructions, text in images, multi-element |
 | `recraft_image` | Recraft V4 via fal.ai | ~$0.04-0.25 | ~5-10s | Logos, SVG vectors, brand assets, text rendering (see caveat below) |
+| `wanx_image` | Wanxiang / Bailian (DashScope) | read live | ~5-20s | Chinese aesthetic presets, multi-image references, promptable edits |
 | `local_diffusion` | Stable Diffusion (local) | Free | ~30s+ | Offline, privacy, free |
 | `image_gen` | Multi (legacy, deprecated) | Varies | Varies | **Deprecated** — use `image_selector` or per-provider tools |
 
@@ -38,6 +39,8 @@
 | **Abstract/conceptual illustration** | `flux_image` | AI excels at custom concepts | `openai_image` |
 | **Style transfer / repaint of an existing image** | `grok_image` | Native edit flow, strong promptable transforms | `openai_image` |
 | **Multi-image merge / composite** | `grok_image` | Can combine multiple source images into one scene | `openai_image` |
+| **Chinese aesthetics / ink / watercolor / poster illustration** | `wanx_image` | Wanxiang styles and Chinese prompt handling | `flux_image` |
+| **Image edit from product/reference images** | `wanx_image` | Native reference-image/edit operations via Bailian | `grok_image` → `openai_image` |
 | **Logo or brand asset** | `recraft_image` | SVG support, text accuracy | `openai_image` |
 | **Image with text/labels** | `openai_image` | Best text rendering (GPT Image 1) | `recraft_image` |
 | **Complex multi-element composition** | `openai_image` | Best instruction following | `flux_image` |
@@ -51,6 +54,11 @@
 ### Recraft V4 via fal.ai
 - **`style` parameter causes 422 errors** (as of 2026-04). The `style` enum values (`digital_illustration`, `realistic_image`, etc.) are rejected by fal.ai's Recraft V4 endpoint. **Workaround:** encode style direction in the prompt text instead (e.g. "digital illustration of a tooth cross-section" rather than `style="digital_illustration"`). The `image_size` and `colors` parameters work fine.
 - **Text rendering is unreliable for exact business names.** Recraft (like all AI image models) may hallucinate wrong text. For any scene where text must be verbatim (CTA screens, business names, phone numbers), use Remotion `text_card` instead of generating an image with text.
+
+### WanxImage via Bailian / DashScope
+- Requires `DASHSCOPE_API_KEY`; read the live `wanx_image.install_instructions` from the registry before offering setup.
+- Read `.agents/skills/wanx-best-practices/SKILL.md` before writing prompts. Wanx has provider-specific style names, editing modes, and reference-image behavior that generic FLUX prompts do not cover.
+- Use `wanx_image` for still frames, product reference images, edit/repaint work, and Chinese visual styles. Do not use it as a substitute for video in motion-required scenes; route those to `video_selector` or `wan_video_api`.
 
 ## Cost-Quality Tradeoff
 

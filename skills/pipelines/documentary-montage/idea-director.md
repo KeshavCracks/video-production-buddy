@@ -13,6 +13,8 @@ Lock `render_runtime = "remotion"`. **HyperFrames is NOT a valid runtime on this
 
 Per AGENT_GUIDE.md → "Present Both Composition Runtimes (HARD RULE)": do NOT silently default. Tell the user: "HyperFrames is available on your machine as an alternative runtime, but documentary-montage depends on the Remotion CinematicRenderer + end-tag overlay stack, so remotion is the only viable choice here — OK to proceed?" Record a `render_runtime_selection` decision in `decision_log` listing both runtimes in `options_considered`, with hyperframes `rejected_because: "CinematicRenderer + end-tag overlay parity deferred on documentary-montage"`.
 
+Write the approved runtime into `brief.metadata.render_runtime`. This field is required by `schemas/artifacts/brief.schema.json` and is the runtime lock that edit and compose must carry forward.
+
 ## Prerequisites
 
 | Layer | Resource | Purpose |
@@ -157,34 +159,46 @@ Minimum fields the brief must carry:
 
 ```json
 {
-  "topic": "A minute in the rain",
-  "thematic_question": "What does rain show you about a city?",
+  "version": "1.0",
+  "title": "A Minute in the Rain",
+  "hook": "What does rain show you about a city?",
+  "key_points": [
+    "Rain changes how the city moves.",
+    "Small details reveal the montage thesis.",
+    "The end tag lands the thematic question."
+  ],
   "tone": "elegiac",
-  "duration_seconds": 90,
-  "shape": "list",
-  "sources_allowed": ["pexels", "pixabay_video", "coverr", "mixkit", "archive_org", "nara", "nasa"],
-  "generated_clips_allowed": false,
-  "narration": "none",
-  "music_plan": {
-    "source": "generated",
-    "provider": "elevenlabs",
-    "prompt_seed": "slow ambient drone in A minor, no percussion, 60s sustained swell, Max Richter register"
-  },
-  "end_tag_plan": {
-    "text": "THE CITY KEEPS ITS OWN VIGIL.",
-    "palette": "cool_offwhite_on_black",
-    "duration_seconds": 5.5,
-    "render_engine": "remotion",
-    "component": "EndTag"
-  },
-  "era_mix": "any",
-  "target_platform": "social_short"
+  "style": "cinematic",
+  "target_platform": "social_short",
+  "target_duration_seconds": 90,
+  "metadata": {
+    "render_runtime": "remotion",
+    "topic": "A minute in the rain",
+    "thematic_question": "What does rain show you about a city?",
+    "shape": "list",
+    "sources_allowed": ["pexels", "pixabay_video", "coverr", "mixkit", "archive_org", "nara", "nasa"],
+    "generated_clips_allowed": false,
+    "narration": "none",
+    "music_plan": {
+      "source": "generated",
+      "provider": "elevenlabs",
+      "prompt_seed": "slow ambient drone in A minor, no percussion, 60s sustained swell, Max Richter register"
+    },
+    "end_tag_plan": {
+      "text": "THE CITY KEEPS ITS OWN VIGIL.",
+      "palette": "cool_offwhite_on_black",
+      "duration_seconds": 5.5,
+      "render_engine": "remotion",
+      "component": "EndTag"
+    },
+    "era_mix": "any"
+  }
 }
 ```
 
-`era_mix` is a documentary-specific field: "modern" biases toward
-Pexels, "vintage" biases toward Archive.org Prelinger, "any" leaves it
-open for the scene director to decide per slot.
+`era_mix`, `music_plan`, `end_tag_plan`, `sources_allowed`, and other
+documentary-specific fields live under `metadata`; the shared brief schema
+rejects them at the top level. `metadata.render_runtime` is required.
 
 ### 8. Quality Gate
 

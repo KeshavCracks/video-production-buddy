@@ -76,19 +76,20 @@ def embed_images(image_paths: Sequence[Union[str, Path]]) -> np.ndarray:
     assert _MODEL is not None and _PROCESSOR is not None
 
     images = []
-    for p in image_paths:
-        img = Image.open(str(p)).convert("RGB")
-        images.append(img)
+    try:
+        for p in image_paths:
+            img = Image.open(str(p)).convert("RGB")
+            images.append(img)
 
-    inputs = _PROCESSOR(images=images, return_tensors="pt").to(_DEVICE)
-    with torch.no_grad():
-        features = _MODEL.get_image_features(**inputs)
-    features = features / features.norm(dim=-1, keepdim=True).clamp_min(1e-8)
-    arr = features.cpu().numpy().astype(np.float32, copy=False)
-    # Close PIL handles to avoid leaking file handles on Windows
-    for img in images:
-        img.close()
-    return arr
+        inputs = _PROCESSOR(images=images, return_tensors="pt").to(_DEVICE)
+        with torch.no_grad():
+            features = _MODEL.get_image_features(**inputs)
+        features = features / features.norm(dim=-1, keepdim=True).clamp_min(1e-8)
+        return features.cpu().numpy().astype(np.float32, copy=False)
+    finally:
+        # Close PIL handles to avoid leaking file handles on Windows.
+        for img in images:
+            img.close()
 
 
 def embed_texts(texts: Sequence[str]) -> np.ndarray:

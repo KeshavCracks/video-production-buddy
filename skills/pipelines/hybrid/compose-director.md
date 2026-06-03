@@ -14,7 +14,7 @@ Read `edit_decisions.render_runtime`. Hybrid work typically sticks with Remotion
 
 Silent runtime swap is a CRITICAL governance violation. Escalate blockers per AGENT_GUIDE.md before substituting.
 
-**Pass `proposal_packet` to `video_compose.execute()`** so the tool's in-tool swap-detection check runs against the proposal directly instead of being `skipped`.
+**Pass `brief` to `video_compose.execute()`** so the tool's in-tool swap-detection check runs against the approved planning artifact directly instead of being `skipped`.
 
 ## Prerequisites
 

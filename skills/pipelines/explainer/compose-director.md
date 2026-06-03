@@ -163,8 +163,9 @@ Call the `video_compose` tool with:
   "operation": "render",
   "edit_decisions": <edit_decisions artifact>,
   "asset_manifest": <asset_manifest artifact>,
-  "output_profile": "youtube_landscape",
-  "output_path": "renders/output.mp4",
+  "proposal_packet": <proposal_packet artifact>,
+  "profile": "youtube_landscape",
+  "output_path": "projects/<name>/renders/output.mp4",
   "options": {
     "subtitle_burn": true,
     "audio_normalize": true,

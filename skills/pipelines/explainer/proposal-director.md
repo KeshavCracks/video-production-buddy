@@ -37,7 +37,7 @@ A `render_runtime_selection` decision with only one option considered when both 
 | Schema | `schemas/artifacts/proposal_packet.schema.json` | Artifact validation |
 | Prior artifact | `research_brief` from Research Director | Raw research findings |
 | Pipeline manifest | `pipeline_defs/animated-explainer.yaml` | Stage and tool definitions |
-| Tool registry | `support_envelope()` output | What's actually available right now |
+| Tool registry | `provider_menu_summary()` output | What's actually available right now |
 | Cost tracker | `tools/cost_tracker.py` | Cost estimation data |
 | Style playbooks | `styles/*.yaml` | Available visual styles |
 | User input | Topic, any preferences expressed | Creative direction |
@@ -90,10 +90,14 @@ Read the `research_brief` thoroughly. Extract:
 Before designing concepts, know what tools are available:
 
 ```bash
-python -c "from tools.tool_registry import registry; import json; registry.discover(); print(json.dumps(registry.support_envelope(), indent=2))"
+python -c "from tools.tool_registry import registry; import json; registry.discover(); print(json.dumps(registry.provider_menu_summary(), indent=2))"
 ```
 
-Also check the capability catalog:
+Use `registry.provider_menu()` only when you need per-tool install instructions
+or dependency details for setup offers. Use `support_envelope()` only as a
+debugging fallback when the compact menu does not explain a tool state.
+
+Also check the capability catalog when you need provider lists beyond the summary:
 
 ```bash
 python -c "from tools.tool_registry import registry; import json; registry.discover(); print(json.dumps(registry.capability_catalog(), indent=2))"
@@ -377,7 +381,7 @@ MUSIC PLAN
 │   ├── cosmic_interstellar_space.mp3 (3:13) — ambient, cosmic
 │   ├── cinematic_epic.mp3 (2:45) — dramatic, building
 │   └── lofi_beat.mp3 (4:00) — chill, electronic
-├── AI generation: music_gen (ElevenLabs) — UNAVAILABLE (plan limit)
+├── AI generation: [provider from registry] — [AVAILABLE/UNAVAILABLE] [cost/quota note]
 └── Recommendation: Use "cosmic_interstellar_space.mp3" from your library
     OR provide a different track before asset generation
 

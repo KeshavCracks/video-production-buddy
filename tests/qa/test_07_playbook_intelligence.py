@@ -3,7 +3,7 @@
 
 Tests contrast validation, color harmony generation, color-blind safety,
 type scale computation, type hierarchy validation, font pairing suggestions,
-and full accessibility audit across all 3 playbooks.
+and full accessibility audit across all shipped playbooks.
 """
 
 import sys, os, json
@@ -27,6 +27,9 @@ from styles.playbook_loader import (
 
 PASS = 0
 FAIL = 0
+SHIPPED_PLAYBOOKS = sorted(
+    p.stem for p in (Path(__file__).resolve().parent.parent.parent / "styles").glob("*.yaml")
+)
 
 def check(name, condition, detail=""):
     global PASS, FAIL
@@ -44,10 +47,10 @@ def check(name, condition, detail=""):
 print("--- Test 1: List and load playbooks ---")
 playbooks_available = list_playbooks()
 print(f"  Found {len(playbooks_available)} playbooks: {playbooks_available}")
-check("At least 3 playbooks exist", len(playbooks_available) >= 3)
+check("All shipped playbooks are discoverable", set(SHIPPED_PLAYBOOKS).issubset(playbooks_available))
 
 loaded = {}
-for name in ["clean-professional", "flat-motion-graphics", "minimalist-diagram"]:
+for name in SHIPPED_PLAYBOOKS:
     try:
         pb = load_playbook(name)
         loaded[name] = pb

@@ -12,11 +12,14 @@ Lock `render_runtime = "remotion"` (audiograms and composed outputs) or `"ffmpeg
 
 Per AGENT_GUIDE.md → "Present Both Composition Runtimes (HARD RULE)": surface the constraint to the user — "HyperFrames is available on your machine, but podcast-repurpose depends on Remotion caption burn, so remotion is the only viable choice here". Record a `render_runtime_selection` decision with hyperframes `rejected_because: "caption-burn parity deferred on podcast-repurpose"`.
 
+Write the approved runtime into `brief.metadata.render_runtime`. This field is required by `schemas/artifacts/brief.schema.json` and is the runtime lock that edit and compose must carry forward.
+
 ## Reference Inputs
 
-- `docs/podcast-repurposing-best-practices.md`
+- `AGENT_GUIDE.md`
 - `skills/creative/short-form.md`
 - `skills/creative/long-form.md`
+- `skills/creative/video-editing.md`
 
 ## Process
 

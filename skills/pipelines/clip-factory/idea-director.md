@@ -12,11 +12,14 @@ Lock `render_runtime = "remotion"` (for composed clips with word-level captions)
 
 Per AGENT_GUIDE.md → "Present Both Composition Runtimes (HARD RULE)": do NOT silently lock remotion. Surface the constraint to the user: "HyperFrames is an available runtime on your machine, but clip-factory depends on Remotion caption burn that doesn't have HyperFrames parity yet, so remotion is the only viable choice here — OK to proceed?" Record the decision in `decision_log` with category `render_runtime_selection`, including hyperframes as a rejected option (`rejected_because: "caption-burn parity deferred on clip-factory"`).
 
+Write the approved runtime into `brief.metadata.render_runtime`. This field is required by `schemas/artifacts/brief.schema.json` and is the runtime lock that edit and compose must carry forward.
+
 ## Reference Inputs
 
-- `docs/clip-factory-best-practices.md`
+- `AGENT_GUIDE.md`
 - `skills/creative/short-form.md`
 - `skills/creative/video-editing.md`
+- `skills/core/subtitle-sync.md`
 
 ## Process
 

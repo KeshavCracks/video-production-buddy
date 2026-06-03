@@ -38,7 +38,7 @@ A `render_runtime_selection` decision with only one option considered when both 
 | Schema | `schemas/artifacts/proposal_packet.schema.json` | Artifact validation |
 | Prior artifact | `research_brief` from Research Director | Visual references, mood research, cinematic directions |
 | Pipeline manifest | `pipeline_defs/cinematic.yaml` | Stage and tool definitions |
-| Tool registry | `support_envelope()` output | What's actually available right now |
+| Tool registry | `provider_menu_summary()` output | What's actually available right now |
 | Cost tracker | `tools/cost_tracker.py` | Cost estimation data |
 | Style playbooks | `styles/*.yaml` | Available visual styles |
 | User input | Subject, footage, preferences | Creative direction |
@@ -87,8 +87,12 @@ Read the `research_brief` thoroughly. Extract:
 Before designing concepts, know what tools are available:
 
 ```bash
-python -c "from tools.tool_registry import registry; import json; registry.discover(); print(json.dumps(registry.support_envelope(), indent=2))"
+python -c "from tools.tool_registry import registry; import json; registry.discover(); print(json.dumps(registry.provider_menu_summary(), indent=2))"
 ```
+
+Use `registry.provider_menu()` only when you need exact install instructions for
+setup offers. Use `support_envelope()` only as a debugging fallback when the
+compact menu does not explain a tool state.
 
 Record:
 - Video generation providers — **critical for cinematic**. If motion is required, these must be available.

@@ -19,11 +19,14 @@ Before locking the production plan, decide `render_runtime` with the user. Hybri
 
 A `render_runtime_selection` decision with only one runtime in `options_considered` when both were available is a CRITICAL reviewer finding.
 
+Write the approved runtime into `brief.metadata.render_runtime`. This field is required by `schemas/artifacts/brief.schema.json` and is the runtime lock that edit and compose must carry forward.
+
 ## Reference Inputs
 
-- `docs/hybrid-video-best-practices.md`
+- `AGENT_GUIDE.md`
 - `skills/creative/storytelling.md`
 - `skills/creative/video-editing.md`
+- `skills/meta/animation-runtime-selector.md`
 
 ## Process
 

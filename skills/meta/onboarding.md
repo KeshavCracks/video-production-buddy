@@ -19,19 +19,21 @@ python -c "
 from tools.tool_registry import registry
 import json
 registry.discover()
-envelope = registry.support_envelope()
-menu = registry.provider_menu()
-print('=== ENVELOPE ===')
-print(json.dumps(envelope, indent=2))
-print('=== MENU ===')
-print(json.dumps(menu, indent=2))
+summary = registry.provider_menu_summary()
+print(json.dumps(summary, indent=2))
 "
 ```
 
-Parse the output into three buckets:
+Use `provider_menu_summary()` first because it is the compact, human-ready
+rollup. If you need exact install text after choosing the 1-2 best quick
+unlocks, call `registry.provider_menu()` for per-tool details. Do not dump raw
+`support_envelope()` during onboarding; reserve it for debugging when the
+summary and menu do not explain a tool state.
+
+Parse the summary into three buckets:
 
 1. **Available** — tools with `status: AVAILABLE`
-2. **Quick unlocks** — tools with `status: UNAVAILABLE` whose `install_instructions` reference an env var (1-minute fixes)
+2. **Quick unlocks** — entries from `setup_offers` whose `install_instructions` reference an env var (1-minute fixes)
 3. **Hardware unlocks** — tools requiring GPU or local model downloads
 
 ### Step 2: Determine the User's Setup Tier
@@ -53,7 +55,7 @@ entries in the provider menu. Report each one's availability separately:
   Best for React-based scene components (text cards, stat cards, charts),
   word-level captions, and the `TalkingHead` avatar composition.
 - **HyperFrames** requires Node.js ≥ 22 + `npx` + FFmpeg. Consumed via
-  `npx @hyperframes/cli` (no monorepo checkout required). Best for
+  `npx hyperframes` (no monorepo checkout required). Best for
   HTML/CSS/GSAP motion graphics — kinetic typography, product promos,
   launch reels, website-to-video workflows, registry blocks.
 
@@ -80,7 +82,7 @@ Present a **short, friendly capability summary**. Do NOT dump the raw provider m
 
 ---
 
-**Welcome to OpenMontage!** I'm your video production agent. Here's what I can do with your current setup:
+**Welcome to Video Production Buddy!** I'm your video production agent. Here's what I can do with your current setup:
 
 **Ready to go:**
 - [List 2-4 key capabilities in plain language, e.g., "Generate narration with free offline TTS (Piper)", "Create animated videos with spring transitions, captions, and charts (Remotion)", "Stock footage and images from Pexels"]
@@ -185,7 +187,7 @@ Common questions and how to respond:
 
 ## Anti-Patterns
 
-- **Don't dump the raw JSON** from `support_envelope()` or `provider_menu()` on the user. Translate it into plain language.
+- **Don't dump the raw JSON** from `provider_menu_summary()`, `provider_menu()`, or `support_envelope()` on the user. Translate it into plain language.
 - **Don't list every tool.** Group by capability ("I can generate images with FLUX" not "I have flux_image, google_imagen, openai_image, recraft_image...").
 - **Don't explain the architecture** unless asked. "Agent-first, instruction-driven" is interesting to developers, but the user came to make a video, not study the codebase.
 - **Don't apologize for missing capabilities.** Frame as "here's what you have" and optionally "here's a quick upgrade." Never "unfortunately you don't have..."

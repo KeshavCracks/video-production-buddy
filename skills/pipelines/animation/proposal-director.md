@@ -43,7 +43,7 @@ A `render_runtime_selection` decision with only one option considered when both 
 | Schema | `schemas/artifacts/proposal_packet.schema.json` | Artifact validation |
 | Prior artifact | `research_brief` from Research Director | Raw findings + technique research |
 | Pipeline manifest | `pipeline_defs/animation.yaml` | Stage and tool definitions |
-| Tool registry | `support_envelope()` output | What's actually available right now |
+| Tool registry | `provider_menu_summary()` output | What's actually available right now |
 | Cost tracker | `tools/cost_tracker.py` | Cost estimation data |
 | Style playbooks | `styles/*.yaml` | Available visual styles |
 | User input | Topic, any preferences expressed | Creative direction |
@@ -95,8 +95,12 @@ to validate the animation style before full production.
 Before designing concepts, know what tools are available:
 
 ```bash
-python -c "from tools.tool_registry import registry; import json; registry.discover(); print(json.dumps(registry.support_envelope(), indent=2))"
+python -c "from tools.tool_registry import registry; import json; registry.discover(); print(json.dumps(registry.provider_menu_summary(), indent=2))"
 ```
+
+Use `registry.provider_menu()` only when you need exact install instructions for
+setup offers. Use `support_envelope()` only as a debugging fallback when the
+compact menu does not explain a tool state.
 
 Also check the capability catalog:
 
@@ -160,7 +164,7 @@ Present the approaches as clear options:
 
 | Approach | What It Looks Like | Tools Required | Cost | Proven? |
 |----------|-------------------|----------------|------|---------|
-| **A: Image-Based Animation (Remotion)** | AI-generated keyframes with crossfade, camera motion, particles. Looks like moving anime/illustration. | `image_selector` (any provider) + Remotion | Pull per-image cost from the chosen provider's `estimate_cost`; 2-3 images per scene is typical | ✅ Proven (mori-no-seishin) |
+| **A: Image-Based Animation (Remotion)** | AI-generated keyframes with crossfade, camera motion, particles. Looks like moving anime/illustration. | `image_selector` (any provider) + Remotion | Pull per-image cost from the chosen provider's `estimate_cost`; 2-3 images per scene is typical | ✅ Proven (`healing-anime-short`) |
 | **B: Clip-Based Video** | AI-generated video clips assembled as a story. Most cinematic but least consistent. | `video_selector` routing to whichever provider is available | Pull per-clip cost from the chosen provider's `estimate_cost`; varies widely between providers | ❌ Not yet proven |
 | **C: Programmatic Animation (Manim)** | Code-driven math/geometry animation. Precise, clean, 3Blue1Brown style. | `math_animate` (ManimCE) | Free (local) | ❌ Not yet proven |
 | **D: Data Visualization (Remotion)** | Animated charts, KPIs, kinetic typography. Data-driven storytelling. | Remotion (built-in components) | Free (local) | ✅ Proven (zero-key formula) |
@@ -203,7 +207,7 @@ Estimated cost for 30s video: pull from each provider's `estimate_cost` on the
   actual clip plan — per-clip costs range widely between providers and change
   often. Do NOT hardcode.
 
-Note: This approach is not yet proven in the OpenMontage pipeline.
+Note: This approach is not yet proven in the Video Production Buddy pipeline.
       Consistency across clips is the #1 challenge.
 ```
 

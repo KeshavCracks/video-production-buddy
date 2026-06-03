@@ -6,8 +6,10 @@ Turn the approved localization brief into a transcript-backed, reviewable script
 
 ## Reference Inputs
 
-- `docs/localization-dubbing-best-practices.md`
+- `AGENT_GUIDE.md`
 - `skills/creative/storytelling.md`
+- `skills/core/whisperx.md`
+- `skills/core/subtitle-sync.md`
 
 ## Process
 

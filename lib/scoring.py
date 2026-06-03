@@ -162,10 +162,15 @@ _GENERATED_VISUAL_TERMS = {
     "pixar",
     "render",
     "scifi",
-    "short",
     "story",
     "stylized",
     "surreal",
+}
+_STOCK_VISUAL_TERMS = {
+    "b-roll",
+    "footage",
+    "library",
+    "stock",
 }
 _REFERENCE_TERMS = {
     "character",
@@ -241,6 +246,7 @@ def _compute_control(supports: dict[str, Any]) -> float:
     control_features = [
         ("controlnet", 2.0),
         ("reference_image", 1.8),
+        ("image_to_video", 1.6),
         ("style_transfer", 1.5),
         ("inpainting", 1.5),
         ("img2img", 1.3),
@@ -348,13 +354,21 @@ def normalize_task_context(
         context["budget_remaining_usd"] = context["budget_usd"]
 
     text_tokens = set(_tokenize_text(combined_text))
-    context["prefers_generated_visuals"] = bool(text_tokens & _GENERATED_VISUAL_TERMS)
-    context["wants_reference_conditioning"] = (
-        operation == "reference_to_video" or bool(text_tokens & _REFERENCE_TERMS)
-    )
-    context["wants_image_editing"] = (
-        operation == "edit" or bool(text_tokens & _IMAGE_EDIT_TERMS)
-    )
+    generated_visual_signal = bool(text_tokens & _GENERATED_VISUAL_TERMS)
+    stock_visual_signal = bool(text_tokens & _STOCK_VISUAL_TERMS)
+    if "prefers_generated_visuals" not in context:
+        context["prefers_generated_visuals"] = (
+            generated_visual_signal and not stock_visual_signal
+        )
+    if "wants_reference_conditioning" not in context:
+        context["wants_reference_conditioning"] = (
+            operation in {"image_to_video", "reference_to_video"}
+            or bool(text_tokens & _REFERENCE_TERMS)
+        )
+    if "wants_image_editing" not in context:
+        context["wants_image_editing"] = (
+            operation == "edit" or bool(text_tokens & _IMAGE_EDIT_TERMS)
+        )
 
     return context
 
@@ -479,7 +493,12 @@ def score_provider(tool, task_context: dict[str, Any]) -> ProviderScore:
         output_quality *= 0.85
 
     if task_context.get("wants_reference_conditioning") and asset_type == "video":
-        if supports.get("reference_to_video") or supports.get("reference_image") or supports.get("multiple_reference_images"):
+        if (
+            supports.get("image_to_video")
+            or supports.get("reference_to_video")
+            or supports.get("reference_image")
+            or supports.get("multiple_reference_images")
+        ):
             task_fit = min(1.0, task_fit + 0.18)
             control = min(1.0, control + 0.12)
         else:
@@ -498,7 +517,7 @@ def score_provider(tool, task_context: dict[str, Any]) -> ProviderScore:
     # lip-sync from quoted dialogue. This is what makes Seedance 2.0 (and
     # peer premium APIs) meaningfully better than generic clip providers.
     if asset_type == "video":
-        intent_words = _expand_synonyms(set(intent.lower().split())) | set(style_keywords)
+        intent_words = _expand_synonyms(set(_tokenize_text(intent))) | set(style_keywords)
         cinematic_signal = bool(
             intent_words & {"cinematic", "film", "movie", "trailer", "teaser", "dramatic", "epic", "premium"}
         )

@@ -6,8 +6,9 @@ Plan the visual system for the presenter-led cut. This stage decides how the spe
 
 ## Reference Inputs
 
-- `docs/avatar-spokesperson-best-practices.md`
+- `AGENT_GUIDE.md`
 - `skills/creative/typography.md`
+- `skills/creative/talking-head-gen-usage.md`
 
 ## Process
 

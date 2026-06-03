@@ -8,9 +8,10 @@ Do not use this pipeline when the project is really footage-led with a few overl
 
 ## Reference Inputs
 
-- `docs/animation-best-practices.md`
+- `AGENT_GUIDE.md`
 - `skills/creative/animation-pipeline.md`
 - `skills/creative/storytelling.md`
+- `skills/meta/animation-runtime-selector.md`
 
 ## Process
 

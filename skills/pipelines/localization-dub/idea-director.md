@@ -12,11 +12,15 @@ Lock `render_runtime = "remotion"` (composed deliverables with per-locale captio
 
 Per AGENT_GUIDE.md → "Present Both Composition Runtimes (HARD RULE)": do NOT silently default to remotion. Tell the user: "HyperFrames is available, but localization-dub depends on Remotion caption + TalkingHead parity that isn't there yet in Phase 1 — remotion is the only viable choice". Record a `render_runtime_selection` decision with hyperframes `rejected_because: "caption + lip-sync parity deferred on localization-dub"`.
 
+Write the approved runtime into `brief.metadata.render_runtime`. This field is required by `schemas/artifacts/brief.schema.json` and is the runtime lock that edit and compose must carry forward.
+
 ## Reference Inputs
 
-- `docs/localization-dubbing-best-practices.md`
+- `AGENT_GUIDE.md`
 - `skills/creative/short-form.md`
 - `skills/creative/long-form.md`
+- `skills/core/subtitle-sync.md`
+- `skills/creative/lip-sync-usage.md`
 
 ## Process
 

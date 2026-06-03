@@ -6,8 +6,9 @@ Turn the approved brief into scene-safe spoken copy for an avatar presenter. The
 
 ## Reference Inputs
 
-- `docs/avatar-spokesperson-best-practices.md`
+- `AGENT_GUIDE.md`
 - `skills/creative/storytelling.md`
+- `skills/creative/talking-head-gen-usage.md`
 
 ## Process
 

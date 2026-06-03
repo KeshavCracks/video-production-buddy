@@ -12,6 +12,8 @@ Lock `render_runtime` at the idea stage alongside the production mode. Which run
 
 Per AGENT_GUIDE.md → "Present Both Composition Runtimes (HARD RULE)": when the mode allows multiple runtimes AND both are available on the machine (check `video_compose.get_info()["render_engines"]`), present both to the user with brief-specific analysis, recommend one, wait for approval. Do NOT silently default. When the mode constrains the choice (e.g. `synthetic_terminal` is Remotion-only), tell the user the constraint explicitly rather than silently locking remotion. Record every choice in `decision_log` under `render_runtime_selection` with all considered options.
 
+Write the approved runtime into `brief.metadata.render_runtime`. This field is required by `schemas/artifacts/brief.schema.json` and is the runtime lock that edit and compose must carry forward.
+
 ## When To Use
 
 Use this pipeline whenever the deliverable is a screen-recording-style demo. There are **two production modes** — pick one in the brief:
@@ -40,8 +42,9 @@ Screen-demo best practices are consistent:
 - optimize for legibility before style.
 
 Reference docs:
-- `docs/screen-demo-best-practices.md`
+- `AGENT_GUIDE.md`
 - `skills/creative/screen-recording.md`
+- `skills/meta/animation-runtime-selector.md`
 
 ## Process
 

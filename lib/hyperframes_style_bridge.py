@@ -1,6 +1,6 @@
-"""Bridge OpenMontage playbooks → HyperFrames-friendly style artifacts.
+"""Bridge Video Production Buddy playbooks → HyperFrames-friendly style artifacts.
 
-OpenMontage playbooks are YAML files describing visual_language, typography,
+Video Production Buddy playbooks are YAML files describing visual_language, typography,
 motion, and asset generation guidance. When `render_runtime = "remotion"`
 they're translated into a `themeConfig` prop on the React composition
 (see `tools/video/video_compose._build_theme_from_playbook`). When
@@ -47,6 +47,15 @@ def _first(raw: Any, default: str) -> str:
     return default
 
 
+def _nth(raw: Any, index: int, default: str) -> str:
+    """Return a palette entry by index, accepting list or scalar values."""
+    if isinstance(raw, list) and len(raw) > index:
+        return str(raw[index])
+    if index == 0 and isinstance(raw, str) and raw:
+        return raw
+    return default
+
+
 def _font(typo: dict[str, Any], key: str, default: str) -> str:
     """Extract a font family string from a typography block."""
     node = typo.get(key) or {}
@@ -57,14 +66,27 @@ def _font(typo: dict[str, Any], key: str, default: str) -> str:
     return default
 
 
-def _motion_easing(motion: dict[str, Any]) -> tuple[str, str]:
+def _seconds(value: Any, default: str) -> str:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return default
+    return f"{numeric:g}s"
+
+
+def _motion_easing(
+    motion: dict[str, Any],
+    identity: dict[str, Any],
+) -> tuple[str, str]:
     """Derive (duration, ease) from the playbook motion block."""
-    pace = (motion.get("pace") or "moderate").lower()
-    if pace == "fast":
-        return "0.4s", "cubic-bezier(0.33, 1, 0.68, 1)"
-    if pace == "slow":
-        return "0.9s", "cubic-bezier(0.65, 0, 0.35, 1)"
-    return "0.6s", "cubic-bezier(0.5, 0, 0.5, 1)"
+    pacing_rules = motion.get("pacing_rules") or {}
+    duration = _seconds(pacing_rules.get("transition_duration_seconds"), "")
+    pace = (identity.get("pace") or motion.get("pace") or "moderate").lower()
+    if pace in {"fast", "rapid"}:
+        return duration or "0.4s", "cubic-bezier(0.33, 1, 0.68, 1)"
+    if pace in {"slow", "gentle", "deliberate"}:
+        return duration or "0.9s", "cubic-bezier(0.65, 0, 0.35, 1)"
+    return duration or "0.6s", "cubic-bezier(0.5, 0, 0.5, 1)"
 
 
 def style_bridge(
@@ -85,8 +107,10 @@ def style_bridge(
     playbook_name = ""
 
     if playbook:
+        identity = playbook.get("identity", {}) or {}
         playbook_name = str(
-            playbook.get("name")
+            identity.get("name")
+            or playbook.get("name")
             or playbook.get("id")
             or playbook.get("display_name")
             or ""
@@ -95,16 +119,27 @@ def style_bridge(
         palette = vl.get("color_palette", {}) or {}
         typo = playbook.get("typography", {}) or {}
         motion = playbook.get("motion", {}) or {}
+        overlays = playbook.get("overlays", {}) or {}
+        stat_overlay = overlays.get("stat_card", {}) or {}
 
         bg = _first(palette.get("background"), css["--color-bg"])
         fg = _first(palette.get("text"), css["--color-fg"])
         accent = _first(palette.get("accent"), css["--color-accent"])
         primary = _first(palette.get("primary"), css["--color-primary"])
-        secondary = _first(palette.get("secondary"), css["--color-secondary"])
-        surface = _first(palette.get("surface"), css["--color-surface"])
-        muted = _first(palette.get("muted_text"), css["--color-muted"])
+        secondary = _first(
+            palette.get("secondary"),
+            _nth(palette.get("accent"), 1, css["--color-secondary"]),
+        )
+        surface = _first(
+            palette.get("surface"),
+            _first(stat_overlay.get("bg"), css["--color-surface"]),
+        )
+        muted = _first(
+            palette.get("muted"),
+            _first(palette.get("muted_text"), css["--color-muted"]),
+        )
 
-        duration, ease = _motion_easing(motion)
+        duration, ease = _motion_easing(motion, identity)
 
         css.update(
             {
@@ -115,13 +150,15 @@ def style_bridge(
                 "--color-secondary": secondary,
                 "--color-surface": surface,
                 "--color-muted": muted,
-                "--font-heading": _font(typo, "heading", css["--font-heading"]),
+                "--font-heading": _font(typo, "headings", css["--font-heading"]),
                 "--font-body": _font(typo, "body", css["--font-body"]),
                 "--font-mono": _font(typo, "code", css["--font-mono"]),
                 "--ease-primary": ease,
                 "--duration-entrance": duration,
             }
         )
+        for index, color in enumerate(playbook.get("chart_palette", [])[:8], start=1):
+            css[f"--chart-color-{index}"] = str(color)
 
         source_note = f"playbook `{playbook_name}`" if playbook_name else "loaded playbook"
 
@@ -148,7 +185,7 @@ def _render_design_md(
     lines = [
         title,
         "",
-        f"> Generated by OpenMontage HyperFrames style bridge (source: {source_note}).",
+        f"> Generated by Video Production Buddy HyperFrames style bridge (source: {source_note}).",
         "",
         "## Colors",
         "",
@@ -159,6 +196,22 @@ def _render_design_md(
         f"- Secondary: `{css['--color-secondary']}`",
         f"- Surface: `{css['--color-surface']}`",
         f"- Muted text: `{css['--color-muted']}`",
+    ]
+    chart_keys = sorted(
+        (key for key in css if key.startswith("--chart-color-")),
+        key=lambda value: int(value.rsplit("-", 1)[1]),
+    )
+    if chart_keys:
+        lines.extend(
+            [
+                "",
+                "## Chart Palette",
+                "",
+                *[f"- {key}: `{css[key]}`" for key in chart_keys],
+            ]
+        )
+    lines.extend(
+        [
         "",
         "## Typography",
         "",
@@ -190,5 +243,6 @@ def _render_design_md(
         "`index.html` (or this bridge for cross-project changes), not the",
         "individual scene styles.",
         "",
-    ]
+        ]
+    )
     return "\n".join(lines)

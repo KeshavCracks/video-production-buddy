@@ -1,61 +1,79 @@
 {
   "name": "talking_head_basic",
   "pipeline_type": "talking-head",
-  "description": "Basic talking-head pipeline: 15s vertical clip with burned subtitles",
+  "description": "Golden scenario: basic talking-head pipeline with synthetic 15s footage",
   "inputs": {
-    "footage_path": "C:/Users/ishan/Documents/SocialMedia/IshanAIVideos/pipeline/2026-03-08/seg1_intro.mp4",
-    "model_size": "base",
-    "target_platform": "youtube"
+    "pipeline": "talking-head",
+    "footage_path": "tests/fixtures/media/talking_head_basic.mp4",
+    "footage_source": "synthetic",
+    "synthetic_footage": {
+      "duration_seconds": 15,
+      "resolution": "1080x1920",
+      "fps": 30,
+      "has_audio": true
+    },
+    "target_platform": "youtube",
+    "target_duration_seconds": 15,
+    "style_playbook": "clean-professional"
   },
   "expected_artifacts": {
     "brief": {
-      "version": "1.0",
-      "required_fields": ["title", "hook", "key_points", "tone", "style", "target_platform", "target_duration_seconds"]
+      "required_keys": ["version", "title", "hook", "key_points", "tone", "style", "target_platform", "target_duration_seconds", "metadata"],
+      "assertions": {
+        "reference_material_includes_footage": true
+      }
+    },
+    "decision_log": {
+      "required_keys": ["version", "project_id", "decisions"],
+      "assertions": {
+        "records_render_runtime_selection": true
+      }
     },
     "script": {
-      "version": "1.0",
-      "required_fields": ["title", "total_duration_seconds", "sections"],
+      "required_keys": ["version", "title", "total_duration_seconds", "sections"],
       "assertions": {
         "sections_not_empty": true,
         "total_duration_range": [10, 20]
       }
     },
     "scene_plan": {
-      "version": "1.0",
-      "required_fields": ["scenes"],
+      "required_keys": ["version", "style_playbook", "scenes"],
       "assertions": {
         "scenes_not_empty": true,
         "all_scenes_are_talking_head": true
       }
     },
     "asset_manifest": {
-      "version": "1.0",
-      "required_fields": ["assets"],
+      "required_keys": ["version", "assets"],
       "assertions": {
         "has_subtitle_asset": true,
         "has_source_footage_asset": true
       }
     },
     "edit_decisions": {
-      "version": "1.0",
-      "required_fields": ["cuts"],
+      "required_keys": ["version", "render_runtime", "cuts"],
       "assertions": {
         "subtitles_enabled": true,
         "cuts_cover_full_duration": true
       }
     },
     "render_report": {
-      "version": "1.0",
-      "required_fields": ["outputs"],
+      "required_keys": ["version", "outputs"],
       "assertions": {
         "output_file_exists": true,
         "output_is_playable": true,
         "resolution_matches_source": true
       }
     },
+    "final_review": {
+      "required_keys": ["version", "output_path", "status", "checks"],
+      "assertions": {
+        "status_is_pass": true,
+        "runtime_swap_check_present": true
+      }
+    },
     "publish_log": {
-      "version": "1.0",
-      "required_fields": ["entries"],
+      "required_keys": ["version", "entries"],
       "assertions": {
         "has_at_least_one_entry": true
       }

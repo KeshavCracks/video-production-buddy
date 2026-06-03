@@ -12,11 +12,15 @@ Lock `render_runtime = "remotion"`. **HyperFrames is NOT a valid runtime on this
 
 Per AGENT_GUIDE.md → "Present Both Composition Runtimes (HARD RULE)": do NOT silently default. Tell the user: "HyperFrames is available on your machine, but avatar-spokesperson depends on the Remotion TalkingHead composition and caption burn, so remotion is the only viable runtime here — OK to proceed?" Record a `render_runtime_selection` decision with hyperframes `rejected_because: "TalkingHead + caption parity deferred on avatar-spokesperson"`.
 
+Write the approved runtime into `brief.metadata.render_runtime`. This field is required by `schemas/artifacts/brief.schema.json` and is the runtime lock that edit and compose must carry forward.
+
 ## Reference Inputs
 
-- `docs/avatar-spokesperson-best-practices.md`
+- `AGENT_GUIDE.md`
 - `skills/creative/storytelling.md`
 - `skills/creative/short-form.md`
+- `skills/creative/talking-head-gen-usage.md`
+- `skills/creative/lip-sync-usage.md`
 
 ## Process
 

@@ -1,4 +1,4 @@
-"""Environment variable loader for OpenMontage.
+"""Environment variable loader for Video Production Buddy.
 
 Loads .env file and provides typed access to environment configuration.
 """

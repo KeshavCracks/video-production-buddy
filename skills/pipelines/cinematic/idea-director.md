@@ -8,9 +8,10 @@ Do not use this pipeline just because the user said "make it look cinematic." If
 
 ## Reference Inputs
 
-- `docs/cinematic-best-practices.md`
+- `AGENT_GUIDE.md`
 - `skills/creative/cinematic.md`
 - `skills/creative/storytelling.md`
+- `skills/meta/animation-runtime-selector.md`
 
 ## Process
 

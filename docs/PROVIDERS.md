@@ -1,6 +1,10 @@
-# OpenMontage Provider Guide
+# Video Production Buddy Provider Guide
 
-Everything you need to know about every provider in OpenMontage — setup instructions, pricing, free tiers, and what each unlocks.
+Everything you need to know about every provider in Video Production Buddy — setup instructions, pricing, free tiers, and what each unlocks.
+
+> Provider pricing and model names change quickly. Use this guide for the
+> Video Production Buddy tool/env-var contract, then verify final pricing in the provider
+> dashboard before approving a production budget.
 
 ---
 
@@ -14,14 +18,16 @@ Everything you need to know about every provider in OpenMontage — setup instru
 | 2 | **$0** | Google API key | TTS with 700+ voices (1M chars/month free) + $300 new account credit |
 | 3 | **$0** | ElevenLabs | Premium TTS + music + SFX (10K chars/month free) |
 | 4 | **$0** | Piper (local install) | Fully offline TTS — no API key, no cost, no network |
-| 5 | **~$0.03/image** | fal.ai | FLUX images + Kling/Veo/MiniMax video + Recraft — broad single-key image + video coverage |
-| 6 | **~$0.04/image** | OpenAI | DALL-E 3 images + OpenAI TTS |
-| 7 | **~$0.04/image** | Google Imagen | Imagen 4 images (shares the Google API key) |
-| 8 | **$12/month** | Runway | Gen-4 video — highest quality AI video |
-| 9 | **pay-as-you-go** | HeyGen | Avatar videos, multi-model video gateway |
-| 10 | **pay-as-you-go** | Suno | Full song generation with vocals and lyrics |
-| 11 | **$0 + GPU** | Local video gen | WAN 2.1, Hunyuan, CogVideo, LTX — free, offline |
-| 12 | **$0 + GPU** | Local Diffusion | Stable Diffusion images — free, offline |
+| 5 | **pay-as-you-go** | Alibaba Cloud Bailian / DashScope | Qwen TTS/ASR + Wan/Wanxiang image and video under one key |
+| 6 | **~$0.03/image** | fal.ai | FLUX/Recraft images + Seedance/Kling/Veo/MiniMax video — broad single-key image + video coverage |
+| 7 | **~$0.04/image** | OpenAI | DALL-E 3 images + OpenAI TTS |
+| 8 | **~$0.04/image** | Google Imagen | Imagen 4 images (shares the Google API key) |
+| 9 | **$12/month** | Runway | Gen-4 video — highest quality AI video |
+| 10 | **pay-as-you-go** | HeyGen | Avatar videos, multi-model video gateway |
+| 11 | **pay-as-you-go** | Replicate | Seedance video via `seedance_replicate` |
+| 12 | **pay-as-you-go** | MiniMax or Suno | Music generation, covers, instrumentals, and full songs |
+| 13 | **$0 + GPU** | Local video gen | WAN 2.1, Hunyuan, CogVideo, LTX — free, offline |
+| 14 | **$0 + GPU** | Local Diffusion | Stable Diffusion images — free, offline |
 
 ### Environment Variable Summary
 
@@ -34,6 +40,7 @@ PIXABAY_API_KEY=             # Stock photos + videos
 
 # GOOGLE (one key, two tools, generous free tier)
 GOOGLE_API_KEY=              # Google TTS + Google Imagen
+GEMINI_API_KEY=              # Optional Google AI Studio alias accepted by Google image/TTS tools
 
 # VOICE + MUSIC
 ELEVENLABS_API_KEY=          # TTS, music, sound effects (10K chars/month free)
@@ -41,18 +48,43 @@ OPENAI_API_KEY=              # OpenAI TTS + DALL-E 3 images
 XAI_API_KEY=                 # xAI Grok image generation/editing + Grok video generation
 DOUBAO_SPEECH_API_KEY=       # Volcengine Doubao Speech TTS (strong Mandarin narration)
 DOUBAO_SPEECH_VOICE_TYPE=    # Default Doubao speaker/voice type
+DASHSCOPE_API_KEY=           # Qwen3 TTS/ASR, Wan video, Wanxiang image generation/editing
+MINIMAX_API_KEY=             # MiniMax Music 2.6 and music-cover generation
 
 # MULTI-MODEL GATEWAY (one key, 6+ tools)
-FAL_KEY=                     # FLUX, Recraft, Kling, Veo, MiniMax video
+FAL_KEY=                     # FLUX, Recraft, Seedance, Kling, Veo, MiniMax video
+FAL_AI_API_KEY=              # Optional fal.ai alias used by several provider tools
 
 # VIDEO
 HEYGEN_API_KEY=              # HeyGen avatar video gateway
 RUNWAY_API_KEY=              # Runway Gen-4 video (direct)
+RUNWAYML_API_SECRET=         # Optional Runway alias accepted by runway_video
+REPLICATE_API_TOKEN=         # Replicate-hosted Seedance provider
+HIGGSFIELD_API_KEY=          # Higgsfield video API key
+HIGGSFIELD_API_SECRET=       # Higgsfield video API secret
+HIGGSFIELD_KEY=              # Optional combined Higgsfield key:secret value
 SUNO_API_KEY=                # Suno music generation
 
 # LOCAL (no keys needed — just GPU + install)
 VIDEO_GEN_LOCAL_ENABLED=     # Set to "true" for local video gen
 VIDEO_GEN_LOCAL_MODEL=       # wan2.1-1.3b, wan2.1-14b, hunyuan-1.5, ltx2-local, cogvideo-5b
+
+# STOCK / SEARCH
+UNSPLASH_ACCESS_KEY=         # Unsplash stock images
+FREESOUND_API_KEY=           # Freesound music/sound search fallback
+COVERR_API_KEY=              # Optional Coverr stock video higher-rate/pro access
+VIDEVO_API_KEY=              # Optional Videvo stock video search
+NASA_API_KEY=                # Optional NASA higher-rate public media access
+NARA_API_KEY=                # Optional NARA higher-rate public media access
+POND5_API_KEY=               # Optional Pond5 public-domain stock access
+
+# ANALYSIS / LOCAL TUNING
+HF_TOKEN=                    # Optional HuggingFace token for speaker diarization
+VIDEO_PRODUCTION_BUDDY_CACHE_DIR=       # Optional clip/media cache override
+VIDEO_PRODUCTION_BUDDY_CACHE_MAX_GB=    # Optional cache size limit in GB
+SUBTITLE_ALIGNER_DEVICE=     # Optional subtitle alignment device, e.g. cpu or cuda
+SADTALKER_PATH=              # Optional local SadTalker repo path
+WAV2LIP_PATH=                # Optional local Wav2Lip repo path
 ```
 
 ---
@@ -90,7 +122,44 @@ Current xAI docs pricing for the Grok media models:
 | `grok-imagine-video` at 720p | $0.07/sec |
 | `grok-imagine-video` input images | $0.002 per input image |
 
-OpenMontage now uses those published rates in the Grok tool estimators.
+Video Production Buddy now uses those published rates in the Grok tool estimators.
+
+---
+
+### Alibaba Cloud Bailian / DashScope — Qwen + Wan + Wanxiang
+
+> **Strong China-region media coverage under one key.** Bailian/DashScope unlocks Qwen speech, Wan video generation/editing, and Wanxiang image generation/editing.
+
+**Tools unlocked:** `cosyvoice_tts`, `qwen_asr`, `wan_video_api`, `wanx_image`
+**Env var:** `DASHSCOPE_API_KEY`
+
+#### Setup
+
+1. Create or open an Alibaba Cloud Bailian account
+2. Generate an API key in the Bailian console
+3. Enable the specific model families you plan to use: Qwen TTS/ASR, Wan video, and/or Wanxiang image
+4. Add to `.env`: `DASHSCOPE_API_KEY=your-key-here`
+
+#### What It's Best For
+
+- Natural Mandarin and bilingual narration through Qwen3/CosyVoice models
+- Fast Chinese and multilingual transcription with `qwen3-asr-flash`
+- Wan API video generation: text-to-video, image-to-video, reference-to-video, and video editing
+- Wanxiang image generation/editing with style presets, seeds, and multi-image references
+- Product-visible ad workflows where a still reference can condition Wan image/video generation
+
+#### API Notes
+
+Video Production Buddy uses two DashScope patterns:
+
+- Qwen TTS/ASR calls the multimodal generation endpoint directly
+- Wan/Wanxiang media tools submit async tasks, poll the task endpoint, then download generated assets
+
+Wanxiang image sizes use `*` separators such as `1024*1024`, not `1024x1024`.
+
+#### Pricing
+
+Pricing is model-specific in Bailian/DashScope. The tools estimate cost from the model metadata in code and prefer provider-returned usage when available; check the Bailian console before committing a production budget.
 
 ---
 
@@ -98,15 +167,15 @@ OpenMontage now uses those published rates in the Grok tool estimators.
 
 > **Broad single-key coverage.** One API key unlocks image and video providers across multiple models.
 
-**Tools unlocked:** `flux_image`, `recraft_image`, `kling_video`, `veo_video`, `minimax_video`
-**Env var:** `FAL_KEY`
+**Tools unlocked:** `flux_image`, `recraft_image`, `seedance_video`, `kling_video`, `veo_video`, `minimax_video`
+**Env var:** `FAL_KEY` or `FAL_AI_API_KEY`
 
 #### Setup
 
 1. Go to [fal.ai](https://fal.ai/) and click **Sign up** (GitHub or Google)
 2. Navigate to [fal.ai/dashboard/keys](https://fal.ai/dashboard/keys)
 3. Click **Create Key**, copy it
-4. Add to `.env`: `FAL_KEY=your-key-here`
+4. Add to `.env`: `FAL_KEY=your-key-here` (or `FAL_AI_API_KEY=your-key-here`)
 
 #### Pricing
 
@@ -125,11 +194,37 @@ No subscription — pure pay-as-you-go, no minimum spend.
 | Model | Price | Per $1 |
 |-------|-------|--------|
 | Kling 2.5 Turbo Pro | $0.07/sec | 14 seconds |
+| Seedance | varies by model page | varies |
 | MiniMax | ~$0.05/sec | 20 seconds |
 | Veo 3 | $0.40/sec | 2.5 seconds |
 | WAN 2.5 | $0.05/sec | 20 seconds |
 
 **Free tier:** None — but $0 to start, you only pay for what you use.
+
+---
+
+### Replicate — Seedance Video
+
+> **Alternative Seedance route.** Use this when you prefer Replicate billing or when the fal.ai Seedance route is unavailable.
+
+**Tools unlocked:** `seedance_replicate`
+**Env var:** `REPLICATE_API_TOKEN`
+
+#### Setup
+
+1. Create or open a Replicate account
+2. Generate an API token at [replicate.com/account/api-tokens](https://replicate.com/account/api-tokens)
+3. Add to `.env`: `REPLICATE_API_TOKEN=your-token-here`
+
+#### What It's Best For
+
+- Premium cinematic video generation through Seedance
+- A fallback route when `seedance_video` cannot use fal.ai
+- Keeping Seedance access separate from other fal.ai-hosted video models
+
+#### Pricing
+
+Replicate charges through its own model billing. Check the Replicate model page and account dashboard before approving a production budget.
 
 ---
 
@@ -181,7 +276,7 @@ No subscription — pure pay-as-you-go, no minimum spend.
 
 #### API Notes
 
-OpenMontage uses the new-console API key flow:
+Video Production Buddy uses the new-console API key flow:
 
 ```text
 X-Api-Key: ${DOUBAO_SPEECH_API_KEY}
@@ -203,7 +298,7 @@ Start with `speech_rate: 0` for natural Mandarin delivery. If the approved forma
 
 #### Pricing
 
-Doubao Speech 2.0 is billed by character package or usage in Volcengine. OpenMontage estimates cost from text length and prefers provider-returned usage metadata when available.
+Doubao Speech 2.0 is billed by character package or usage in Volcengine. Video Production Buddy estimates cost from text length and prefers provider-returned usage metadata when available.
 
 ---
 
@@ -212,7 +307,7 @@ Doubao Speech 2.0 is billed by character package or usage in Volcengine. OpenMon
 > **One key, two tools.** Google Cloud TTS has 700+ voices in 50+ languages — the strongest localization option. Imagen 4 generates high-quality images.
 
 **Tools unlocked:** `google_tts`, `google_imagen`
-**Env var:** `GOOGLE_API_KEY`
+**Env var:** `GOOGLE_API_KEY` or `GEMINI_API_KEY`
 
 #### Setup
 
@@ -220,7 +315,7 @@ Doubao Speech 2.0 is billed by character package or usage in Volcengine. OpenMon
 2. Navigate to [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 3. Click **Create API Key**, select a Google Cloud project
 4. Copy the key
-5. Add to `.env`: `GOOGLE_API_KEY=AIza...`
+5. Add to `.env`: `GOOGLE_API_KEY=AIza...` (or `GEMINI_API_KEY=AIza...`)
 
 **For TTS specifically**, you also need to enable the Text-to-Speech API:
 1. Visit [console.cloud.google.com/apis/library/texttospeech.googleapis.com](https://console.cloud.google.com/apis/library/texttospeech.googleapis.com)
@@ -315,14 +410,14 @@ Google TTS offers 700+ voices across 50+ languages. Voice names follow the patte
 > **Highest-rated AI video quality.** #1 on Elo rankings. Professional-grade video generation with Gen-3 Alpha Turbo, Gen-4 Turbo, and Gen-4 Aleph models.
 
 **Tools unlocked:** `runway_video`
-**Env var:** `RUNWAY_API_KEY`
+**Env var:** `RUNWAY_API_KEY` or `RUNWAYML_API_SECRET`
 
 #### Setup
 
 1. Go to [dev.runwayml.com](https://dev.runwayml.com/) and create a developer account
 2. Subscribe to a paid plan (Standard or above — API requires subscription)
 3. Generate an API key from the developer portal
-4. Add to `.env`: `RUNWAY_API_KEY=key_...`
+4. Add to `.env`: `RUNWAY_API_KEY=key_...` (or `RUNWAYML_API_SECRET=key_...`)
 
 #### Pricing
 
@@ -362,6 +457,8 @@ Google TTS offers 700+ voices across 50+ languages. Voice names follow the patte
    ```
    HIGGSFIELD_API_KEY=your-api-key
    HIGGSFIELD_API_SECRET=your-api-secret
+   # or:
+   HIGGSFIELD_KEY=your-api-key:your-api-secret
    ```
 
 #### Pricing
@@ -421,6 +518,34 @@ Google TTS offers 700+ voices across 50+ languages. Voice names follow the patte
 | Business | $72/mo | API access, more credits |
 
 **Free tier:** 1 credit on web platform. API is pay-as-you-go with prepaid balance.
+
+---
+
+### MiniMax Music — Music 2.6 + Covers
+
+> **Fast synchronous music generation.** MiniMax is useful for background tracks, instrumentals, structured lyric songs, and cover-style generations from reference audio.
+
+**Tools unlocked:** `minimax_music`
+**Env var:** `MINIMAX_API_KEY`
+
+#### Setup
+
+1. Create a MiniMax developer account
+2. Generate an interface key from the MiniMax platform user center
+3. Add to `.env`: `MINIMAX_API_KEY=your-key-here`
+4. For paid models such as `music-2.6` and `music-cover`, make sure the account has a Token Plan
+
+#### What It's Best For
+
+- Background music from a style/mood prompt
+- Instrumental tracks under narration
+- Songs with structured lyric tags such as `[Verse]`, `[Chorus]`, and `[Bridge]`
+- Cover generations from a reference audio URL or local audio file
+- Fast synchronous generation where you do not want to poll a long-running job
+
+#### Pricing
+
+Video Production Buddy's current estimator treats `music-2.6` and `music-cover` as paid generation models and also exposes `*-free` model variants. Check MiniMax account limits and plan details before proposing a production budget.
 
 ---
 
@@ -520,10 +645,12 @@ These providers run entirely on your machine. No network, no API key, no cost. S
 
 ```bash
 # Included in make setup, or install manually:
-cd remotion-composer && npm install && cd ..
+cd remotion-composer
+npx --yes pnpm install --frozen-lockfile
+cd ..
 ```
 
-Requires **Node.js 18+** and `npx`. The `remotion-composer/` project is included in the repo.
+Requires **Node.js 18+** and `npx`. Dependencies are locked by `remotion-composer/pnpm-lock.yaml`; `make install-remotion` automatically uses pnpm when that lockfile exists.
 
 #### What Remotion Renders
 
@@ -536,16 +663,18 @@ Requires **Node.js 18+** and `npx`. The `remotion-composer/` project is included
 | **ComparisonCard** | Side-by-side comparison layouts |
 | **BarChart / LineChart / PieChart** | Animated data visualizations |
 | **KPIGrid** | Multi-metric dashboard cards |
+| **BrandCard / BrowserTabs / Dashboard / Notification** | Registry-backed product, software, and workflow scenes |
+| **BadgeFreeze / Checkmark / LineConnection / StatRoll** | Short confirmation, comparison, and motion-graphics beats |
 | **Image scenes** | Still images with spring-animated motion (replaces Ken Burns) |
 
 #### When Does Remotion Activate?
 
-The `video_compose` tool's `render` operation auto-detects when Remotion is needed:
+The `video_compose` tool's `render` operation uses the proposal/edit runtime contract and routes to Remotion for rich scene work:
 - Cuts contain still images (`.png`, `.jpg`, etc.)
-- Cuts have `type` set to `text_card`, `stat_card`, `chart`, etc.
+- Cuts have `type` set to a Remotion registry scene such as `text_card`, `stat_card`, `brand_card`, `browser_tabs`, or `dashboard`
 - Cuts specify `animation` or `transition_in`/`transition_out`
 
-If Remotion is not installed, compositions fall back to FFmpeg Ken Burns pan-and-zoom — functional but less engaging.
+If `render_runtime="remotion"` was locked and Remotion is unavailable, that is a blocker; the agent must fix setup or get a user-approved runtime substitution. If no runtime was locked and Remotion is unavailable, `video_compose` can use FFmpeg for simpler fallback output.
 
 **Cost:** Free. Always local.
 
@@ -567,7 +696,7 @@ ffmpeg -version
 npx --yes hyperframes doctor
 ```
 
-The CLI is consumed as `npx hyperframes`. Do not use `npx @hyperframes/cli`; that package name is not the OpenMontage runtime path.
+The CLI is consumed as `npx hyperframes`. Do not use `npx @hyperframes/cli`; that package name is not the Video Production Buddy runtime path.
 
 #### What HyperFrames Renders
 
@@ -578,7 +707,7 @@ The CLI is consumed as `npx hyperframes`. Do not use `npx @hyperframes/cli`; tha
 | **Website-to-video** | Browser-captured site compositions with HyperFrames validation |
 | **Character animation** | SVG character rigs, pose/action timelines, and GSAP acting beats rendered to `renders/final.mp4` |
 
-HyperFrames workspaces live under `projects/<project-name>/hyperframes/`. Final videos still follow the normal OpenMontage convention: `projects/<project-name>/renders/final.mp4`.
+HyperFrames workspaces live under `projects/<project-name>/hyperframes/`. Final videos still follow the normal Video Production Buddy convention: `projects/<project-name>/renders/final.mp4`.
 
 **Cost:** Free. Always local.
 
@@ -702,6 +831,7 @@ These tools require only FFmpeg or Python packages — no GPU, no API key.
 |------|---------|-------------|
 | **FFmpeg tools** (video_compose, video_stitch, video_trimmer, audio_mixer, audio_enhance, color_grade, face_enhance, frame_sampler, scene_detect) | `brew install ffmpeg` / `sudo apt install ffmpeg` / `winget install FFmpeg` | Video editing, audio processing, color grading, analysis |
 | **Transcriber** | `pip install faster-whisper` | Speech-to-text with word-level timestamps |
+| **Subtitle Aligner** | `pip install faster-whisper` | ASS subtitle timing aligned to TTS audio instead of estimated word counts |
 | **Background Remove** | `pip install rembg` (CPU) or `pip install rembg[gpu]` | Remove image/video backgrounds |
 | **Upscale** | `pip install realesrgan` (requires PyTorch + CUDA) | Real-ESRGAN image/video upscaling |
 | **Face Restore** | `pip install gfpgan` (requires PyTorch) | CodeFormer/GFPGAN face restoration |
@@ -710,8 +840,8 @@ These tools require only FFmpeg or Python packages — no GPU, no API key.
 | **Math Animate** | `pip install manim` | ManimCE mathematical animations |
 | **Subtitle Gen** | No install needed | SRT/VTT subtitle file generation |
 | **Video Understand** | `pip install transformers torch` | CLIP/BLIP-2 visual analysis |
-| **Talking Head** | Clone [SadTalker](https://github.com/OpenTalker/SadTalker) | Avatar animation from photo + audio |
-| **Lip Sync** | Clone [Wav2Lip](https://github.com/Rudrabha/Wav2Lip) | Audio-driven lip synchronization |
+| **Talking Head** | Clone [SadTalker](https://github.com/OpenTalker/SadTalker) and set `SADTALKER_PATH` | Avatar animation from photo + audio |
+| **Lip Sync** | Clone [Wav2Lip](https://github.com/Rudrabha/Wav2Lip) and set `WAV2LIP_PATH`, or install an importable package | Audio-driven lip synchronization |
 
 ---
 
@@ -722,33 +852,40 @@ These tools require only FFmpeg or Python packages — no GPU, no API key.
 | **Pexels** | `PEXELS_API_KEY` | `pexels_image`, `pexels_video` | Free |
 | **Pixabay** | `PIXABAY_API_KEY` | `pixabay_image`, `pixabay_video` | Free |
 | **Piper** | — (install only) | `piper_tts` | Free |
-| **Google** | `GOOGLE_API_KEY` | `google_tts`, `google_imagen` | Free tier + paid |
+| **Google** | `GOOGLE_API_KEY` or `GEMINI_API_KEY` | `google_tts`, `google_imagen` | Free tier + paid |
 | **ElevenLabs** | `ELEVENLABS_API_KEY` | `elevenlabs_tts`, `music_gen` | Free tier + paid |
-| **fal.ai** | `FAL_KEY` | `flux_image`, `recraft_image`, `kling_video`, `veo_video`, `minimax_video` | Pay-as-you-go |
+| **fal.ai** | `FAL_KEY` or `FAL_AI_API_KEY` | `flux_image`, `recraft_image`, `seedance_video`, `kling_video`, `veo_video`, `minimax_video` | Pay-as-you-go |
+| **Bailian / DashScope** | `DASHSCOPE_API_KEY` | `cosyvoice_tts`, `qwen_asr`, `wan_video_api`, `wanx_image` | Pay-as-you-go |
 | **OpenAI** | `OPENAI_API_KEY` | `openai_tts`, `openai_image` | Paid only |
 | **xAI** | `XAI_API_KEY` | `grok_image`, `grok_video` | Paid only |
-| **Runway** | `RUNWAY_API_KEY` | `runway_video` | Free trial + paid |
-| **Higgsfield** | `HIGGSFIELD_API_KEY` + `HIGGSFIELD_API_SECRET` | `higgsfield_video` | Subscription ($15-84/mo) |
+| **Doubao Speech** | `DOUBAO_SPEECH_API_KEY` + `DOUBAO_SPEECH_VOICE_TYPE` | `doubao_tts` | Paid / package billing |
+| **Runway** | `RUNWAY_API_KEY` or `RUNWAYML_API_SECRET` | `runway_video` | Free trial + paid |
+| **Replicate** | `REPLICATE_API_TOKEN` | `seedance_replicate` | Pay-as-you-go |
+| **Higgsfield** | `HIGGSFIELD_API_KEY` + `HIGGSFIELD_API_SECRET` or `HIGGSFIELD_KEY` | `higgsfield_video` | Subscription / pay-as-you-go |
 | **HeyGen** | `HEYGEN_API_KEY` | `heygen_video` | Pay-as-you-go |
+| **MiniMax** | `MINIMAX_API_KEY` | `minimax_music` | Pay-as-you-go |
 | **Suno** | `SUNO_API_KEY` | `suno_music` | Pay-as-you-go |
+| **Freesound** | `FREESOUND_API_KEY` | `freesound_music` | Free / API terms |
+| **Additional stock sources** | `UNSPLASH_ACCESS_KEY`, `COVERR_API_KEY`, `VIDEVO_API_KEY`, `NASA_API_KEY`, `NARA_API_KEY`, `POND5_API_KEY` | stock-source adapters for source/clip acquisition | Free / provider-specific |
 | **Local GPU** | `VIDEO_GEN_LOCAL_ENABLED` | `wan_video`, `hunyuan_video`, `cogvideo_video`, `ltx_video_local` | Free (GPU required) |
 | **Local Diffusion** | — (install only) | `local_diffusion` | Free (GPU required) |
 | **Modal** | `MODAL_LTX2_ENDPOINT_URL` | `ltx_video_modal` | Self-hosted cloud |
+| **Local Avatar** | `SADTALKER_PATH`, `WAV2LIP_PATH` | `talking_head`, `lip_sync` | Free (local install) |
 
 ---
 
 ## Capability Coverage
 
-How many providers cover each capability:
+Coverage is discovered from the live registry at preflight. This table groups the main provider families:
 
 | Capability | Cloud Providers | Local Providers | Free Options |
 |-----------|----------------|-----------------|--------------|
-| **Image Generation** | FLUX, Grok, Google Imagen, DALL-E 3, Recraft | Local Diffusion | Pexels, Pixabay (stock) |
-| **Video Generation** | Grok, Kling, Runway, Veo, Higgsfield, MiniMax, HeyGen | WAN, Hunyuan, CogVideo, LTX | Pexels, Pixabay (stock) |
-| **Text-to-Speech** | ElevenLabs, Google TTS, OpenAI | Piper | Piper, Google free tier, ElevenLabs free tier |
-| **Music Generation** | ElevenLabs, Suno | — | ElevenLabs free tier |
+| **Image Generation** | FLUX, Grok, Google Imagen, DALL-E 3, Recraft, Wanxiang | Local Diffusion | Pexels, Pixabay (stock) |
+| **Video Generation** | Grok, Kling, Runway, Veo, Higgsfield, MiniMax, HeyGen, Seedance, Wan API | WAN, Hunyuan, CogVideo, LTX | Pexels, Pixabay (stock) |
+| **Text-to-Speech** | ElevenLabs, Google TTS, OpenAI, Doubao, Qwen/CosyVoice | Piper | Piper, Google free tier, ElevenLabs free tier |
+| **Music Generation** | ElevenLabs, MiniMax, Suno | — | ElevenLabs free tier, Freesound/Pixabay search, provider-specific trial/free variants |
 | **Post-Production** | — | FFmpeg (compose, stitch, trim, mix, enhance, grade) | All free |
-| **Analysis** | — | WhisperX, Scene Detect, Frame Sampler, CLIP/BLIP-2 | All free |
+| **Analysis and transcription** | Qwen ASR | WhisperX, Scene Detect, Frame Sampler, CLIP/BLIP-2, audio/video probes | Local analysis is free |
 | **Enhancement** | — | Upscale, BG Remove, Face Enhance, Face Restore | All free |
 | **Avatar** | — | SadTalker, Wav2Lip | All free |
 
@@ -763,13 +900,13 @@ A: FFmpeg + Node.js (both free, local). FFmpeg handles video assembly, audio mix
 A: Yes. The agent generates still images (via any image provider — even free stock from Pexels/Pixabay) and Remotion composes them into animated video with spring physics transitions, text cards, stat cards, and charts. This is the default path for explainer and animation pipelines when no video gen is configured.
 
 **Q: What's one low-friction way to get AI-generated images and video?**
-A: fal.ai (`FAL_KEY`) is one pay-as-you-go option with broad single-key coverage. It unlocks FLUX images plus multiple video providers. No subscription — pay only for what you generate.
+A: fal.ai (`FAL_KEY` or `FAL_AI_API_KEY`) is one pay-as-you-go option with broad single-key coverage. It unlocks FLUX/Recraft images plus Seedance, Kling, Veo, and MiniMax video. Bailian/DashScope (`DASHSCOPE_API_KEY`) is another broad option if you want Qwen speech plus Wan/Wanxiang image/video coverage.
 
 **Q: I have a GPU. What can I run locally for free?**
 A: Set `VIDEO_GEN_LOCAL_ENABLED=true` and install `diffusers`. You get WAN 2.1, Hunyuan, CogVideo, and LTX video generation plus Stable Diffusion image generation — all free, all offline.
 
 **Q: Which TTS provider should I use?**
-A: For quality → ElevenLabs. For localization (50+ languages) → Google TTS. For budget → Google free tier (1M chars/month). For offline → Piper.
+A: For quality -> ElevenLabs. For localization (50+ languages) -> Google TTS. For Mandarin or bilingual Chinese/English work -> Doubao or Qwen/CosyVoice. For budget -> Google free tier (1M chars/month). For offline -> Piper.
 
 **Q: Do I need all these providers?**
 A: No. Start with what you have. The selector pattern auto-routes to whatever's available. Missing a provider? The system falls through to the next one automatically.

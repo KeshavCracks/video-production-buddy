@@ -1,10 +1,10 @@
-# OpenMontage - Shared Project Context
+# Video Production Buddy - Shared Project Context
 
 This is the single source of truth for project architecture and conventions. All platform-specific agent files (CLAUDE.md, CODEX.md, CURSOR.md, COPILOT.md) should point here instead of duplicating this content.
 
 ## Identity
 
-OpenMontage is an open-source, AI-orchestrated video production platform.
+Video Production Buddy is an open-source, AI-orchestrated video production platform.
 
 ## Architecture: Instruction-Driven (Agent-First)
 
@@ -25,6 +25,7 @@ Agent reads pipeline manifest (YAML) → reads stage director skill (MD)
 - **Tool registry:** `tools/tool_registry.py`
 - **Pipeline manifests:** `pipeline_defs/`
 - **Artifact schemas:** `schemas/artifacts/`
+- **Curated knowledge:** `knowledge/ad-video/` for ad-video professional producer doctrine
 - **Style playbooks:** `styles/*.yaml` (schema: `schemas/styles/playbook.schema.json`)
 - **Stage director skills:** `skills/pipelines/<pipeline>/<stage>-director.md`
 - **Meta skills:** `skills/meta/*.md` (reviewer, checkpoint-protocol, skill-creator)
@@ -34,27 +35,37 @@ Agent reads pipeline manifest (YAML) → reads stage director skill (MD)
 
 ```
 Layer 1: tools/tool_registry.py     → "What tools exist" (runtime capabilities, status, cost)
-Layer 2: skills/                    → "How OpenMontage uses them" (project conventions)
-Layer 3: .agents/skills/            → "How the technology works" (generic API rules, skills.sh)
+Layer 2: skills/                    → "How Video Production Buddy uses them" (project conventions)
+Layer 3: .agents/skills/            → "How the technology works" (generated from locked component deps)
 ```
 
 Each tool's `agent_skills[]` field bridges Layer 1 → Layer 3. See `skills/INDEX.md` for the full mapping.
+Layer 3 dependencies are declared in `.agents/components.yaml`, pinned in
+`.agents/components.lock.json`, and materialized with
+`python -m lib.agent_components install --profile default --frozen`.
+Verified third-party components are Git-backed in the manifest, so
+`python -m lib.agent_components outdated` reports upstream ref movement and
+`python -m lib.agent_components update <component>` refreshes the lock. Keep
+`.agents/local/skills/` for first-party skills, locally edited third-party
+snapshots, or components whose upstream path has not been verified yet.
 
 ## Key Patterns
 
-- **Pipeline state machine:** `idea -> script -> scene_plan -> assets -> edit -> compose -> publish`
+- **Pipeline state machine:** stage order is manifest-owned; top-level stages drive shared pipeline shape, and dotted child gates drive checkpointable specialized execution when a parent stage needs more governance
+- **Canonical top-level stages:** `research -> proposal -> script -> scene_plan -> assets -> edit -> compose -> publish`; new pipelines should use these names where applicable and put domain-specific governance in `sub_stages`
 - **Instruction-driven stages:** Each stage has a director skill (MD) that teaches the agent HOW
 - **Pipeline manifests:** Declarative YAML defining stages, skills, tools, review focus, approval gates
 - **Capability-first tool design:** Each major family should expose a selector tool plus explicit provider tools
   - Example: `tts_selector` + `elevenlabs_tts` / `google_tts` / `openai_tts` / `piper_tts`
   - Example: `video_selector` + `heygen_video` / `wan_video` / `hunyuan_video` / `ltx_video_local` / `ltx_video_modal` / `cogvideo_video`
 - **Style playbooks:** YAML defining visual language, typography, motion, audio, asset generation constraints
-- **Artifacts are canonical:** `brief`, `script`, `scene_plan`, `asset_manifest`, `edit_decisions`, `render_report`, `publish_log`
+- **Artifacts are canonical:** `user_request`, `intake_brief`, `enriched_brief`, `intelligence_brief`, `production_bible`, `idea_options`, `production_proposal`, `script`, `scene_plan`, `asset_manifest`, `edit_decisions`, `render_report`, `publish_log`
 - **Every tool inherits from `tools/base_tool.py`** (ToolContract)
 - **Checkpoint policy** lives in pipeline manifest (`human_approval_default` per stage) + `skills/meta/checkpoint-protocol.md`
 - **Reviewer** is a meta skill (`skills/meta/reviewer.md`), advisory, max 2 rounds
 - **Cost tracker** (`tools/cost_tracker.py`) manages budget: estimate -> reserve -> reconcile
 - **Canonical artifacts** validated against JSON schemas in `schemas/artifacts/`
+- **GenUI interaction system:** dynamic local browser sessions for rounds where linear chat is insufficient; `genui_interaction` records every CLI-vs-browser decision in `ui_interaction_journal`, applies stage-aware policies and fixed workspace contracts for known gates, `genui_session` materializes A2UI/CopilotKit + AG-UI sessions, persists cursor-addressable `events.jsonl`, exposes `/events`, `/session.json`, and response-only `/draft`, checks source artifact hashes before resume, and supports status/replay/validate/summarize lifecycle modes. Sessions write `ui_session_response`, predecessor session artifacts remain compatible, `genui_surface`/`ui_surface_response` remains an explicit compatibility fallback, and the agent still writes canonical artifacts.
 
 ## Key Files
 
@@ -69,14 +80,26 @@ Each tool's `agent_skills[]` field bridges Layer 1 → Layer 3. See `skills/INDE
 | `tools/base_tool.py` | ToolContract base class |
 | `tools/tool_registry.py` | Tool discovery and reporting |
 | `tools/cost_tracker.py` | Budget governance |
+| `lib/ad_knowledge.py` | Curated ad-video knowledge-card loading, validation, and deterministic retrieval |
+| `lib/knowledge_alignment.py` | Checks that selected producer-knowledge refs reach script and scene_plan artifacts |
+| `lib/genui/` | GenUI journal/lifecycle support plus session and compatibility-surface config validation, A2UI/json-render view-spec compilation, durable event logs, response-only draft state, local serving, and browser response helpers |
+| `lib/genui/static/renderer/` | Built React A2UI/json-render browser bundle served by `genui_session` and `genui_surface` |
+| `genui-renderer/` | Source package for the Video Production Buddy A2UI/CopilotKit product catalog plus json-render compatibility component catalog |
+| `tools/interaction/genui_interaction.py` | Dynamic GenUI router for deciding whether linear chat is sufficient and synthesizing per-round visual interactions |
+| `tools/interaction/genui_session.py` | GenUI A2UI session materializer/lifecycle tool; serves AG-UI + framework-backed UI and writes ui_session_response/draft state only |
+| `tools/interaction/genui_surface.py` | GenUI compatibility gate workspace/project cockpit materializer; serves AG-UI + json-render UI and writes ui_surface_response only |
+| `tools/analysis/ad_knowledge_retriever.py` | Local professional advertising knowledge retrieval for ad-video pre-production |
+| `tools/compliance/compliance_check.py` | Deterministic structural compliance checks for `compliance_manifest` checkpoints (timing/presence/beat-mapping) |
 | `tools/video/video_stitch.py` | Multi-clip assembly (stitch, spatial, validate, preview) |
 | `tools/video/video_compose.py` | Runtime-aware composition orchestrator — routes to Remotion / HyperFrames / FFmpeg based on `edit_decisions.render_runtime` |
 | `tools/video/hyperframes_compose.py` | HyperFrames runtime — workspace materialization, `hyperframes lint`/`validate`/`render`, FFmpeg floor check |
 | `tools/character/character_animation.py` | Local character-animation tools — character specs, SVG rig plans, pose libraries, action timelines, HyperFrames packages, and QA reports |
 | `lib/hyperframes_style_bridge.py` | Playbook → CSS custom properties + `DESIGN.md` bridge for HyperFrames workspaces |
-| `remotion-composer/src/components/` | 8 Remotion components (TextCard, StatCard, ProgressBar, CalloutBox, ComparisonCard + charts/) |
-| `.agents/skills/hyperframes*/` | Vendored HyperFrames Layer 3 skills (authoring contract, CLI, registry, website-to-video) |
-| `skills/core/hyperframes.md` | Layer 2 — when OpenMontage should pick HyperFrames vs Remotion, artifact → workspace mapping |
+| `remotion-composer/src/components/` | Remotion scene components and registry-backed scene types for deterministic zero-key demos |
+| `.agents/components.yaml` + `.agents/components.lock.json` | Version-controlled Layer 3 component manifest and lockfile |
+| `.agents/local/skills/` | Tracked first-party, locally edited, or not-yet-verified Layer 3 component sources |
+| `.agents/skills/hyperframes*/` | Generated HyperFrames Layer 3 compatibility paths (authoring contract, CLI, registry, website-to-video) |
+| `skills/core/hyperframes.md` | Layer 2 — when Video Production Buddy should pick HyperFrames vs Remotion, artifact → workspace mapping |
 | `schemas/styles/playbook.schema.json` | Playbook schema v2 with design tokens (chart_palette, scale_system, weight_matrix, color_rules) |
 | `tests/qa/` | Quality validation test scripts for tool-by-tool output inspection |
 
@@ -91,8 +114,10 @@ Each tool's `agent_skills[]` field bridges Layer 1 → Layer 3. See `skills/INDE
 | `podcast-repurpose` | `pipeline_defs/podcast-repurpose.yaml` | Podcast repurposing |
 | `cinematic` | `pipeline_defs/cinematic.yaml` | Cinematic edit |
 | `animation` | `pipeline_defs/animation.yaml` | Animation-first |
+| `ad-video` | `pipeline_defs/ad-video.yaml` | Ad/commercial orchestration with pre-production governance and approval gates |
 | `character-animation` | `pipeline_defs/character-animation.yaml` | Local rigged character animation |
 | `hybrid` | `pipeline_defs/hybrid.yaml` | Source-plus-support hybrid |
+| `documentary-montage` | `pipeline_defs/documentary-montage.yaml` | Documentary montage assembly |
 | `avatar-spokesperson` | `pipeline_defs/avatar-spokesperson.yaml` | Avatar presenter |
 | `localization-dub` | `pipeline_defs/localization-dub.yaml` | Localization and dubbing |
 | `framework-smoke` | `pipeline_defs/framework-smoke.yaml` | Test harness |
@@ -100,10 +125,12 @@ Each tool's `agent_skills[]` field bridges Layer 1 → Layer 3. See `skills/INDE
 ## When Building New Pipelines
 
 1. Create a YAML manifest in `pipeline_defs/` (validated by `pipeline_manifest.schema.json`)
-2. Create stage director skills in `skills/pipelines/<pipeline-name>/` (7 skills: idea through publish)
-3. Reference meta skills (reviewer, checkpoint-protocol) in the manifest
-4. Add compatible playbooks to the manifest
-5. Add contract tests in `tests/contracts/`
+2. Use lowercase snake_case stage/sub-stage ids without dots; dotted ids are reserved for derived `<stage>.<sub_stage>` checkpoint units
+3. Prefer the canonical top-level stages and express specialized governance as `sub_stages` instead of inventing unrelated top-level concepts
+4. Create stage director skills in `skills/pipelines/<pipeline-name>/` for every manifest stage
+5. Reference meta skills (reviewer, checkpoint-protocol) in the manifest
+6. Add compatible playbooks to the manifest
+7. Add contract tests in `tests/contracts/`
 
 ## When Building New Tools
 

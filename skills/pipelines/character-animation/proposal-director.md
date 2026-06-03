@@ -24,6 +24,10 @@ Each option must include:
 
 Read `skills/meta/animation-runtime-selector.md` before recommending a runtime.
 
+Present both Remotion and hyperframes before locking `render_runtime` whenever
+both runtimes are available. Record the choice as a `render_runtime_selection`
+decision so downstream edit and compose stages can preserve the approved path.
+
 When both Remotion and HyperFrames are available:
 
 - Remotion: best when the final composition needs deterministic React-rendered

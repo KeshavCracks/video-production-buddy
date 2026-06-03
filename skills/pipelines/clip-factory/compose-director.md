@@ -10,7 +10,7 @@ This pipeline is Phase 1 deferred from the HyperFrames adoption schedule. `edit_
 
 - If `edit_decisions.render_runtime == "hyperframes"`, stop. Re-open the idea stage so the user can be presented the real constraint and lock `remotion` with a `render_runtime_selection` decision that records `hyperframes` as `rejected_because: "caption-burn parity deferred on clip-factory"`.
 - Per AGENT_GUIDE.md → "Present Both Composition Runtimes (HARD RULE)": the constraint is NOT an excuse to skip the conversation. The user still gets to see that HyperFrames exists and why it isn't viable here.
-- Pass `proposal_packet`/`brief` to `video_compose.execute()` so the in-tool runtime-swap check runs end-to-end.
+- Pass `brief` to `video_compose.execute()` so the in-tool runtime-swap check runs end-to-end.
 
 ## Prerequisites
 

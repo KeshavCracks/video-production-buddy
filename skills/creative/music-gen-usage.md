@@ -1,18 +1,24 @@
-# Music Generation Usage for OpenMontage
+# Music Generation Usage for Video Production Buddy
 
-> Sources: ElevenLabs Music API documentation, ElevenLabs best practices guide, Artlist BPM
-> guide, existing Layer 3 skills at `.agents/skills/music/` and `.agents/skills/elevenlabs/`
+> Sources: provider tool contracts, Artlist BPM guide, existing Layer 3 skills at
+> `.agents/skills/music/` and `.agents/skills/elevenlabs/`
 
 ## Quick Reference Card
 
 ```
-API MODEL:        music_v1
-MIN DURATION:     3,000ms (3s)
-MAX DURATION:     600,000ms (10 min)
-INSTRUMENTAL:     Always set force_instrumental=true for video background
-COST:             ~$0.05 per 30 seconds
+PRIMARY TOOL:     registry.get_by_capability("music_generation")
+PROVIDERS:        minimax_music, music_gen, suno_music (availability varies)
+INSTRUMENTAL:     Always request instrumental/background mode for narration beds
+COST:             Read live estimate_cost(); do not hardcode in proposals
 KEY RULE:         Music must be 18-20 dB below narration (see sound-design.md)
 ```
+
+Use the registry first. `minimax_music` is the MiniMax Music 2.6 path for
+instrumental background tracks, structured songs, and cover generation.
+`music_gen` is the legacy-named ElevenLabs music tool kept for compatibility.
+`suno_music` is a separate provider path when configured. Provider names, costs,
+duration limits, and install steps must come from `provider_menu_summary()` /
+`provider_menu()` and each tool's `input_schema`, not from memory.
 
 ## BPM Selection by Video Type
 
@@ -69,7 +75,7 @@ bass, contemplative and focused, background music for technical explanation
 ### Key Prompting Rules
 
 1. **Always include "background" or "underscore"** — tells the model to stay dynamically even
-2. **Always use `force_instrumental=true`** — lyrics compete with narration
+2. **Always request instrumental output** — use the provider's field (`is_instrumental=true` for `minimax_music`; equivalent settings where available). Lyrics compete with narration.
 3. **Specify BPM explicitly** — don't rely on genre to set tempo
 4. **Avoid "bright hi-hats" or "prominent vocals"** — high-frequency busy elements compete with speech in the 2-4 kHz intelligibility band
 5. **Include energy direction** — "steady energy" for explainers, "building gradually" for reveals
@@ -82,6 +88,18 @@ bass, contemplative and focused, background music for technical explanation
 result = music_gen.execute({
     "prompt": "Gentle ambient, 90 BPM, background underscore",
     "duration_seconds": 150,  # Match video length
+    "output_path": "assets/music/background.mp3"
+})
+```
+
+For `minimax_music`, request instrumental mode explicitly and read the live schema
+for supported model names:
+
+```python
+result = minimax_music.execute({
+    "prompt": "Gentle ambient electronic, 90 BPM, background underscore",
+    "is_instrumental": True,
+    "model": "music-2.6",
     "output_path": "assets/music/background.mp3"
 })
 ```
@@ -110,7 +128,10 @@ For videos longer than the generated track:
    ```
 3. Add a 2-3 second crossfade at loop points in `audio_mixer`
 
-**Better approach:** Generate at the exact video duration. ElevenLabs supports up to 10 minutes per generation.
+**Better approach:** Generate at the exact video duration when the selected
+provider supports explicit duration. ElevenLabs `music_gen` accepts
+`duration_seconds`; MiniMax generation may return provider-determined lengths, so
+plan trimming/looping in `audio_mixer` and verify before compose.
 
 ## Stem Isolation
 
@@ -120,15 +141,15 @@ For cleaner ducking control, generate isolated stems:
 - `"soft ambient pad in C major, 80 BPM"` — synth pad only
 - Layer stems in FFmpeg during composition for precise ducking control
 
-## Applying to OpenMontage
+## Applying to Video Production Buddy
 
-When using the `music_gen` tool:
+When using a music-generation tool:
 
 1. **Match BPM to content type** using the table above — don't default to a generic prompt
-2. **Always set `force_instrumental=true`** — no lyrics under narration
+2. **Always request instrumental/background mode** — no lyrics under narration unless the approved brief calls for vocals
 3. **Include "background" or "underscore"** in every prompt
-4. **Set duration to match video length** — avoid looping when possible
-5. **Budget check** — at $0.05/30s, a 3-minute video costs ~$0.30 for music
+4. **Set or verify duration against video length** — avoid looping when possible, otherwise trim/loop intentionally in `audio_mixer`
+5. **Budget check** — read live cost via `estimate_cost()` on the selected provider
 6. **Duck music 18-20 dB below narration** — see `skills/creative/sound-design.md` for ducking rules
 7. **Cut 2-4 kHz on the music bed** in `audio_mixer` to clear the speech intelligibility band
 8. **Test on phone speakers** — if narration disappears behind music, duck more aggressively

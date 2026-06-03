@@ -112,9 +112,9 @@ chart_palette:
   - "#A8E6CF"
   - "#FFB347"
   - "#FF6B9D"
-  - "#87CEEB"
-  - "#DDA0DD"
-  - "#F5F0E8"
+  - "#0F766E"
+  - "#581C87"
+  - "#6B7280"
 
 color_rules:
   harmony_type: "analogous"

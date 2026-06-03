@@ -1,4 +1,4 @@
-"""Runtime configuration model for OpenMontage.
+"""Runtime configuration model for Video Production Buddy.
 
 Loads config.yaml, merges with env overrides, and provides typed access.
 """
@@ -42,7 +42,7 @@ class BudgetConfig(BaseModel):
 
 class CheckpointConfig(BaseModel):
     policy: CheckpointPolicy = CheckpointPolicy.GUIDED
-    storage_dir: str = "pipeline"
+    storage_dir: str = "projects"
 
 
 class OutputConfig(BaseModel):
@@ -55,14 +55,14 @@ class OutputConfig(BaseModel):
 
 
 class PathsConfig(BaseModel):
-    pipeline_dir: str = "pipeline"
-    library_dir: str = "library"
+    pipeline_dir: str = "pipeline_defs"
+    library_dir: str = "lib"
     styles_dir: str = "styles"
     skills_dir: str = "skills"
-    output_dir: str = "output"
+    output_dir: str = "projects"
 
 
-class OpenMontageConfig(BaseModel):
+class VideoProductionBuddyConfig(BaseModel):
     """Top-level runtime configuration."""
 
     llm: LLMConfig = Field(default_factory=LLMConfig)
@@ -72,7 +72,7 @@ class OpenMontageConfig(BaseModel):
     paths: PathsConfig = Field(default_factory=PathsConfig)
 
     @classmethod
-    def load(cls, config_path: Optional[Path] = None) -> "OpenMontageConfig":
+    def load(cls, config_path: Optional[Path] = None) -> "VideoProductionBuddyConfig":
         """Load config from YAML file. Falls back to defaults if file missing."""
         if config_path is None:
             config_path = Path(__file__).resolve().parent.parent / "config.yaml"

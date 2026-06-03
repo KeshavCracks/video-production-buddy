@@ -95,8 +95,8 @@ chart_palette:
   - "#F59E0B"
   - "#10B981"
   - "#8B5CF6"
-  - "#EF4444"
-  - "#06B6D4"
+  - "#B45309"
+  - "#0F766E"
 
 color_rules:
   harmony_type: "analogous"

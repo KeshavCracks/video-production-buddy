@@ -8,10 +8,10 @@ identity:
 visual_language:
   color_palette:
     primary: ["#7C3AED", "#4F46E5"]
-    accent: ["#EC4899", "#06B6D4"]
+    accent: ["#EC4899", "#F97316"]
     background: "#0F172A"
     text: "#F8FAFC"
-    muted: "#64748B"
+    muted: "#94A3B8"
   composition: edge-to-edge, bold framing, off-center for dynamism
   texture: flat color blocks, geometric shapes, no gradients except on backgrounds
 
@@ -93,10 +93,10 @@ quality_rules:
 chart_palette:
   - "#7C3AED"
   - "#EC4899"
-  - "#06B6D4"
+  - "#F97316"
   - "#F59E0B"
-  - "#10B981"
-  - "#EF4444"
+  - "#0F766E"
+  - "#1D4ED8"
 
 color_rules:
   harmony_type: "split-complementary"

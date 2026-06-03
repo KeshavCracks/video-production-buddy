@@ -3,8 +3,8 @@
 ## When to Use
 
 When writing prompts for the video generation family (`video_selector`, `seedance_video`,
-`heygen_video`, `wan_video`, `hunyuan_video`, `ltx_video_local`, `ltx_video_modal`,
-`cogvideo_video`). This skill covers the universal prompt vocabulary that works across all
+`heygen_video`, `wan_video_api`, `wan_video`, `hunyuan_video`, `ltx_video_local`,
+`ltx_video_modal`, `cogvideo_video`). This skill covers the universal prompt vocabulary that works across all
 video generation models. For the **preferred premium default**, see the Seedance 2.0 row
 in the table below.
 
@@ -22,7 +22,8 @@ For model-specific tips, see the linked guides below.
 | **HunyuanVideo 1.5** | [Tencent Prompt Handbook](https://github.com/Tencent-Hunyuan/HunyuanVideo-1.5/blob/main/assets/HunyuanVideo_1_5_Prompt_Handbook_EN.md) | Formula: Subject + Motion + Scene + [Shot] + [Camera] + [Lighting] + [Style] + [Atmosphere]. |
 | **Runway Gen-4** | [Runway Prompting Guide](https://help.runwayml.com/hc/en-us/articles/39789879462419-Gen-4-Video-Prompting-Guide) | "Focus on motion, not appearance." One scene per clip. Simplicity wins. |
 | **Kling 2.6** | [Kling Prompt Guide](https://fal.ai/learn/devs/kling-2-6-pro-prompt-guide) | 4-part structure. Supports `++emphasis++` syntax for key elements. |
-| **Wan 2.1 / CogVideoX** | Use this generic guide | No official prompt guide. Standard cinematographic vocabulary works well. |
+| **Wan 2.7 / Wan 2.6 API** | `wan_video_api` + Layer 3 `.agents/skills/ai-video-gen/` | Bailian/DashScope path for t2v, i2v, reference-to-video, and video editing. Use 5-aspect prompts; pass `aspect_ratio` instead of landscape `resolution` for vertical/square output. |
+| **Wan 2.1 local / CogVideoX** | Use this generic guide | Standard cinematographic vocabulary works well; keep local model limits in mind. |
 
 ## Order Matters
 
@@ -39,7 +40,7 @@ When listing multiple subjects or events:
 
 Prior work (CMU/Harvard, "Building a Precise Video Language with Human-AI Oversight") shows VLMs reliably describe subject + scene but fail on motion, spatial, and camera. **Forcing prompts to fill all five slots is the highest-leverage change.**
 
-The OpenMontage canonical 5-aspect skeleton:
+The Video Production Buddy canonical 5-aspect skeleton:
 
 ```
 [Subject]        type + key visual attributes + how to disambiguate when multiple

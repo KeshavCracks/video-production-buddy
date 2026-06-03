@@ -7,10 +7,12 @@ Tested prompts that produce impressive videos. Copy any prompt into your AI codi
 These render pre-built compositions using only Remotion components — animated charts, typography, data visualization. No external services, no cost, no waiting.
 
 ```bash
-make demo                         # Render all three demos
+make demo                         # Render all checked-in demos
 ./render-demo.sh world-in-numbers # Render one specific demo
 ./render-demo.sh --list           # See all available demos
 ```
+
+Run `./render-demo.sh --list` for the current complete set. These are representative fixtures:
 
 | Demo | Duration | What It Shows |
 |------|----------|--------------|
@@ -58,9 +60,9 @@ These use the full agent pipeline — research, scripting, asset generation, com
 
 ---
 
-## One-Key Prompts (FAL_KEY only, ~$0.50-$1.50)
+## One-Key Prompts (FAL_KEY or FAL_AI_API_KEY, ~$0.50-$1.50)
 
-Adding `FAL_KEY` to your `.env` unlocks FLUX image generation. These prompts combine AI-generated visuals with Remotion animation.
+Adding `FAL_KEY` or `FAL_AI_API_KEY` to your `.env` unlocks FLUX image generation. These prompts combine AI-generated visuals with Remotion animation.
 
 ### Science Explainer
 
@@ -88,7 +90,7 @@ Adding `FAL_KEY` to your `.env` unlocks FLUX image generation. These prompts com
 
 ---
 
-## Animation Pipeline — Anime/Ghibli Style (FAL_KEY, ~$0.15)
+## Animation Pipeline — Anime/Ghibli Style (FAL_KEY or FAL_AI_API_KEY, ~$0.15)
 
 These use the **Animation pipeline** with `image_animation` approach — FLUX-generated still images brought to life through multi-image crossfade, cinematic camera motion, particle overlays, and ambient music. No video generation APIs needed. Each 30-second video costs ~$0.15.
 
@@ -130,7 +132,7 @@ These use the **Animation pipeline** with `image_animation` approach — FLUX-ge
 
 These use the HyperFrames composition runtime — HTML + CSS + GSAP rendered deterministically to video via headless Chrome + FFmpeg. Perfect for kinetic typography, product promos, launch reels, and website-to-video treatments where the visual grammar is typographic and motion-first.
 
-**Requirements:** Node.js ≥ 22, FFmpeg, `npx` — no monorepo checkout, the CLI is fetched via `npx @hyperframes/cli` on first run.
+**Requirements:** Node.js ≥ 22, FFmpeg, `npx` — no monorepo checkout, the CLI is fetched via `npx hyperframes` on first run.
 
 ### Kinetic Product Launch
 

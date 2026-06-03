@@ -10,7 +10,7 @@ Phase 1 deferred from HyperFrames. `edit_decisions.render_runtime` must be `"rem
 
 - If `edit_decisions.render_runtime == "hyperframes"`, stop. Re-open the idea stage and surface the constraint. Silent rewrite is a governance violation.
 - Per AGENT_GUIDE.md → "Present Both Composition Runtimes (HARD RULE)": the pipeline's constraint doesn't skip the conversation. Present the constraint to the user so they know HyperFrames exists but isn't viable here. Record a `render_runtime_selection` decision with hyperframes `rejected_because: "TalkingHead + caption parity deferred on talking-head"`.
-- Pass `proposal_packet`/`brief` to `video_compose.execute()` for runtime-swap detection.
+- Pass `brief` to `video_compose.execute()` for runtime-swap detection.
 
 ## Prerequisites
 
@@ -51,7 +51,7 @@ Before rendering anything, validate the inputs and catch issues that are expensi
        "DMI": "EMI",
        "AMI": "EMI",
        # Common brand misspellings
-       "open montage": "OpenMontage",
+       "open montage": "Video Production Buddy",
        "remotion": "Remotion",
        # Numbers that got split by ASR
        "4 -5": "4-5",
@@ -145,7 +145,7 @@ Build a corrections dict:
 corrections = {
     "cloud": "Claude",
     "co pilot": "Copilot",
-    "open montage": "OpenMontage",
+    "open montage": "Video Production Buddy",
 }
 ```
 
@@ -411,7 +411,7 @@ video_compose.execute({
     "operation": "encode",
     "input_path": "<mixed_video>",
     "output_path": "<project>/renders/final.mp4",
-    "media_profile": "instagram_reels",
+    "profile": "instagram_reels",
     "video_bitrate": "4M",
     "audio_bitrate": "192k",
 })

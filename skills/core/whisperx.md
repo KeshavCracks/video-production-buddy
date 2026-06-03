@@ -7,11 +7,17 @@ audio or video files. This is the entry point for all transcript-dependent
 workflows: subtitle generation, edit decisions based on spoken content, and
 scene analysis from dialogue.
 
+Use `qwen_asr` only when you need fast Chinese or multilingual transcript text
+and do **not** need word-level timestamps or diarization. It is useful for
+quick narration review, but it is not a replacement for `transcriber` when the
+next stage is subtitle timing.
+
 ## Tool
 
 | Tool | Capability |
 |------|-----------|
 | `transcriber` | Speech-to-text with word timestamps, language detection, optional diarization |
+| `qwen_asr` | Bailian/DashScope transcript text; no word timestamps or diarization |
 
 ## How It Works
 

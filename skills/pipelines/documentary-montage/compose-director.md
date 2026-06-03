@@ -13,9 +13,9 @@ The output is a single mp4 plus a `render_report` artifact.
 
 This pipeline currently REQUIRES `render_runtime="remotion"`. The end-tag stack (ProRes 4444 overlay composited on final scenes, or concat fallback) depends on Remotion's `CinematicRenderer` composition and its alpha-preserving render path. HyperFrames end-tag parity is explicitly Wave 3 / deferred work (see `skills/core/hyperframes.md` → "What stays Remotion-only in Phase 1").
 
-- If `edit_decisions.render_runtime` is anything other than `remotion`, stop. This is a CRITICAL governance violation. Surface the conflict to the user, route the decision back to proposal to re-lock `render_runtime="remotion"`, log a `render_runtime_selection` correction in decision_log, and resume.
+- If `edit_decisions.render_runtime` is anything other than `remotion`, stop. This is a CRITICAL governance violation. Surface the conflict to the user, route the decision back to idea to re-lock `render_runtime="remotion"` in `brief`, log a `render_runtime_selection` correction in decision_log, and resume.
 - Never silently proceed by rewriting render_runtime in edit_decisions. The documentary promise (motion-led, mood-driven, uniform grade) is preserved by the Remotion stack, and that promise is what the user approved.
-- Pass `proposal_packet` to `video_compose.execute()` so the in-tool `runtime_swap_detected` check actively confirms the runtime stayed `remotion` end-to-end. A `skipped` check on this pipeline means you forgot to pass the proposal artifact.
+- Pass `brief` to `video_compose.execute()` so the in-tool `runtime_swap_detected` check actively confirms the runtime stayed `remotion` end-to-end. A `skipped` check on this pipeline means you forgot to pass the planning artifact.
 
 ## Prerequisites
 
@@ -98,6 +98,7 @@ video_compose.execute({
     "output_path": "projects/<name>/renders/final.mp4",
     "edit_decisions": edit_decisions_with_renderer_family,
     "asset_manifest": asset_manifest,
+    "brief": brief,
 })
 ```
 

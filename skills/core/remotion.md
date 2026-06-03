@@ -10,8 +10,11 @@ data-driven batch rendering. For simple cuts, burns, and encodes, prefer FFmpeg 
 
 The **installed agent skills** (`.agents/skills/remotion-best-practices/`) teach correct
 Remotion API usage — imports, timing, animation constraints, code patterns.
-**This file** teaches how OpenMontage uses Remotion — which compositions map to pipeline
+**This file** teaches how Video Production Buddy uses Remotion — which compositions map to pipeline
 stages, how artifacts flow in, and how renders are triggered.
+
+If the generated Layer 3 path is missing after checkout, run
+`python -m lib.agent_components install --profile default --frozen` before using it.
 
 ## Remotion-First Routing
 
@@ -20,8 +23,9 @@ It handles video clips (via `<OffthreadVideo>`), still images, animated scenes,
 component types, transitions, and mixed content — all in a single React-based
 render pass.
 
-FFmpeg is the **fallback** — used only when Remotion is unavailable, or for
-simple standalone operations that don't benefit from React rendering.
+FFmpeg is the **explicit alternate runtime** for simple standalone operations
+that don't benefit from React rendering. It is not an automatic downgrade after
+`render_runtime` has been locked to `remotion`.
 
 | Use Case | Backend | Why |
 |----------|---------|-----|
@@ -35,17 +39,22 @@ simple standalone operations that don't benefit from React rendering.
 | Simple trim, concat (no composition) | FFmpeg | Instant, no Node dependency |
 | Subtitle burn-in (standalone, post-hoc) | FFmpeg | Only for adding subs to an already-rendered video without re-rendering |
 | Face enhance, color grade | FFmpeg | Filter-based, deterministic |
-| Remotion unavailable | FFmpeg | Automatic fallback |
+| Remotion unavailable before runtime lock | FFmpeg can be proposed | Surface as an option before approval |
+| Remotion unavailable after `render_runtime: remotion` is locked | Blocker | Fix Remotion or get user-approved runtime change |
 
-**Note:** The `render` operation auto-routes to Remotion by default. FFmpeg is
-only selected when Remotion is not installed or the agent explicitly calls
-`operation='compose'` for standalone operations. The agent can also write custom
-Remotion compositions on the fly via the capability-extension protocol when no
-existing composition covers the layout (e.g., custom PiP, split-screen).
+**Note:** The `render` operation honors `edit_decisions.render_runtime`. If it
+is `remotion`, unavailable Remotion is a governance blocker, not a silent FFmpeg
+fallback. FFmpeg is selected only when `render_runtime: ffmpeg` is explicitly
+approved, or when the agent calls `operation='compose'` for standalone FFmpeg
+operations. The agent can also write custom Remotion compositions on the fly via
+the capability-extension protocol when no existing composition covers the layout
+(e.g., custom PiP, split-screen).
 
 ## Supported Scene Types (Cut Types)
 
-The Explainer composition supports the following cut types:
+The Explainer composition supports the following cut types. The authoritative,
+machine-readable list is `remotion-composer/scene_type_registry.json`; check it
+before authoring cuts, and update this section whenever the registry grows.
 
 | Type | Props Required | Best For |
 |------|---------------|----------|
@@ -60,6 +69,17 @@ The Explainer composition supports the following cut types:
 | `kpi_grid` | `chartData` [{label, value, prefix, suffix, change, icon}] | Dashboards, traction metrics |
 | `progress_bar` | `progress` (0-100), optional `progressSegments` | Journey viz, completion, stacked metrics |
 | `anime_scene` | `images` (1-4 paths), optional `animation`, `particles`, `particleColor`, `particleCount`, `particleIntensity`, `vignette`, `lightingFrom`, `lightingTo` | Anime/Ghibli-style scenes with multi-image crossfade, camera motion, particle overlays |
+| `notification_scene` | optional `badgeStart`, `badgeEnd`, `banners`, `styleLayers` | Hook/chaos beats with app-icon grid, badge counters, and notification banners |
+| `creator_workflow_scene` | optional `productImage`, `text`, `subtitle`, `banners`, `sidebarItems` | Product-visible creator workflow scenes; `productImage` must be an approved reference, never generic hardware |
+| `dashboard_scene` | optional `primaryColor`, `accentColor`, `toastText`, `sidebarItems`, `panelTitle` | Product UI reveal beats with sidebar spring-in, cards, and toast motion |
+| `brand_card` | optional `brandName`, `tagline`, `ctaText`, `productImage`, `hardwareTreatment` | End cards with wordmark motion, CTA, and optional approved product image |
+| `terminal_scene` | `steps` | Synthetic terminal animation for CLI/install flows; no screen capture needed |
+| `screenshot_scene` | `backgroundImage`, `screenshotSteps` | Synthetic UI recording over a static screenshot: cursor moves, clicks, typing, highlights, and callouts without live capture |
+| `checkmark_scene` | optional `label`, `accentColor`, `styleLayers` | Resolution moments: checkmark draw, radial ripple, spring pop |
+| `browser_tabs_scene` | optional `tabCount`, `showKeyboardPill`, `keyShortcut` | Browser overload or multi-tab workflow moments |
+| `badge_freeze_scene` | optional `startCount`, `endCount`, `freezeAtSeconds`, `showThumb` | Close-up counter/freeze recognition trigger |
+| `line_connection_scene` | `leftLabel`, `rightLabel` | Sync/data-flow visualization with connected anchors |
+| `stat_roll_scene` | `targetValue` | Rolling-number reveal with comma separators and unit label |
 
 **Chart animations:** `grow-up`, `slide-in`, `pop` (bar), `draw`, `fade-in` (line), `spin`, `expand`, `sequential` (pie), `count-up`, `pop`, `cascade` (kpi)
 
@@ -75,7 +95,7 @@ The `anime_scene` type renders 1-4 images with smooth crossfade transitions, cin
 
 **Multi-image crossfade math:** Each image owns an equal time segment. Fade-out of image N and fade-in of image N+1 OVERLAP by `crossfadeDur` (~1.2s) so there's never a dead frame. Generate 2-3 images per scene from the same visual system, but vary the shot, subject, and lighting per beat. Nearby seeds help create subtle motion without flattening the whole sequence into one repeated prompt.
 
-**Reference composition:** `remotion-composer/public/demo-props/mori-no-seishin.json` — 6 anime scenes, 30 seconds, with particles, lighting, overlays, and ambient music.
+**Reference composition:** `remotion-composer/public/demo-props/healing-anime-short.json` — anime scenes with particles, lighting, overlays, and ambient music.
 
 **Style playbook:** `styles/anime-ghibli.yaml` — Ghibli-inspired aesthetic with color palette, typography, motion parameters, and FLUX prompt prefix.
 
@@ -115,8 +135,10 @@ animations at least 4 seconds to complete. Hero title needs only 4 seconds.
 them consistently across charts, overlays, and accents. Use the same chartColors array
 across bar/pie/line scenes for visual unity.
 
-**Reference compositions:** See `remotion-composer/public/demo-props/climate-dashboard.json`
-as the gold standard, and other demo files for additional patterns.
+**Reference compositions:** See `remotion-composer/public/demo-props/world-in-numbers.json`
+and `remotion-composer/public/demo-props/focusflow-pitch.json` for zero-key chart
+and pitch-deck patterns, plus `remotion-composer/public/demo-props/code-to-screen.json`
+for terminal/code-oriented scenes.
 
 ### Pre-Render Validation (mandatory)
 
@@ -147,16 +169,15 @@ result = CompositionValidator().execute({
 remotion-composer/
 ├── src/
 │   ├── Root.tsx              # Composition registry
-│   ├── compositions/         # One file per pipeline type
-│   │   ├── Explainer.tsx     # Generated explainer composition
-│   │   ├── AnimatedScene.tsx # Individual animated scene
-│   │   └── TitleCard.tsx     # Standalone title card
+│   ├── Explainer.tsx         # Generated explainer composition
+│   ├── CinematicRenderer.tsx # Source/video-led cinematic composition
+│   ├── TalkingHead.tsx       # Presenter composition
 │   ├── components/           # Reusable visual building blocks
-│   │   ├── Caption.tsx       # Subtitle/caption renderer
-│   │   ├── DiagramOverlay.tsx
+│   │   ├── CaptionOverlay.tsx
 │   │   ├── ProgressBar.tsx
-│   │   └── TransitionWrapper.tsx
-│   └── styles/               # Tailwind + playbook-derived styles
+│   │   ├── TerminalScene.tsx
+│   │   └── TextCard.tsx
+│   └── cinematic/            # Cinematic fixtures and types
 ├── public/                   # Static assets (fonts, LUTs)
 ├── package.json
 ├── remotion.config.ts
@@ -167,7 +188,7 @@ remotion-composer/
 
 ### How Artifacts Map to Remotion Props
 
-| OpenMontage Artifact | Remotion Prop | Maps To |
+| Video Production Buddy Artifact | Remotion Prop | Maps To |
 |---------------------|---------------|---------|
 | `scene_plan.json` → `scenes[]` | `scenes` prop | `<TransitionSeries>` children |
 | `scene.type` | Component selector | `talking_head` → `<Video>`, `diagram` → `<DiagramOverlay>`, etc. |
@@ -202,7 +223,7 @@ In Python, invoke via `subprocess` from `video_compose.py` when `backend="remoti
 
 ### Media Profile Mapping
 
-| OpenMontage Profile | Remotion Config |
+| Video Production Buddy Profile | Remotion Config |
 |--------------------|-----------------|
 | `youtube_landscape` | `width: 1920, height: 1080, fps: 30` |
 | `youtube_shorts` | `width: 1080, height: 1920, fps: 30` |
@@ -218,7 +239,7 @@ In Python, invoke via `subprocess` from `video_compose.py` when `backend="remoti
 Each scene in `scene_plan.json` becomes a child of `<TransitionSeries>`:
 
 ```tsx
-// Pseudocode — actual component in remotion-composer/src/compositions/Explainer.tsx
+// Pseudocode — actual component in remotion-composer/src/Explainer.tsx
 const Explainer: React.FC<ExplainerProps> = ({ scenes, theme, assets }) => {
   return (
     <TransitionSeries>

@@ -17,6 +17,7 @@ from tools.video.clip_cache import (
     CacheEntry,
     ClipCache,
     _link_or_copy,
+    _safe_blob_name,
     default_cache_dir,
     default_max_total_bytes,
     get_default_cache,
@@ -56,23 +57,49 @@ def _default_metadata(clip_id: str = "test_001") -> dict:
 
 
 def test_default_cache_dir_uses_env_override(monkeypatch, tmp_path):
-    monkeypatch.setenv("OPENMONTAGE_CACHE_DIR", str(tmp_path / "overridden"))
-    assert default_cache_dir() == tmp_path / "overridden"
+    monkeypatch.setenv("VIDEO_PRODUCTION_BUDDY_CACHE_DIR", str(tmp_path / "new"))
+    monkeypatch.setenv("OPEN" + "MONTAGE_CACHE_DIR", str(tmp_path / "ignored"))
+    assert default_cache_dir() == tmp_path / "new"
+
+
+def test_default_cache_dir_ignores_upstream_env_override(monkeypatch, tmp_path):
+    monkeypatch.delenv("VIDEO_PRODUCTION_BUDDY_CACHE_DIR", raising=False)
+    monkeypatch.setenv("OPEN" + "MONTAGE_CACHE_DIR", str(tmp_path / "ignored"))
+    assert default_cache_dir() == Path.home() / ".video-production-buddy" / "clips_cache"
 
 
 def test_default_cache_dir_falls_back_to_home(monkeypatch):
-    monkeypatch.delenv("OPENMONTAGE_CACHE_DIR", raising=False)
+    monkeypatch.delenv("VIDEO_PRODUCTION_BUDDY_CACHE_DIR", raising=False)
+    monkeypatch.delenv("OPEN" + "MONTAGE_CACHE_DIR", raising=False)
     result = default_cache_dir()
-    assert result == Path.home() / ".openmontage" / "clips_cache"
+    assert result == Path.home() / ".video-production-buddy" / "clips_cache"
+
+
+def test_default_cache_dir_ignores_upstream_home_cache(monkeypatch, tmp_path):
+    monkeypatch.delenv("VIDEO_PRODUCTION_BUDDY_CACHE_DIR", raising=False)
+    monkeypatch.delenv("OPEN" + "MONTAGE_CACHE_DIR", raising=False)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    upstream_cache = tmp_path / (".open" + "montage") / "clips_cache"
+    upstream_cache.mkdir(parents=True)
+
+    assert default_cache_dir() == tmp_path / ".video-production-buddy" / "clips_cache"
 
 
 def test_default_max_total_bytes_respects_env_override(monkeypatch):
-    monkeypatch.setenv("OPENMONTAGE_CACHE_MAX_GB", "5")
-    assert default_max_total_bytes() == 5 * 1024 * 1024 * 1024
+    monkeypatch.setenv("VIDEO_PRODUCTION_BUDDY_CACHE_MAX_GB", "2")
+    monkeypatch.setenv("OPEN" + "MONTAGE_CACHE_MAX_GB", "5")
+    assert default_max_total_bytes() == 2 * 1024 * 1024 * 1024
+
+
+def test_default_max_total_bytes_ignores_upstream_env_override(monkeypatch):
+    monkeypatch.delenv("VIDEO_PRODUCTION_BUDDY_CACHE_MAX_GB", raising=False)
+    monkeypatch.setenv("OPEN" + "MONTAGE_CACHE_MAX_GB", "5")
+    assert default_max_total_bytes() == 20 * 1024 * 1024 * 1024
 
 
 def test_default_max_total_bytes_ignores_garbage_override(monkeypatch):
-    monkeypatch.setenv("OPENMONTAGE_CACHE_MAX_GB", "not-a-number")
+    monkeypatch.delenv("VIDEO_PRODUCTION_BUDDY_CACHE_MAX_GB", raising=False)
+    monkeypatch.setenv("VIDEO_PRODUCTION_BUDDY_CACHE_MAX_GB", "not-a-number")
     assert default_max_total_bytes() == 20 * 1024 * 1024 * 1024
 
 
@@ -175,6 +202,32 @@ def test_ingest_rejects_too_small_file(tmp_path):
     assert cache.ingest("pexels_tiny", tiny, {}) is False
 
 
+def test_ingest_sanitizes_clip_ids_before_building_cache_blob_paths(tmp_path):
+    cache = ClipCache(cache_dir=tmp_path / "cache")
+    src = _fake_clip(tmp_path / "project" / "escape.mp4", 2048)
+    unsafe_clip_id = "../escape"
+
+    assert cache.ingest(unsafe_clip_id, src, {}) is True
+
+    entries = cache._read_manifest()
+    entry = entries[unsafe_clip_id]
+    assert ".." not in Path(entry.file_name).parts
+    blob_path = (cache.cache_dir / entry.file_name).resolve()
+    blob_path.relative_to(cache.cache_dir.resolve())
+    assert blob_path.exists()
+    assert not (tmp_path / "escape.mp4").exists()
+
+
+def test_safe_blob_name_caps_overlong_safe_clip_ids():
+    clip_id = "pexels_" + ("a" * 300)
+
+    blob_name = _safe_blob_name(clip_id, ".mp4")
+
+    assert len(blob_name) <= 120
+    assert blob_name.endswith(".mp4")
+    assert "a" * 160 not in blob_name
+
+
 def test_ingest_same_clip_twice_bumps_last_access(tmp_path):
     cache = ClipCache(cache_dir=tmp_path / "cache")
     src = _fake_clip(tmp_path / "a.mp4", 2000)
@@ -216,6 +269,25 @@ def test_manifest_drift_falls_back_to_miss(tmp_path):
     assert cache.try_link("pexels_drift", dest) is False
     entries = cache._read_manifest()
     assert "pexels_drift" not in entries
+
+
+def test_try_link_rejects_manifest_blob_paths_outside_cache_dir(tmp_path):
+    cache = ClipCache(cache_dir=tmp_path / "cache")
+    outside_blob = _fake_clip(tmp_path / "outside.mp4", 2048)
+    entry = CacheEntry(
+        clip_id="bad_manifest",
+        file_name="../outside.mp4",
+        size_bytes=outside_blob.stat().st_size,
+        added_at=1000.0,
+        last_access_at=1000.0,
+    )
+    with open(cache.manifest_path, "w", encoding="utf-8") as f:
+        f.write(json.dumps(entry.to_dict()) + "\n")
+
+    dest = tmp_path / "project" / "bad_manifest.mp4"
+    assert cache.try_link("bad_manifest", dest) is False
+    assert not dest.exists()
+    assert "bad_manifest" not in cache._read_manifest()
 
 
 # ----------------------------------------------------------------------
@@ -387,6 +459,33 @@ def test_try_link_falls_back_to_copy_and_still_bumps_access(tmp_path, monkeypatc
     assert cache.hits == 1
 
 
+def test_try_link_preserves_existing_destination_when_materialization_fails(
+    tmp_path, monkeypatch
+):
+    cache = ClipCache(cache_dir=tmp_path / "cache")
+    src = _fake_clip(tmp_path / "src.mp4", 3000)
+    cache.ingest("pexels_existing", src, _default_metadata("pexels_existing"))
+
+    dest = tmp_path / "project" / "clips" / "pexels_existing.mp4"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    original_bytes = b"existing-local-file" * 128
+    dest.write_bytes(original_bytes)
+
+    def broken_link(a, b):
+        raise OSError("no link")
+
+    def broken_copy(a, b):
+        raise OSError("no copy")
+
+    monkeypatch.setattr(os, "link", broken_link)
+
+    import shutil
+    monkeypatch.setattr(shutil, "copy2", broken_copy)
+
+    assert cache.try_link("pexels_existing", dest) is False
+    assert dest.read_bytes() == original_bytes
+
+
 # ----------------------------------------------------------------------
 # Stats
 # ----------------------------------------------------------------------
@@ -422,16 +521,19 @@ def test_stats_reports_cache_state_and_session_counters(tmp_path):
 
 def test_get_default_cache_honors_env_var(monkeypatch, tmp_path):
     reset_default_cache()
-    monkeypatch.setenv("OPENMONTAGE_CACHE_DIR", str(tmp_path / "envcache"))
+    monkeypatch.setenv("VIDEO_PRODUCTION_BUDDY_CACHE_DIR", str(tmp_path / "newenvcache"))
+    monkeypatch.setenv("OPEN" + "MONTAGE_CACHE_DIR", str(tmp_path / "ignored"))
     cache = get_default_cache()
-    assert Path(cache.cache_dir) == tmp_path / "envcache"
+    assert Path(cache.cache_dir) == tmp_path / "newenvcache"
     reset_default_cache()
 
 
 def test_get_default_cache_returns_same_instance(monkeypatch, tmp_path):
     reset_default_cache()
-    monkeypatch.setenv("OPENMONTAGE_CACHE_DIR", str(tmp_path / "singleton"))
+    monkeypatch.delenv("VIDEO_PRODUCTION_BUDDY_CACHE_DIR", raising=False)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
     a = get_default_cache()
     b = get_default_cache()
     assert a is b
+    assert Path(a.cache_dir) == tmp_path / ".video-production-buddy" / "clips_cache"
     reset_default_cache()

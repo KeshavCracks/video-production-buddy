@@ -1,8 +1,8 @@
-# OpenMontage Architecture
+# Video Production Buddy Architecture
 
-> Last updated: 2026-03-28 | Derived from code exploration, not prior documentation.
+> Last updated: 2026-06-02 | Derived from code exploration, not prior documentation.
 
-OpenMontage is an **agent-orchestrated video production platform**. An LLM coding assistant (Claude Code, Cursor, Copilot, etc.) acts as the orchestrator — reading pipeline manifests, following skill instructions, calling Python tools, and checkpointing state. There is no runtime Python orchestrator; the agent _is_ the control plane.
+Video Production Buddy is an **agent-orchestrated video production platform**. An LLM coding assistant (Claude Code, Cursor, Copilot, etc.) acts as the orchestrator — reading pipeline manifests, following skill instructions, calling Python tools, and checkpointing state. There is no runtime Python orchestrator; the agent _is_ the control plane.
 
 ---
 
@@ -20,7 +20,7 @@ For each stage:
    2. Agent calls Python tools via tool registry
    3. Agent writes checkpoint (JSON) with artifacts
    4. Agent self-reviews using meta/reviewer skill
-   5. Human approval gate (if configured)
+   5. Human approval gate (if configured, optionally through GenUI)
         |
         v
 Final video output
@@ -31,44 +31,54 @@ Final video output
 ## Repository Layout
 
 ```
-OpenMontage/
+Video Production Buddy/
 ├── lib/                    # Core runtime infrastructure (Python)
 │   ├── config_model.py     # Pydantic config: LLM, budget, checkpoint, output, paths
 │   ├── checkpoint.py       # Pipeline state persistence & stage transitions
 │   ├── pipeline_loader.py  # YAML manifest loading & validation
 │   ├── media_profiles.py   # Platform-specific render profiles (YouTube, TikTok, etc.)
+│   ├── genui/              # Visual configs, A2UI/json-render specs, response helpers
 │   ├── env_loader.py       # .env variable management
 │   └── providers/          # (Reserved for future provider abstractions)
 │
-├── tools/                  # 57+ Python tool implementations
+├── tools/                  # Registry-discovered Python tool implementations
 │   ├── base_tool.py        # Abstract base class — the tool contract
 │   ├── tool_registry.py    # Auto-discovery singleton registry
 │   ├── cost_tracker.py     # Budget governance (estimate → reserve → reconcile)
 │   ├── analysis/           # Transcription, scene detection, frame sampling, video understanding
 │   ├── audio/              # TTS (ElevenLabs, OpenAI, Piper), music gen, mixing, enhancement
 │   ├── avatar/             # Talking head animation, lip sync
+│   ├── capture/            # Screen capture selectors and recorder adapters
+│   ├── character/          # Local character specs, rigs, poses, timelines, QA
+│   ├── compliance/         # Deterministic structural compliance checks
 │   ├── enhancement/        # Upscale, bg removal, face enhance/restore, color grading
 │   ├── graphics/           # Image gen (FLUX, DALL-E, Recraft, local diffusion), stock, diagrams, code snippets, math animation
+│   ├── interaction/         # GenUI local form tool for dense human gates
 │   ├── publishers/         # (Reserved)
 │   ├── subtitle/           # SRT/VTT generation from timestamps
-│   └── video/              # 13 video gen providers, composition, stitching, trimming
+│   ├── validation/         # Cross-artifact governance validators
+│   └── video/              # Video generation providers, composition runtimes, stitching, trimming
 │
 ├── pipeline_defs/          # YAML pipeline manifests
+├── knowledge/              # Curated ad-video professional knowledge cards
 ├── schemas/                # JSON Schema definitions for validation
-│   ├── artifacts/          # 11 artifact schemas (brief → publish_log)
+│   ├── artifacts/          # 28 artifact schemas (brief -> publish_log plus governance artifacts)
 │   ├── checkpoints/        # Checkpoint state schema
 │   ├── pipelines/          # Pipeline manifest schema
 │   ├── styles/             # Style playbook schema
 │   └── tools/              # Tool-specific schemas
 │
-├── skills/                 # Layer 2: OpenMontage-specific agent instructions
+├── skills/                 # Layer 2: Video Production Buddy-specific agent instructions
 │   ├── core/               # FFmpeg, Remotion, WhisperX, color grading skills
 │   ├── creative/           # Video editing, enhancement, data viz, prompt engineering
 │   ├── meta/               # reviewer, checkpoint-protocol, skill-creator
 │   └── pipelines/          # Per-pipeline stage-director skills
 │
-├── .agents/skills/         # Layer 3: external technology skills (FFmpeg, HyperFrames, GSAP, etc.)
+├── .agents/components.yaml # Layer 3 dependency manifest
+├── .agents/local/skills/   # Tracked first-party / locally edited Layer 3 sources
+├── .agents/skills/         # Generated Layer 3 compatibility target
 ├── styles/                 # Visual style playbooks (YAML) + loader
+├── music_library/          # Optional user-provided royalty-free tracks (gitignored)
 ├── remotion-composer/      # Node.js/React — Remotion video composition renderer
 ├── tests/                  # Contract tests, QA integration tests, eval harness
 ├── docs/                   # Best-practices guides, session handoffs, audits
@@ -91,11 +101,52 @@ Python provides **tools and persistence only**. All intelligence lives in skill 
 
 ### 2. No LLM API Key in Runtime
 
-OpenMontage does not call LLM APIs at runtime. The coding assistant running in the user's IDE _is_ the LLM. Tools that need generation (images, video, TTS) call domain-specific APIs directly (ElevenLabs, fal.ai, HeyGen, etc.), not general-purpose LLM endpoints.
+Video Production Buddy does not call LLM APIs at runtime. The coding assistant running in the user's IDE _is_ the LLM. Tools that need generation (images, video, TTS) call domain-specific APIs directly (ElevenLabs, fal.ai, HeyGen, etc.), not general-purpose LLM endpoints.
 
 ### 3. Dual-Provider Support
 
 Every capability must support both **API providers** (cloud, paid) and **local/open-source alternatives** (free, GPU-dependent). The selector pattern enforces this by routing to whatever is available.
+
+### 4. GenUI Is an Interaction Layer, Not an Orchestrator
+
+Video Production Buddy can present any substantive human interaction round as a local
+browser GenUI surface when linear chat is insufficient. The standard browser
+path is **GenUI**: an A2UI/CopilotKit React renderer catalog plus AG-UI
+event/session transport, backed by an agent-owned `ui_interaction_journal`,
+stage-aware routing policies, fixed workspace contracts, durable
+decision/resume metadata, operation events, cursor-addressable `events.jsonl`
+replay, `/events` streaming, a `/session.json` status document,
+response-only `/draft` autosave, conflict-safe source artifact hash checks, and
+a project cockpit snapshot.
+Before each substantive human interaction, the agent decides whether linear
+chat is sufficient. When a round needs visual
+demonstration, media review, side-by-side comparison, multi-axis selection,
+many options, or structured revision capture, the agent uses
+`genui_interaction` to route and synthesize a dynamic `ui_session_config`.
+`genui_session` compiles the config into renderer-only `view_spec.json`; the
+A2UI/CopilotKit catalog renders gate workspaces, media review rooms, cockpit,
+status sessions, and product interaction panels; the server validates the submitted
+`ui_session_response`; `genui_session` can report status, prepare replay,
+validate responses, and summarize submissions; then the agent writes canonical
+artifacts itself. Predecessor session wire artifacts remain compatible, and
+GenUI `genui_surface` + `json-render` remains an explicit compatibility
+fallback.
+
+Media review rooms materialize safe project-relative review assets from
+`asset_manifest`, `product_identity_reference`, `render_report`, and
+`final_review` into `/media/...` refs before rendering. The same materialization
+normalizes explicit paths under `renders/`, `assets/`, `reference_assets/`,
+`media/`, or `outputs/`. This keeps sample clips, generated video clips,
+audio/music, product references, concept images, keyframes, and final renders
+inside the GenUI review surface; manual folder opening is fallback only when the
+local browser path fails or the user declines it.
+
+GenUI does not change stage order, provider/runtime governance, review policy,
+checkpoint policy, or canonical artifact ownership. The local surface server must
+not write `enriched_brief`, `production_proposal`, `decision_log`, or
+checkpoints directly. `view_spec.json` is not a pipeline artifact and does not
+make artifact bindings executable. `ui_interaction_journal` is agent-owned
+routing/session lifecycle state and is never written by the browser.
 
 ---
 
@@ -134,6 +185,7 @@ Key queries:
 - `get_available()` — tools whose dependencies are satisfied
 - `find_fallback("elevenlabs_tts")` — resolve fallback chain
 - `support_envelope()` — full capability report for agent consumption
+- `provider_menu_summary()` — compact user-facing preflight menu with provider counts and composition runtime availability
 - `gpu_required_tools()`, `network_required_tools()`
 
 ### Selector Pattern
@@ -150,19 +202,25 @@ Selectors route based on: user preference when explicitly set, then scored ranki
 
 ### Tool Inventory by Category
 
-**Analysis (4):** transcriber (WhisperX), scene_detect, frame_sampler, video_understand (CLIP/BLIP-2)
+The live inventory is intentionally registry-driven. Use:
 
-**Audio (8):** elevenlabs_tts, google_tts, openai_tts, piper_tts, tts_selector, music_gen, audio_mixer, audio_enhance
+```bash
+python -c "from tools.tool_registry import registry; import json; registry.discover(); print(json.dumps(registry.provider_menu_summary(), indent=2))"
+```
 
-**Avatar (2):** talking_head (SadTalker/MuseTalk), lip_sync (Wav2Lip)
+Representative capability families:
 
-**Enhancement (5):** upscale (Real-ESRGAN), bg_remove (rembg/U2Net), face_enhance, face_restore (CodeFormer/GFPGAN), color_grade (FFmpeg LUTs)
-
-**Graphics (13):** flux_image, grok_image, google_imagen, openai_image, recraft_image, local_diffusion, pexels_image, pixabay_image, image_selector, code_snippet, diagram_gen, math_animate (ManimCE), image_gen (deprecated)
-
-**Subtitle (1):** subtitle_gen
-
-**Video (18):** grok_video, heygen_video, higgsfield_video, veo_video, kling_video, runway_video, minimax_video, wan_video, hunyuan_video, cogvideo_video, ltx_video_local, ltx_video_modal, pexels_video, pixabay_video, video_selector, video_compose (FFmpeg), video_stitch, video_trimmer
+| Capability | Examples |
+|------------|----------|
+| Analysis and transcription | `transcriber`, `qwen_asr`, `scene_detect`, `frame_sampler`, `video_analyzer`, `video_understand`, `visual_qa`, `audio_probe` |
+| TTS and audio | `tts_selector`, `elevenlabs_tts`, `google_tts`, `openai_tts`, `doubao_tts`, `cosyvoice_tts`, `piper_tts`, `audio_mixer`, `audio_enhance` |
+| Music | `music_gen`, `minimax_music`, `suno_music`, plus search helpers such as `pixabay_music` |
+| Image generation and graphics | `image_selector`, `flux_image`, `grok_image`, `google_imagen`, `openai_image`, `recraft_image`, `wanx_image`, `local_diffusion`, stock image tools, `code_snippet`, `diagram_gen`, `math_animate` |
+| Video generation | `video_selector`, `wan_video_api`, `seedance_video`, `grok_video`, `heygen_video`, `higgsfield_video`, `veo_video`, `kling_video`, `runway_video`, `minimax_video`, local GPU tools, and stock video tools |
+| Video post-production | `video_compose`, `hyperframes_compose`, `video_stitch`, `video_trimmer`, `auto_reframe`, green-screen tools, silence cutting, showcase cards |
+| Subtitles and captions | `subtitle_gen`, `remotion_caption_burn`, and the `tools.audio.subtitle_aligner` forced-alignment utility |
+| Validation and compliance | `provider_consistency_check`, `scene_fidelity_check`, `runtime_consistency_check`, `hallucination_contract_check`, `product_identity_consistency_check`, `sample_product_visibility_check`, `compliance_check` |
+| Interaction and planning support | `genui_interaction`, `genui_session`, `genui_surface`, `ad_knowledge_retriever`, source/clip acquisition tools, screen capture selectors, character-animation tools |
 
 ---
 
@@ -204,44 +262,139 @@ stages:
 
 | Pipeline | Category | Description |
 |----------|----------|-------------|
+| `ad-video` | custom | Ad/commercial pipeline with intake, strategic brief enrichment, product identity governance, sample approval, hallucination checks, and publish packaging |
 | `animated-explainer` | generated | AI-produced explainer with research, narration, visuals, music |
 | `animation` | animation | Motion graphics, kinetic typography |
-| `avatar-spokesperson` | talking_head | Avatar-driven presenter videos |
+| `avatar-spokesperson` | custom | Avatar-driven presenter videos |
 | `character-animation` | animation | Local rigged cartoon characters with SVG rigs, pose libraries, GSAP timelines, and HyperFrames rendering |
 | `cinematic` | cinematic | Trailer, teaser, mood-driven edits |
 | `clip-factory` | custom | Batch short-form clips from long source |
+| `documentary-montage` | documentary | Documentary-style montage from source media and supporting assets |
+| `framework-smoke` | custom | Minimal smoke test for framework validation |
 | `hybrid` | hybrid | Source footage + AI-generated support visuals |
 | `localization-dub` | custom | Subtitle, dub, and translate existing video |
-| `podcast-repurpose` | hybrid | Podcast highlights to video |
+| `podcast-repurpose` | custom | Podcast highlights to video |
 | `screen-demo` | screen_recording | Software screen recordings and walkthroughs |
 | `talking-head` | talking_head | Footage-led speaker videos |
-| `framework-smoke` | custom | Minimal smoke test for framework validation |
 
 ### Standard Stage Progression
 
-Most production pipelines follow a canonical 8-stage flow:
+The canonical top-level stage progression is:
 
 ```
 research → proposal → script → scene_plan → assets → edit → compose → publish
 ```
 
-Each stage:
+Pipelines should use those names for top-level stages when the work fits the
+common model. Specialized governance should be expressed as `sub_stages` under
+the nearest standard parent stage, not as a new top-level taxonomy. Stage and
+sub-stage ids must be lowercase snake_case without dots. Dotted ids are
+reserved for derived `<stage>.<sub_stage>` units emitted by manifest helpers and
+used for checkpoint/resume behavior.
+
+Each concrete stage:
 1. Has a **stage-director skill** (Markdown instructions for the agent)
-2. Declares **tools_available** (what the agent can call)
-3. **Produces** one or more canonical artifacts
+2. Declares **tools_available** (what the agent can call), when applicable
+3. **Produces** one or more canonical artifacts, when applicable
 4. Has **review_focus** criteria and **success_criteria**
 5. Can require **human approval** before proceeding
+6. Can own `sub_stages` whose child gates carry their own skills, artifacts,
+   tools, review criteria, approvals, and checkpoint policy
 
-Specialized pipelines may insert domain-specific stages. For example,
-`character-animation` adds `character_design` and `rig_plan` before
-`scene_plan`, then emits a HyperFrames workspace and final deliverable at
-`projects/<project-name>/renders/final.mp4`.
+For example, `ad-video` uses the common top-level flow and places its extra
+governance under `research` and `proposal`:
+
+```
+research.intake -> research.brief_enrichment -> research.intelligence
+-> proposal.bible -> proposal.idea -> proposal.technical_proposal
+-> script -> scene_plan -> assets -> edit -> compose -> publish
+```
+
+The parent stages keep common orchestration comparable; the child gates preserve
+the specialized business approvals and artifacts.
+
+The manifest in `pipeline_defs/<pipeline>.yaml` is the source of truth for
+stage order and canonical stage artifacts. Do not assume every pipeline ends in
+`publish`; `documentary-montage`, for example, currently ends at `compose`.
+
+### Project Workspaces and User Request Provenance
+
+Production runs write canonical state under `projects/<project-id>/`. Before
+research, planning, or paid generation, the agent records the user's original
+instruction as `USER_PROMPT.md` and `artifacts/user_request.json` through
+`lib.user_request.record_user_request(...)`. Later brief artifacts interpret
+that source request; they do not replace it.
+
+Generated media stays inside the project workspace:
+
+```
+projects/<project-id>/
+├── USER_PROMPT.md
+├── artifacts/      # Canonical JSON artifacts
+├── reference_assets/
+├── assets/
+└── renders/
+```
+
+### Governed Ad-Video Architecture
+
+The `ad-video` pipeline is a governed commercial-production flow, not a shorter
+topic-to-video pipeline. Its manifest-owned stage order is:
+
+```
+research -> proposal -> script -> scene_plan -> assets -> edit -> compose -> publish
+```
+
+Its checkpointable execution gates are:
+
+```
+research.intake -> research.brief_enrichment -> research.intelligence
+-> proposal.bible -> proposal.idea -> proposal.technical_proposal
+-> script -> scene_plan -> assets -> edit -> compose -> publish
+```
+
+Key contract surfaces:
+
+- `research.brief_enrichment`, `research.intelligence`, and `proposal.bible`
+  establish the approved strategy before execution. `research.intelligence`
+  retrieves curated producer doctrine through `ad_knowledge_retriever`;
+  `production_bible` carries the truth
+  contract, trend alignment, and professional-knowledge alignment that script
+  and scene_plan must reference.
+- `proposal.idea` selects the execution concept inside the approved bible.
+- `proposal.technical_proposal` locks technical choices: `style_mode`,
+  `render_runtime`, `product_reference_strategy`, audio/voice contract,
+  subtitles, derivatives, budget, and `decision_log`. Runtime selection must
+  consider both Remotion and HyperFrames when both are available.
+- Product-visible ads require an approved `product_identity_reference` before
+  product-visible generation, or an explicit user-approved `risk_accepted`
+  waiver. Text-only product-visible generation is not a silent fallback.
+- `assets` always has a sample approval sub-stage before full generation, then
+  explicit asset and music review gates before compose.
+- High-risk generated visuals carry scene-derived `hallucination_checks`; asset
+  review records start/mid/end keyframes and per-check verdicts. Blocker `FLAG`
+  verdicts cannot reach compose without regeneration, rerouting, or an approved
+  waiver in `decision_log`.
+- Compose and publish rerun cross-artifact checks such as
+  `ad_video_planning_chain_check`, `provider_consistency_check`,
+  `runtime_consistency_check`, `scene_fidelity_check`,
+  `product_identity_consistency_check`, `sample_product_visibility_check`, and
+  `hallucination_contract_check` where the manifest requires them.
+
+The professional-knowledge layer lives in `knowledge/ad-video/`. Knowledge
+cards cover 15 producer domains, including positioning, audience insight, hook
+mechanics, narrative arc, emotional rhythm, visual rhetoric, proof logic,
+product demo logic, platform format, commercial compliance, cinematography,
+color theory, editing technique, sound design, and music direction.
+`lib/ad_knowledge.py` retrieves these cards with field-weighted scoring, and
+planning checks enforce trend/knowledge conflict detection plus cross-domain
+co-presence where selected cards depend on each other.
 
 ---
 
 ## Checkpoint System
 
-Checkpoints persist pipeline state as JSON in the project's `pipeline/` directory.
+Checkpoints persist pipeline state as JSON in the project's `projects/` directory.
 
 ```json
 {
@@ -259,7 +412,7 @@ Checkpoints persist pipeline state as JSON in the project's `pipeline/` director
 }
 ```
 
-**Status values:** `pending` | `in_progress` | `awaiting_human` | `completed` | `failed`
+**Status values:** `in_progress` | `awaiting_human` | `completed` | `failed`
 
 **Checkpoint policies:**
 - `guided` — checkpoint at key creative stages, auto-proceed on mechanical ones
@@ -268,7 +421,7 @@ Checkpoints persist pipeline state as JSON in the project's `pipeline/` director
 
 **Functions:** `write_checkpoint()`, `read_checkpoint()`, `get_latest_checkpoint()`, `get_completed_stages()`, `get_next_stage()`
 
-### Canonical Artifacts (11 types, all JSON-schema validated)
+### Artifact Schemas (30 types, all JSON-schema validated)
 
 | Artifact | Stage | Contains |
 |----------|-------|----------|
@@ -283,6 +436,29 @@ Checkpoints persist pipeline state as JSON in the project's `pipeline/` director
 | `publish_log` | publish | Platform publication entries with status |
 | `review` | (any) | Reviewer feedback and approval records |
 | `cost_log` | (any) | Budget tracking entries |
+| `decision_log` | (any) | Governance decisions such as approved runtime/provider substitutions |
+| `visual_need_assessment` | human gate | GenUI dynamic routing decision with stage policy, schema strategy, mode, reasons, UI primitives, confidence, and fallback |
+| `ui_interaction_journal` | human gate | GenUI agent-owned journal of CLI-vs-browser routing, session lifecycle, response validation, replay/status state, event/session URLs, pending responses, stale sessions, and fallback reasons |
+| `ui_session_config` | human gate | GenUI/session-contract A2UI session surfaces, fixed workspace contracts, durable decision/resume metadata, operation events, media refs, issue lifecycle, trace refs, revision capture, approval contract, source hashes, draft policy, and framework metadata |
+| `ui_session_response` | human gate | Submitted GenUI/session-contract values, resume decisions, review completion status, conflict status, timecoded annotations, issue IDs, revision patches, approval attestations, interaction evidence, routing id, evidence status, and bounded event summary pending agent validation |
+| `ui_surface_config` | human gate | GenUI compatibility workspace/cockpit blocks, media refs, artifact refs, trace refs, revision capture, approval contract, and renderer-only visual hints |
+| `ui_surface_response` | human gate | Submitted GenUI compatibility values, annotations, selected refs, revision patches, approval attestations, and bounded event summary pending agent validation |
+| `user_request` | research.intake | Original user request captured for project provenance |
+| `intake_brief` | research.intake | Research-direction fields for ad/commercial workflows |
+| `enriched_brief` | research.brief_enrichment | Structured worksheet expanding sparse ad briefs before strategy |
+| `intelligence_brief` | research.intelligence | Category, audience, and competitive insight for ad strategy |
+| `production_bible` | proposal.bible | Approved ad strategy, truth contract, motif, audio, and compliance contract |
+| `idea_options` | proposal.idea | Execution concepts constrained by an approved production bible |
+| `production_proposal` | proposal.technical_proposal | Ad technical plan, runtime, audio, visual, budget, and variants |
+| `product_identity_reference` | assets | Approved visual reference strategy for product-visible ads |
+| `character_design` | character_design | Character specifications for local rigged animation |
+| `rig_plan` | rig_plan | SVG rig structure, parts, pivots, and animation constraints |
+| `pose_library` | rig_plan | Reusable poses/action cycles for character animation |
+| `action_timeline` | scene_plan/assets | Timed character actions compiled from scene intent |
+| `source_media_review` | preplanning | Source-media suitability and constraints before planning |
+| `final_review` | compose | Final self-review before presenting a render |
+| `character_qa_report` | compose | Character-animation schema, rig, pose, and timeline QA |
+| `video_analysis_brief` | reference input | External/reference video analysis carried into planning |
 
 ---
 
@@ -320,12 +496,12 @@ reconcile(entry_id, $)     # records actual spend
 ## 3-Layer Knowledge Architecture
 
 ```
-Layer 3: .agents/skills/          External technology knowledge (47 skills)
+Layer 3: .agents/skills/          Generated external technology knowledge skills
          "How the technology works"    FFmpeg, ElevenLabs API, FLUX, Remotion, Three.js, etc.
               ^
               | agent_skills[] references
               |
-Layer 2: skills/                  OpenMontage conventions
+Layer 2: skills/                  Video Production Buddy conventions
          "How this project uses the tech"  Pipeline integration, quality checklists, artifact mappings
               ^
               | stage skill references
@@ -338,6 +514,10 @@ Each tool's `agent_skills[]` field links Layer 1 to Layers 2 and 3. For example:
 - `video_compose.agent_skills = ["remotion-best-practices", "remotion", "ffmpeg"]`
 - `tts_selector.agent_skills = ["text-to-speech", "elevenlabs", "openai-docs"]`
 
+Layer 3 component dependencies are declared in `.agents/components.yaml`, pinned
+in `.agents/components.lock.json`, and materialized with
+`python -m lib.agent_components install --profile default --frozen`.
+
 ---
 
 ## Configuration
@@ -347,6 +527,7 @@ Each tool's `agent_skills[]` field links Layer 1 to Layers 2 and 3. For example:
 ```yaml
 llm:
   provider: anthropic
+  model: null
   temperature: 0.7
   max_tokens: 4096
 
@@ -355,10 +536,11 @@ budget:
   total_usd: 10.00
   reserve_pct: 0.10
   single_action_approval_usd: 0.50
+  require_approval_for_new_paid_tool: true
 
 checkpoint:
   policy: guided
-  storage_dir: pipeline
+  storage_dir: projects
 
 output:
   default_format: mp4
@@ -369,11 +551,11 @@ output:
   default_crf: 23
 
 paths:
-  pipeline_dir: pipeline
-  library_dir: library
+  pipeline_dir: pipeline_defs
+  library_dir: lib
   styles_dir: styles
   skills_dir: skills
-  output_dir: output
+  output_dir: projects
 ```
 
 All config is validated via Pydantic models in `lib/config_model.py`.
@@ -385,16 +567,26 @@ All config is validated via Pydantic models in `lib/config_model.py`.
 | `ELEVENLABS_API_KEY` | elevenlabs_tts, music_gen | TTS, music, sound effects |
 | `OPENAI_API_KEY` | openai_tts, openai_image | TTS fallback, DALL-E 3 |
 | `XAI_API_KEY` | grok_image, grok_video | Grok image editing/generation, Grok video generation |
-| `FAL_KEY` | flux_image, kling_video, veo_video, minimax_video, recraft_image | fal.ai hosted models (FLUX, Veo, Kling, MiniMax, Recraft) |
+| `FAL_KEY` / `FAL_AI_API_KEY` | flux_image, recraft_image, seedance_video, kling_video, veo_video, minimax_video | fal.ai hosted image/video models |
+| `DASHSCOPE_API_KEY` | cosyvoice_tts, qwen_asr, wan_video_api, wanx_image | Alibaba Cloud Bailian / DashScope Qwen TTS/ASR and Wan/Wanxiang image/video generation |
+| `DOUBAO_SPEECH_API_KEY` + `DOUBAO_SPEECH_VOICE_TYPE` | doubao_tts | Volcengine Doubao Speech TTS and default voice |
 | `HEYGEN_API_KEY` | heygen_video | Multi-provider video generation |
 | `PEXELS_API_KEY` | pexels_image, pexels_video | Stock media |
 | `PIXABAY_API_KEY` | pixabay_image, pixabay_video | Stock media |
-| `GOOGLE_API_KEY` | google_imagen, google_tts | Google Imagen images, Google Cloud TTS |
-| `RUNWAY_API_KEY` | runway_video | Runway Gen-3/Gen-4 direct |
-| `HIGGSFIELD_API_KEY` + `HIGGSFIELD_API_SECRET` | higgsfield_video | Higgsfield multi-model video |
+| `UNSPLASH_ACCESS_KEY`, `COVERR_API_KEY`, `VIDEVO_API_KEY`, `NASA_API_KEY`, `NARA_API_KEY`, `POND5_API_KEY` | source/clip acquisition | Optional stock-source search keys and higher-rate public-media access |
+| `FREESOUND_API_KEY` | freesound_music | Freesound music and sound search |
+| `GOOGLE_API_KEY` / `GEMINI_API_KEY` | google_imagen, google_tts | Google Imagen images, Google Cloud TTS |
+| `RUNWAY_API_KEY` / `RUNWAYML_API_SECRET` | runway_video | Runway direct video generation |
+| `REPLICATE_API_TOKEN` | seedance_replicate | Replicate-hosted Seedance video |
+| `HIGGSFIELD_API_KEY` + `HIGGSFIELD_API_SECRET` / `HIGGSFIELD_KEY` | higgsfield_video | Higgsfield multi-model video |
+| `MINIMAX_API_KEY` | minimax_music | MiniMax Music 2.6 and music-cover generation |
+| `SUNO_API_KEY` | suno_music | Suno music generation |
 | `MODAL_LTX2_ENDPOINT_URL` | ltx_video_modal | Self-hosted LTX-2 |
 | `VIDEO_GEN_LOCAL_ENABLED` | local video tools | Enable local GPU generation |
 | `VIDEO_GEN_LOCAL_MODEL` | wan, hunyuan, ltx, cogvideo | Select local model |
+| `HF_TOKEN` | transcriber | Optional HuggingFace token for speaker diarization |
+| `SADTALKER_PATH`, `WAV2LIP_PATH` | talking_head, lip_sync | Local avatar/lip-sync repository locations |
+| `VIDEO_PRODUCTION_BUDDY_CACHE_DIR`, `VIDEO_PRODUCTION_BUDDY_CACHE_MAX_GB`, `SUBTITLE_ALIGNER_DEVICE` | cache and subtitle alignment utilities | Optional local runtime tuning |
 
 ---
 
@@ -402,6 +594,8 @@ All config is validated via Pydantic models in `lib/config_model.py`.
 
 Style playbooks in `styles/` define visual language for pipelines:
 
+- `ad-brand.yaml` — Commercial/product-campaign look with CTA emphasis
+- `anime-ghibli.yaml` — Warm anime illustration for narrative animation
 - `clean-professional.yaml` — Corporate, polished look
 - `flat-motion-graphics.yaml` — Modern flat design
 - `minimalist-diagram.yaml` — Technical, minimal diagrams
@@ -431,7 +625,7 @@ Each profile specifies codec, audio codec, CRF, pixel format, max file size, max
 
 ## Composition Runtimes
 
-OpenMontage has a multi-runtime composition layer. Three engines live behind `video_compose`, chosen at proposal and locked in `edit_decisions.render_runtime`:
+Video Production Buddy has a multi-runtime composition layer. Three engines live behind `video_compose`, chosen at proposal and locked in `edit_decisions.render_runtime`:
 
 ### Remotion (React-based)
 
@@ -439,6 +633,7 @@ A standalone Node.js/React subproject in `remotion-composer/` using [Remotion](h
 
 - **React 18** + **Remotion 4.0** + **TypeScript 5.3**
 - Handles the existing scene-component stack (`text_card`, `stat_card`, charts, captions, `TalkingHead`, `CinematicRenderer`)
+- Dependencies are locked with `pnpm-lock.yaml`; use `make install-remotion` or `cd remotion-composer && npx --yes pnpm install --frozen-lockfile`
 - Scripts: `start` (studio), `build` (render), `upgrade`
 
 ### HyperFrames (HTML/CSS/GSAP)
@@ -447,7 +642,7 @@ Consumed via `npx hyperframes` (no monorepo checkout needed). Runtime floor: Nod
 
 - Handles kinetic typography, product promos, launch reels, website-to-video, registry blocks, and SVG/GSAP character rigs
 - Driver: `tools/video/hyperframes_compose.py` materializes a workspace under `projects/<name>/hyperframes/`, then runs `lint → validate → render`
-- Layer 3 skills vendored at `.agents/skills/hyperframes*/`; Layer 2 guide at `skills/core/hyperframes.md`
+- Layer 3 skills materialize at `.agents/skills/hyperframes*/` from the locked component manifest; Layer 2 guide at `skills/core/hyperframes.md`
 - The `character-animation` pipeline uses HyperFrames as the production render package. Browser previews are QA/debug artifacts only, not the render path.
 
 ### FFmpeg (fallback / simple cuts)

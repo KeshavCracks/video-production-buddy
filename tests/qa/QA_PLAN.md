@@ -4,18 +4,17 @@
 
 Run every tool with real API keys, inspect outputs (see images, listen to audio, watch video), find gaps, fix them. This is the gate before calling Phase 3.5 "Verified."
 
-## Test Scripts (all ready to run)
+## Current QA Scripts
 
 | Script | Tools Tested | API Keys Used | Est. Cost |
 |--------|-------------|---------------|-----------|
-| `test_01_tts.py` | `elevenlabs_tts` (ElevenLabs) | ELEVENLABS_API_KEY | ~$0.02 |
-| `test_02_image_gen.py` | `image_gen` (DALL-E 3 + FLUX) | OPENAI_API_KEY, FAL_AI_API_KEY | ~$0.15 |
-| `test_03_music.py` | `music_gen` (ElevenLabs) | ELEVENLABS_API_KEY | ~$0.10 |
 | `test_04_audio_mix.py` | `audio_mixer` | None (ffmpeg only) | $0 |
 | `test_05_video_compose.py` | `video_compose` | None (ffmpeg only) | $0 |
 | `test_06_video_stitch.py` | `video_stitch` | None (ffmpeg only) | $0 |
 | `test_07_playbook_intelligence.py` | `playbook_loader.py` functions | None (pure Python) | $0 |
 | `test_08_end_to_end.py` | Full animated-explainer pipeline | None (ffmpeg fixtures) | $0 |
+| `test_09_hyperframes_compose.py` | HyperFrames scaffold/lint/validate/render | None (local CLI; opt-in) | $0 |
+| `test_phase2_comparison.py` | Phase 1 vs Phase 2 media comparison | None (ffmpeg fixtures) | $0 |
 
 ## Inspection Protocol
 
@@ -41,30 +40,29 @@ For each output:
 ## Run Order
 
 ```bash
-cd C:/Users/ishan/Documents/OpenMontage
+cd C:/Users/ishan/Documents/Video Production Buddy
 
-# Phase 1: Individual tools (can run in parallel)
-python tests/qa/test_01_tts.py
-python tests/qa/test_02_image_gen.py
-python tests/qa/test_03_music.py
-
-# Phase 2: Composition (depends on Phase 1 outputs)
+# Phase 1: Composition fixtures and inspectable outputs
 python tests/qa/test_04_audio_mix.py
 python tests/qa/test_05_video_compose.py
 python tests/qa/test_06_video_stitch.py
+python -m pytest tests/qa/test_phase2_comparison.py -v
 
-# Phase 3: Intelligence validation (no API calls)
+# Phase 2: Intelligence validation (no API calls)
 python tests/qa/test_07_playbook_intelligence.py
 
-# Phase 4: Full pipeline
+# Phase 3: Full pipeline
 python tests/qa/test_08_end_to_end.py
+
+# Optional HyperFrames runtime QA
+HYPERFRAMES_QA=1 python -m pytest tests/qa/test_09_hyperframes_compose.py -v
 ```
 
 ## Success Criteria
 
-- [ ] All 3 TTS samples: clear speech, correct content, no artifacts, ≥44.1kHz
-- [ ] All 4 images: match prompt intent, correct dimensions, no watermarks, good composition
-- [ ] Both music tracks: match mood prompt, correct duration (±2s), no abrupt cuts
+- [ ] Generated narration fixtures: clear speech, correct content, no artifacts, ≥44.1kHz
+- [ ] Generated image fixtures: match prompt intent, correct dimensions, no watermarks, good composition
+- [ ] Music fixtures: match mood prompt, correct duration (±2s), no abrupt cuts
 - [ ] Audio mix: speech clearly above music, ducking smooth, no clipping
 - [ ] Video compose: A/V sync within 50ms, correct resolution, playable in VLC
 - [ ] Video stitch: smooth transitions, no frame drops, PIP correctly positioned

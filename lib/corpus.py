@@ -30,6 +30,8 @@ implements the operations the agent names.
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -133,52 +135,63 @@ class Corpus:
         self._id_to_row = {}
         if self.index_path.is_file():
             with open(self.index_path, encoding="utf-8") as f:
-                for i, line in enumerate(f):
+                for line in f:
                     line = line.strip()
                     if not line:
                         continue
                     data = json.loads(line)
                     rec = ClipRecord(**data)
                     self.records.append(rec)
-                    self._id_to_row[rec.clip_id] = i
 
-        if self.embed_path.is_file():
-            self.clip_embeddings = np.load(self.embed_path)
-        else:
-            self.clip_embeddings = np.zeros((0, EMBED_DIM), dtype=np.float32)
+        self.clip_embeddings = _load_embedding_bank(self.embed_path)
+        self.tag_embeddings = _load_embedding_bank(self.tag_embed_path)
 
-        if self.tag_embed_path.is_file():
-            self.tag_embeddings = np.load(self.tag_embed_path)
-        else:
-            self.tag_embeddings = np.zeros((0, EMBED_DIM), dtype=np.float32)
-
-        # Sanity check: if JSONL and .npy drifted out of sync (e.g. crash
-        # mid-add), we truncate to the shorter length so subsequent adds
-        # don't alias to the wrong rows.
-        n = min(len(self.records), self.clip_embeddings.shape[0], self.tag_embeddings.shape[0])
+        # Sanity check: if JSONL and the required visual embedding bank drifted
+        # out of sync (e.g. crash mid-add), truncate to the shorter length so
+        # subsequent adds don't alias to the wrong rows. The tag bank is
+        # auxiliary and can be backfilled with zeros for older/partial corpora.
+        n = min(len(self.records), self.clip_embeddings.shape[0])
         if n != len(self.records):
             self.records = self.records[:n]
-            self._id_to_row = {r.clip_id: i for i, r in enumerate(self.records)}
         if self.clip_embeddings.shape[0] != n:
             self.clip_embeddings = self.clip_embeddings[:n]
-        if self.tag_embeddings.shape[0] != n:
+        if self.tag_embeddings.shape[0] < n:
+            padded = np.zeros((n, EMBED_DIM), dtype=np.float32)
+            if self.tag_embeddings.shape[0] > 0:
+                padded[: self.tag_embeddings.shape[0]] = self.tag_embeddings
+            self.tag_embeddings = padded
+        elif self.tag_embeddings.shape[0] != n:
             self.tag_embeddings = self.tag_embeddings[:n]
+        self._id_to_row = {r.clip_id: i for i, r in enumerate(self.records)}
 
     def save(self) -> None:
         """Persist index + both embedding stacks atomically-ish."""
         self.ensure_dirs()
 
-        # JSONL first — if a crash interrupts the .npy writes the JSONL
-        # is the source of truth for what exists, and load() will
-        # auto-truncate the embeddings to match.
-        tmp_index = self.index_path.with_suffix(".jsonl.tmp")
-        with open(tmp_index, "w", encoding="utf-8") as f:
-            for rec in self.records:
-                f.write(json.dumps(asdict(rec)) + "\n")
-        tmp_index.replace(self.index_path)
+        tmp_paths: list[Path] = []
+        try:
+            tmp_index = _temp_sibling(self.index_path, ".jsonl.tmp")
+            tmp_paths.append(tmp_index)
+            with open(tmp_index, "w", encoding="utf-8") as f:
+                for rec in self.records:
+                    f.write(json.dumps(asdict(rec)) + "\n")
 
-        np.save(self.embed_path, self.clip_embeddings)
-        np.save(self.tag_embed_path, self.tag_embeddings)
+            tmp_embed = _temp_sibling(self.embed_path, ".npy")
+            tmp_tag_embed = _temp_sibling(self.tag_embed_path, ".npy")
+            tmp_paths.extend([tmp_embed, tmp_tag_embed])
+            np.save(tmp_embed, self.clip_embeddings)
+            np.save(tmp_tag_embed, self.tag_embeddings)
+
+            tmp_embed.replace(self.embed_path)
+            tmp_tag_embed.replace(self.tag_embed_path)
+            tmp_index.replace(self.index_path)
+        finally:
+            for path in tmp_paths:
+                try:
+                    if path.exists():
+                        path.unlink()
+                except OSError:
+                    pass
 
     # ------------------------------------------------------------------
     # Mutation
@@ -394,9 +407,17 @@ class Corpus:
         are visually redundant. Returns the ordered clip_ids to keep;
         order matches pick order.
         """
+        if n <= 0:
+            return []
         if not candidate_ids:
             return []
-        idxs = [self._id_to_row[c] for c in candidate_ids if c in self._id_to_row]
+        seen: set[str] = set()
+        idxs: list[int] = []
+        for clip_id in candidate_ids:
+            if clip_id in seen or clip_id not in self._id_to_row:
+                continue
+            seen.add(clip_id)
+            idxs.append(self._id_to_row[clip_id])
         if not idxs:
             return []
 
@@ -422,3 +443,28 @@ class Corpus:
             remaining.remove(best_i)
 
         return [self.records[i].clip_id for i in picked]
+
+
+def _load_embedding_bank(path: Path) -> np.ndarray:
+    """Load an embedding bank as a two-dimensional float32 matrix."""
+    if not path.is_file():
+        return np.zeros((0, EMBED_DIM), dtype=np.float32)
+    try:
+        arr = np.load(path).astype(np.float32, copy=False)
+    except (OSError, ValueError, EOFError):
+        return np.zeros((0, EMBED_DIM), dtype=np.float32)
+    if arr.ndim == 1 and arr.shape[0] == EMBED_DIM:
+        return arr.reshape(1, EMBED_DIM)
+    if arr.ndim == 2 and arr.shape[1] == EMBED_DIM:
+        return arr
+    return np.zeros((0, EMBED_DIM), dtype=np.float32)
+
+
+def _temp_sibling(path: Path, suffix: str) -> Path:
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=suffix, dir=path.parent)
+    try:
+        os.close(fd)
+    except OSError:
+        pass
+    Path(tmp_name).unlink()
+    return Path(tmp_name)

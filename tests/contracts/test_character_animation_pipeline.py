@@ -169,6 +169,12 @@ def test_character_animation_smoke_flow(tmp_path):
     preview_html = preview_path.read_text(encoding="utf-8")
     assert "character_mouse-lead" in preview_html
     assert "character_bird-friend" in preview_html
+    assert "https://cdn.jsdelivr.net/npm/gsap@" in preview_html
+    assert "gsap.min.js" in preview_html
+    composition_html = Path(render_result.data["composition_path"]).read_text(
+        encoding="utf-8"
+    )
+    assert "https://cdn.jsdelivr.net" not in composition_html
 
     qa_result = CharacterAnimationReviewer().execute(
         {
@@ -257,6 +263,13 @@ def test_character_renderer_can_handoff_to_video_compose(tmp_path):
     validate_artifact("edit_decisions", render_result.data["edit_decisions"])
     assert render_result.data["edit_decisions"]["render_runtime"] == "hyperframes"
     assert Path(render_result.data["composition_path"]).exists()
+    composition_html = Path(render_result.data["composition_path"]).read_text(
+        encoding="utf-8"
+    )
+    preview_html = Path(render_result.data["preview_path"]).read_text(encoding="utf-8")
+    assert "https://cdn.jsdelivr.net" not in composition_html
+    assert "https://cdn.jsdelivr.net/npm/gsap@" in preview_html
+    assert "gsap.min.js" in preview_html
 
     output_path = tmp_path / "renders" / "final.mp4"
     compose_result = VideoCompose().execute(

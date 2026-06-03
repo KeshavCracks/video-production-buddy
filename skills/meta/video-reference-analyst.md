@@ -113,10 +113,14 @@ See `skills/creative/video-gen-prompting.md` for primitive definitions and the c
 Run standard preflight:
 
 ```bash
-python -c "from tools.tool_registry import registry; import json; registry.discover(); print(json.dumps(registry.support_envelope(), indent=2))"
-python -c "from tools.tool_registry import registry; import json; registry.discover(); print(json.dumps(registry.provider_menu(), indent=2))"
-python -c "from tools.tool_registry import registry; import json; registry.discover(); print(json.dumps(registry.capability_catalog(), indent=2))"
+python -c "from tools.tool_registry import registry; import json; registry.discover(); print(json.dumps(registry.provider_menu_summary(), indent=2))"
 ```
+
+Use `provider_menu_summary()` for the capability table below. If a gap looks
+fixable, call `registry.provider_menu()` next and read the exact
+`install_instructions` for the relevant unavailable tools. Use
+`support_envelope()` only for debugging when the menu fields do not explain a
+tool state.
 
 Map the reference video's requirements against available capabilities:
 

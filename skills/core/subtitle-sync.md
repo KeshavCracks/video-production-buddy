@@ -6,11 +6,18 @@ Use the `subtitle_gen` tool to convert transcript data (from `transcriber`)
 into properly timed subtitle files. This skill covers timing strategy,
 formatting, and readability for both vertical and horizontal video.
 
-## Tool
+Use the local `subtitle_aligner` CLI utility when subtitles must follow generated
+TTS audio precisely. It forced-aligns each audio segment against the known script
+text and writes ASS subtitles with real word timing. This is stronger than
+estimating cue timing from script word counts. It is not a registry-discovered
+`BaseTool`; run it with `python -m tools.audio.subtitle_aligner`.
+
+## Tool / Utility
 
 | Tool | Capability |
 |------|-----------|
 | `subtitle_gen` | Generate SRT, VTT, or caption JSON from word-level timestamps |
+| `subtitle_aligner` | Local CLI utility: forced-align TTS audio segments and emit PlayRes-safe ASS subtitles |
 
 ## Output Formats
 
@@ -19,6 +26,7 @@ formatting, and readability for both vertical and horizontal video.
 | SRT | `.srt` | Universal — works with FFmpeg, players, YouTube upload |
 | VTT | `.vtt` | Web-native — HTML5 video, browser playback |
 | Caption JSON | `.caption.json` | Programmatic — word-level data for custom renderers |
+| ASS | `.ass` | Burn-in with predictable PlayRes, font size, margins, and outline |
 
 ## Cue Length by Format
 
@@ -43,6 +51,11 @@ formatting, and readability for both vertical and horizontal video.
 
 When burning subtitles via `video_compose`, these parameters are passed as ASS
 `force_style`. Use the correct ASS color format: `&HAABBGGRR` (not hex RGB).
+
+For ASS files generated directly by `subtitle_aligner`, preserve the PlayResX /
+PlayResY header that matches the final render resolution. Do not convert the ASS
+to SRT before burn-in; SRT lacks PlayRes and libass may scale margins and font
+sizes against a tiny default canvas.
 
 ### Vertical Video (1080x1920)
 
