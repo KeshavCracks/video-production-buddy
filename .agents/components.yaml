@@ -50,9 +50,11 @@ profiles:
     - setup-api-key
     - sound-effects
     - speech-to-text
+    - stock-sourcing
     - svg-character-animation
     - synthetic-screen-recording
     - tailwind-design-system
+    - text-generation
     - text-to-speech
     - threejs-animation
     - threejs-fundamentals
@@ -145,9 +147,11 @@ sources:
       setup-api-key: {kind: skill, path: setup-api-key}
       sound-effects: {kind: skill, path: sound-effects}
       speech-to-text: {kind: skill, path: speech-to-text}
+      stock-sourcing: {kind: skill, path: stock-sourcing}
       svg-character-animation: {kind: skill, path: svg-character-animation}
       synthetic-screen-recording: {kind: skill, path: synthetic-screen-recording}
       tailwind-design-system: {kind: skill, path: tailwind-design-system}
+      text-generation: {kind: skill, path: text-generation}
       text-to-speech: {kind: skill, path: text-to-speech}
       threejs-animation: {kind: skill, path: threejs-animation}
       threejs-fundamentals: {kind: skill, path: threejs-fundamentals}

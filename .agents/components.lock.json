@@ -381,23 +381,23 @@
         {
           "mode": "100644",
           "path": "references/colour-schemes.md",
-          "sha256": "sha256:3db0ecfc0bd489ecd63f5a0ab560215bcd84e2c6bb69cce991a86bca09a00d9d"
+          "sha256": "sha256:84205e73bec30b6b050f6bf8c2336c44b9d05104c5ce6b4c4f0d9993e8dbc0bb"
         },
         {
           "mode": "100644",
           "path": "references/d3-patterns.md",
-          "sha256": "sha256:9e3a63dc969180568bd2fb90c7142da1147723ff49ec76dfaae6a6cdec6ad1f3"
+          "sha256": "sha256:11acd7fe979cc22e9dc0ee56f8c7215b439789bbb82f47d3b5797390cc353cf7"
         },
         {
           "mode": "100644",
           "path": "references/scale-reference.md",
-          "sha256": "sha256:89a9bad41f6a4057b7ac0ee29206dfb6e77836247d75f04773679e532b3f3619"
+          "sha256": "sha256:98884a1a19582da89f6ec3fbd15d2e2d5e1d7197b9679e25ee27116452c7ed81"
         }
       ],
       "kind": "skill",
       "source": "video-production-buddy-local",
       "sourcePath": ".agents/local/skills/d3-viz",
-      "treeSha256": "sha256:4b6298523204011a7582158fdaf31648539619bb0a6683a65f345a0b519f96fc",
+      "treeSha256": "sha256:9f5f3e152cfae6731c25c4f75701327382d317f636dd4f0ea65b550c5da94ea9",
       "type": "local"
     },
     "doubao-tts": {
@@ -2301,6 +2301,20 @@
       "treeSha256": "sha256:77a009e01651bb3df22d905f6b6b36ceea5dcf149aef3df2343bcc32ccd45a83",
       "type": "local"
     },
+    "stock-sourcing": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:91f1a4d13be9c9c45a14c024d4c58d554f68c1930558a37f8475e6726d19b26e"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/stock-sourcing",
+      "treeSha256": "sha256:0d179ba391e493c5e1e39d19f271a7fb333b18f24d6a16f7dbcb0a8ffa69d077",
+      "type": "local"
+    },
     "svg-character-animation": {
       "files": [
         {
@@ -2341,6 +2355,20 @@
       "source": "video-production-buddy-local",
       "sourcePath": ".agents/local/skills/tailwind-design-system",
       "treeSha256": "sha256:6425a6ecbaba1275decf84ce8bae4e6d40ce9c482a51c985a8afd37388f395ee",
+      "type": "local"
+    },
+    "text-generation": {
+      "files": [
+        {
+          "mode": "100644",
+          "path": "SKILL.md",
+          "sha256": "sha256:0c538403868f73857b55da02a78950569e59b1052cdc150968c6deb580b7327d"
+        }
+      ],
+      "kind": "skill",
+      "source": "video-production-buddy-local",
+      "sourcePath": ".agents/local/skills/text-generation",
+      "treeSha256": "sha256:793d86d147815261fe39a8fbf906484a0f0d69ce5f682ed56d8684b20e7f1086",
       "type": "local"
     },
     "text-to-speech": {

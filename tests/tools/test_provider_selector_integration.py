@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import jsonschema
+import pytest
+
 from tools.base_tool import ToolResult
 from lib.scoring import ProviderScore
 from tools.audio.openai_tts import OpenAITTS
@@ -18,8 +21,10 @@ class _AvailableProviderTool:
         self.name = name
         self.provider = provider
         self.best_for = []
+        self.agent_skills = []
         self.input_schema = {"properties": {"prompt": {"type": "string"}}}
         self.supports = {}
+        self.calls: list[dict[str, object]] = []
 
     def get_status(self):
         from tools.base_tool import ToolStatus
@@ -30,14 +35,41 @@ class _AvailableProviderTool:
         return {
             "name": self.name,
             "provider": self.provider,
-            "agent_skills": [],
+            "agent_skills": self.agent_skills,
             "usage_location": __file__,
             "best_for": self.best_for,
             "supports": self.supports,
         }
 
     def execute(self, inputs: dict[str, object]) -> ToolResult:
+        self.calls.append(dict(inputs))
         return ToolResult(success=True, data={"inputs": inputs})
+
+
+class _BrokenStatusProviderTool(_AvailableProviderTool):
+    def get_status(self):
+        raise RuntimeError(f"{self.name} status backend unavailable")
+
+
+def _component_has_skill_source(component) -> bool:
+    if component.source_type == "local":
+        return (component.source_path / "SKILL.md").exists()
+    return bool(component.url)
+
+
+def test_selector_schemas_require_output_path_for_generation_but_not_rank() -> None:
+    cases = [
+        (TTSSelector(), {"text": "Narration line."}),
+        (ImageSelector(), {"prompt": "Product key visual"}),
+        (VideoSelector(), {"prompt": "Product launch shot"}),
+    ]
+
+    for selector, generation_inputs in cases:
+        with pytest.raises(jsonschema.ValidationError):
+            jsonschema.validate(instance=generation_inputs, schema=selector.input_schema)
+
+        rank_inputs = {**generation_inputs, "operation": "rank"}
+        jsonschema.validate(instance=rank_inputs, schema=selector.input_schema)
 
 
 def test_image_selector_maps_edit_inputs_to_wanx_contract(monkeypatch, tmp_path):
@@ -62,12 +94,14 @@ def test_image_selector_maps_edit_inputs_to_wanx_contract(monkeypatch, tmp_path)
             "image_path": str(source),
             "preferred_provider": "bailian",
             "allowed_providers": ["bailian"],
+            "output_path": "projects/demo/assets/images/edited-product.png",
         }
     )
 
     assert result.success
     assert captured["operation"] == "image_editing"
     assert captured["base_image_path"] == str(source)
+    assert captured["output_path"] == "projects/demo/assets/images/edited-product.png"
 
 
 def test_video_selector_passes_local_reference_path_to_wan_api_without_fal_upload(
@@ -98,11 +132,13 @@ def test_video_selector_passes_local_reference_path_to_wan_api_without_fal_uploa
             "reference_image_path": str(source),
             "preferred_provider": "bailian",
             "allowed_providers": ["bailian"],
+            "output_path": "projects/demo/assets/video/product-frame.mp4",
         }
     )
 
     assert result.success
     assert captured["image_path"] == str(source)
+    assert captured["output_path"] == "projects/demo/assets/video/product-frame.mp4"
 
 
 def test_video_selector_selects_highest_ranked_tool_when_provider_has_multiple_tools(monkeypatch):
@@ -200,6 +236,242 @@ def test_tts_selector_selects_highest_ranked_tool_when_provider_has_multiple_too
     assert score.tool_name == "high_ranked_voice"
 
 
+@pytest.mark.parametrize(
+    ("selector", "artifact_key", "artifact_path"),
+    [
+        (
+            ImageSelector(),
+            "image",
+            "projects/demo/assets/images/selector-image.png",
+        ),
+        (
+            VideoSelector(),
+            "video",
+            "projects/demo/assets/video/selector-video.mp4",
+        ),
+    ],
+)
+def test_media_selector_generation_success_payload_matches_output_schema(
+    selector,
+    artifact_key: str,
+    artifact_path: str,
+    monkeypatch,
+):
+    provider = _AvailableProviderTool(f"{selector.name}_provider", provider="selected")
+    provider.agent_skills = ["media-generation"]
+    provider.best_for = [f"{artifact_key} generation"]
+    provider.input_schema = {
+        "properties": {
+            "prompt": {"type": "string"},
+            "output_path": {"type": "string"},
+        }
+    }
+
+    def fake_execute(inputs: dict[str, object]) -> ToolResult:
+        provider.calls.append(dict(inputs))
+        return ToolResult(
+            success=True,
+            data={
+                "provider": "selected",
+                "output": artifact_path,
+                "output_path": artifact_path,
+            },
+            artifacts=[artifact_path],
+        )
+
+    monkeypatch.setattr(provider, "execute", fake_execute)
+    monkeypatch.setattr(selector, "_providers", lambda: [provider])
+    monkeypatch.setattr(
+        "lib.scoring.rank_providers",
+        lambda candidates, _ctx: [
+            ProviderScore(tool_name=tool.name, provider=tool.provider, task_fit=1.0)
+            for tool in candidates
+        ],
+    )
+
+    output_properties = selector.output_schema["properties"]
+    assert {
+        "output",
+        "output_path",
+        "selected_tool",
+        "selected_provider",
+        "selection_reason",
+        "provider_score",
+        "selected_tool_agent_skills",
+        "required_agent_skills",
+        "selected_tool_usage_location",
+        "selected_tool_best_for",
+        "alternatives_considered",
+    } <= set(output_properties)
+
+    result = selector.execute(
+        {
+            "prompt": f"Generate a {artifact_key} asset.",
+            "preferred_provider": "selected",
+            "allowed_providers": ["selected"],
+            "output_path": artifact_path,
+        }
+    )
+
+    assert result.success is True
+    assert result.data["selected_tool"] == provider.name
+    assert result.data["selected_provider"] == "selected"
+    assert result.data["required_agent_skills"] == ["media-generation"]
+    assert result.data["selected_tool_best_for"] == [f"{artifact_key} generation"]
+    assert result.data["output_path"] == artifact_path
+    assert result.artifacts == [artifact_path]
+    jsonschema.validate(instance=result.data, schema=selector.output_schema)
+
+
+@pytest.mark.parametrize(
+    ("selector", "inputs"),
+    [
+        (ImageSelector(), {"prompt": "Product render", "operation": "rank"}),
+        (VideoSelector(), {"prompt": "Product clip", "operation": "rank"}),
+    ],
+)
+def test_media_selector_rank_success_payload_matches_output_schema(
+    selector,
+    inputs: dict[str, object],
+    monkeypatch,
+):
+    provider = _AvailableProviderTool(f"{selector.name}_provider", provider="selected")
+    monkeypatch.setattr(selector, "_providers", lambda: [provider])
+    monkeypatch.setattr(
+        "lib.scoring.rank_providers",
+        lambda candidates, _ctx: [
+            ProviderScore(tool_name=tool.name, provider=tool.provider, task_fit=1.0)
+            for tool in candidates
+        ],
+    )
+
+    output_properties = selector.output_schema["properties"]
+    assert {
+        "rankings",
+        "explanation",
+        "normalized_task_context",
+    } <= set(output_properties)
+
+    result = selector.execute(inputs)
+
+    assert result.success is True
+    assert result.data["rankings"][0]["tool_name"] == provider.name
+    jsonschema.validate(instance=result.data, schema=selector.output_schema)
+
+
+def test_selectors_skip_providers_when_status_check_fails(monkeypatch):
+    selector_cases = [
+        (VideoSelector(), {"prompt": "cinematic product launch"}),
+        (ImageSelector(), {"prompt": "product key visual"}),
+        (TTSSelector(), {"text": "Narration"}),
+    ]
+
+    for selector, inputs in selector_cases:
+        broken = _BrokenStatusProviderTool(f"{selector.name}_broken")
+        available = _AvailableProviderTool(f"{selector.name}_available")
+
+        def fake_rank(candidates, _task_context):
+            return [
+                ProviderScore(tool_name=tool.name, provider=tool.provider, task_fit=1.0 - idx / 10)
+                for idx, tool in enumerate(candidates)
+            ]
+
+        monkeypatch.setattr("lib.scoring.rank_providers", fake_rank)
+
+        selected, score = selector._select_best_tool(
+            inputs,
+            [broken, available],
+            selector._prepare_task_context(inputs),
+        )
+
+        assert selected is available
+        assert score.tool_name == available.name
+
+
+def test_selectors_require_project_output_path_before_provider_execution(monkeypatch):
+    selector_cases = [
+        (VideoSelector(), {"prompt": "cinematic product launch"}),
+        (ImageSelector(), {"prompt": "product key visual"}),
+        (TTSSelector(), {"text": "Narration"}),
+    ]
+
+    for selector, inputs in selector_cases:
+        provider = _AvailableProviderTool(f"{selector.name}_available")
+        if selector.name == "tts_selector":
+            provider.input_schema = {"properties": {"text": {"type": "string"}, "output_path": {"type": "string"}}}
+        else:
+            provider.input_schema = {"properties": {"prompt": {"type": "string"}, "output_path": {"type": "string"}}}
+        monkeypatch.setattr(selector, "_providers", lambda provider=provider: [provider])
+        monkeypatch.setattr(
+            "lib.scoring.rank_providers",
+            lambda candidates, _ctx: [
+                ProviderScore(tool_name=tool.name, provider=tool.provider, task_fit=1.0)
+                for tool in candidates
+            ],
+        )
+
+        result = selector.execute(inputs)
+
+        assert not result.success
+        assert "output_path is required" in (result.error or "")
+        assert provider.calls == []
+
+
+def test_selectors_require_missing_output_path_before_provider_discovery(monkeypatch):
+    selector_cases = [
+        (VideoSelector(), {"prompt": "cinematic product launch"}),
+        (ImageSelector(), {"prompt": "product key visual"}),
+        (TTSSelector(), {"text": "Narration"}),
+    ]
+
+    for selector, inputs in selector_cases:
+
+        def fail_provider_discovery(selector_name=selector.name):
+            raise AssertionError(
+                f"{selector_name} discovered providers before output_path validation"
+            )
+
+        monkeypatch.setattr(selector, "_providers", fail_provider_discovery)
+
+        result = selector.execute(inputs)
+
+        assert not result.success
+        assert "output_path is required" in (result.error or "")
+        assert "projects/<project-name>/" in (result.error or "")
+
+
+def test_selectors_reject_invalid_output_path_before_provider_discovery(monkeypatch):
+    selector_cases = [
+        (VideoSelector(), {"prompt": "cinematic product launch", "output_path": "clip.mp4"}),
+        (ImageSelector(), {"prompt": "product key visual", "output_path": "image.png"}),
+        (TTSSelector(), {"text": "Narration", "output_path": "voice.mp3"}),
+    ]
+
+    for selector, inputs in selector_cases:
+        def fail_provider_discovery(selector_name=selector.name):
+            raise AssertionError(f"{selector_name} discovered providers before output_path validation")
+
+        monkeypatch.setattr(selector, "_providers", fail_provider_discovery)
+
+        result = selector.execute(inputs)
+
+        assert not result.success
+        assert "output_path" in (result.error or "")
+        assert "projects/<project-name>/" in (result.error or "")
+
+
+def test_selector_rank_mode_reports_degraded_status_when_provider_status_fails(monkeypatch):
+    selector = VideoSelector()
+    broken = _BrokenStatusProviderTool("broken_video_provider", provider="broken")
+    monkeypatch.setattr(selector, "_providers", lambda: [broken])
+
+    result = selector.execute({"prompt": "cinematic product launch", "operation": "rank"})
+
+    assert result.success
+    assert result.data["rankings"][0]["tool_name"] == "broken_video_provider"
+    assert result.data["rankings"][0]["status"] == "degraded"
+
+
 def test_selector_rank_serialization_uses_status_values():
     score = ProviderScore(tool_name="ranked_tool", provider="same-provider")
     candidate = _AvailableProviderTool("ranked_tool")
@@ -264,6 +536,8 @@ def test_selector_idempotency_keys_include_routing_and_generation_inputs():
                 "voice_id": "voice-a",
                 "model_id": "model-a",
                 "output_format": "mp3_44100_128",
+                "instructions": "Warm, restrained delivery.",
+                "speed": 1.0,
             },
             [
                 {"text": "A different narration line."},
@@ -271,6 +545,8 @@ def test_selector_idempotency_keys_include_routing_and_generation_inputs():
                 {"voice_id": "voice-b"},
                 {"model_id": "model-b"},
                 {"output_format": "wav"},
+                {"instructions": "Urgent trailer delivery."},
+                {"speed": 0.9},
                 {"output_path": "projects/demo/assets/audio/selector-a.mp3"},
             ],
         ),
@@ -348,7 +624,11 @@ def test_video_selector_generation_alternatives_match_requested_operation(monkey
     monkeypatch.setattr("lib.scoring.rank_providers", fake_rank)
 
     result = selector.execute(
-        {"prompt": "Animate the product frame", "operation": "image_to_video"}
+        {
+            "prompt": "Animate the product frame",
+            "operation": "image_to_video",
+            "output_path": "projects/demo/assets/video/product-frame.mp4",
+        }
     )
 
     assert result.success
@@ -364,7 +644,11 @@ def test_video_selector_refuses_image_to_video_when_no_provider_supports_referen
     monkeypatch.setattr(selector, "_providers", lambda: [text_only])
 
     result = selector.execute(
-        {"prompt": "Animate the product frame", "operation": "image_to_video"}
+        {
+            "prompt": "Animate the product frame",
+            "operation": "image_to_video",
+            "output_path": "projects/demo/assets/video/product-frame.mp4",
+        }
     )
 
     assert result.success is False
@@ -415,6 +699,7 @@ def test_tts_selector_reports_openai_layer3_skill(monkeypatch, tmp_path):
             "text": "A concise narration line.",
             "preferred_provider": "openai",
             "allowed_providers": ["openai"],
+            "output_path": "projects/demo/assets/audio/voice.mp3",
         }
     )
 
@@ -438,8 +723,9 @@ def test_screen_capture_selector_reports_registered_fallback_tools():
     repo_root = Path(__file__).resolve().parent.parent.parent
     manifest = load_manifest(repo_root / ".agents" / "components.yaml", repo_root=repo_root)
     for skill in selector.agent_skills:
-        assert skill in manifest.components
-        assert (manifest.agents_dir / skill / "SKILL.md").exists()
+        component = manifest.components.get(skill)
+        assert component is not None
+        assert _component_has_skill_source(component)
 
 
 def test_registered_tool_agent_skills_resolve_to_project_layer3_skills():
@@ -458,8 +744,7 @@ def test_registered_tool_agent_skills_resolve_to_project_layer3_skills():
             if component is None:
                 missing.append(f"{tool_name}:{skill}")
                 continue
-            skill_path = manifest.agents_dir / component.name / "SKILL.md"
-            if not skill_path.exists():
+            if not _component_has_skill_source(component):
                 missing.append(f"{tool_name}:{skill}")
 
     assert missing == []
