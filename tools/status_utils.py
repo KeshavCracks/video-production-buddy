@@ -2,10 +2,79 @@
 
 from __future__ import annotations
 
+import base64
+import math
 from collections.abc import Mapping
+from dataclasses import is_dataclass
+from datetime import date, datetime
+from decimal import Decimal
+from enum import Enum
+from fractions import Fraction
+from pathlib import PurePath
 from typing import Any
+from uuid import UUID
 
-from tools.base_tool import ToolStatus, _coerce_tool_status, _json_safe
+from tools.base_tool import ToolStatus
+
+
+def _coerce_tool_status(value: Any) -> ToolStatus:
+    try:
+        raw_value = getattr(value, "value", value)
+    except Exception:
+        return ToolStatus.DEGRADED
+    try:
+        return ToolStatus(str(raw_value))
+    except (TypeError, ValueError):
+        return ToolStatus.DEGRADED
+
+
+def _json_safe_key(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)
+    return str(value)
+
+
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, PurePath):
+        return str(value)
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, Decimal):
+        return str(value) if value.is_finite() else None
+    if isinstance(value, Fraction):
+        return str(value)
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        raw = bytes(value)
+        return {
+            "encoding": "base64",
+            "data": base64.b64encode(raw).decode("ascii"),
+            "size_bytes": len(raw),
+        }
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if isinstance(value, Enum):
+        return _json_safe(value.value)
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if is_dataclass(value) and not isinstance(value, type):
+        return {
+            field_name: _json_safe(getattr(value, field_name))
+            for field_name in value.__dataclass_fields__
+        }
+    if isinstance(value, Mapping):
+        return {
+            _json_safe_key(key): _json_safe(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, set):
+        return [_json_safe(item) for item in sorted(value, key=repr)]
+    return str(value)
 
 
 def safe_tool_attr(tool: object, attr: str, default: Any = None) -> Any:
