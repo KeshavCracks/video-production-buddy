@@ -13,6 +13,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Optional
 
+from schemas.artifacts import load_strict_json_object
+
 
 class EvalMode(str, Enum):
     DETERMINISTIC = "deterministic"
@@ -32,8 +34,7 @@ class GoldenScenario:
 
     @classmethod
     def load(cls, path: Path) -> "GoldenScenario":
-        with open(path) as f:
-            data = json.load(f)
+        data = load_strict_json_object(path, context=f"golden scenario {path}")
         return cls(
             name=data["name"],
             pipeline_type=data["pipeline_type"],
@@ -54,9 +55,14 @@ class GoldenScenario:
             "tolerance": self.tolerance,
             "tags": self.tags,
         }
+        try:
+            serialized = json.dumps(data, indent=2, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Golden scenario must be strict JSON serializable: {exc}") from exc
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w") as f:
-            json.dump(data, f, indent=2)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(serialized)
+            f.write("\n")
 
 
 @dataclass

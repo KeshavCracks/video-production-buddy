@@ -70,7 +70,7 @@ def _has_named_entity_token(text: str) -> bool:
     return False
 
 
-def _has_citable_evidence(text: str) -> bool:
+def has_citable_evidence(text: str) -> bool:
     """Return True iff ``text`` contains an explicit URL, a named-entity token,
     or a whole-word generic-noun signal ('report', 'study', 'campaign', etc.)
     anchored by a source-specificity signal.
@@ -93,6 +93,9 @@ def _has_citable_evidence(text: str) -> bool:
         _SOURCE_SPECIFICITY_RE.search(text) is not None
         or _QUOTED_TITLE_RE.search(text) is not None
     )
+
+
+_has_citable_evidence = has_citable_evidence
 
 
 def audit_intelligence_provenance(intelligence_brief: dict[str, Any]) -> list[dict[str, Any]]:
@@ -127,7 +130,7 @@ def audit_intelligence_provenance(intelligence_brief: dict[str, Any]) -> list[di
         if entry.get("confidence") != "research-grounded":
             continue
         rationale = str(entry.get("rationale", ""))
-        if _has_citable_evidence(rationale):
+        if has_citable_evidence(rationale):
             continue
         # Emit both the human-readable `path` (audit trail) and structured
         # fields (`path_type`, `key`) so consumers don't have to re-parse the
@@ -153,7 +156,7 @@ def audit_intelligence_provenance(intelligence_brief: dict[str, Any]) -> list[di
         if verdict_entry.get("confidence") != "research-grounded":
             continue
         evidence = str(verdict_entry.get("challenge_evidence", ""))
-        if _has_citable_evidence(evidence):
+        if has_citable_evidence(evidence):
             continue
         dim = verdict_entry.get("dimension", "?")
         flags.append({

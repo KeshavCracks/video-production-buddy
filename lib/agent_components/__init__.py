@@ -14,6 +14,8 @@ from typing import Any, Iterable
 
 import yaml
 
+from schemas.artifacts import load_strict_json_object
+
 
 DEFAULT_MANIFEST = Path(".agents/components.yaml")
 DEFAULT_LOCK = Path(".agents/components.lock.json")
@@ -252,7 +254,13 @@ class ComponentManager:
     def load_lock(self) -> dict[str, Any]:
         if not self.lock_path.exists():
             raise ComponentError(f"component lockfile not found: {_display_path(self.lock_path, self.repo_root)}")
-        data = json.loads(self.lock_path.read_text(encoding="utf-8"))
+        try:
+            data = load_strict_json_object(
+                self.lock_path,
+                context="component lockfile",
+            )
+        except ValueError as exc:
+            raise ComponentError(str(exc)) from exc
         if data.get("lockfileVersion") != 1:
             raise ComponentError("component lockfile version must be 1")
         if not isinstance(data.get("components"), dict):
@@ -766,7 +774,7 @@ def _sha256_file(path: Path) -> str:
 
 
 def _canonical_json(data: dict[str, Any]) -> str:
-    return json.dumps(data, indent=2, sort_keys=True) + "\n"
+    return json.dumps(data, indent=2, sort_keys=True, allow_nan=False) + "\n"
 
 
 def _short_hash(value: str) -> str:

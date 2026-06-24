@@ -11,11 +11,54 @@ from urllib.parse import urlparse
 
 import jsonschema
 
+from lib.provenance_audit import has_citable_evidence
+
 SCHEMA_DIR = Path(__file__).parent
 FORMAT_CHECKER = jsonschema.FormatChecker()
 _RFC3339_DATETIME = re.compile(
     r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$"
 )
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"invalid JSON constant {value}")
+
+
+def loads_strict_json(text: str, *, context: str | None = None) -> Any:
+    """Parse JSON text and reject Python's non-standard numeric constants."""
+    label = context or "JSON text"
+    try:
+        data = json.loads(text, parse_constant=_reject_json_constant)
+        json.dumps(data, allow_nan=False)
+    except ValueError as exc:
+        raise ValueError(f"{label} must be strict JSON serializable: {exc}") from exc
+    return data
+
+
+def load_strict_json(path: Path | str, *, context: str | None = None) -> Any:
+    """Load JSON using the same finite-number contract used for writes."""
+    json_path = Path(path)
+    label = context or str(json_path)
+    try:
+        with open(json_path, encoding="utf-8") as f:
+            data = json.load(f, parse_constant=_reject_json_constant)
+        json.dumps(data, allow_nan=False)
+    except ValueError as exc:
+        raise ValueError(f"{label} must be strict JSON serializable: {exc}") from exc
+    return data
+
+
+def load_strict_json_object(
+    path: Path | str,
+    *,
+    context: str | None = None,
+) -> dict[str, Any]:
+    """Load a strict JSON object from disk."""
+    data = load_strict_json(path, context=context)
+    if not isinstance(data, dict):
+        label = context or str(path)
+        raise ValueError(f"{label} must contain a JSON object")
+    return data
 
 
 @FORMAT_CHECKER.checks("date-time", raises=ValueError)
@@ -90,8 +133,7 @@ def load_schema(name: str) -> dict:
     path = SCHEMA_DIR / f"{name}.schema.json"
     if not path.exists():
         raise FileNotFoundError(f"Schema not found: {path}")
-    with open(path) as f:
-        return json.load(f)
+    return load_strict_json_object(path, context=f"artifact schema {name}")
 
 
 AD_VIDEO_SCRIPT_BEAT_ORDER = ("hook", "build", "reveal", "cta_brand")
@@ -319,6 +361,14 @@ def _validate_intelligence_brief(
                         "ad-video intelligence_brief.dimension_verdicts"
                         f"[{idx}].challenge_evidence is required when "
                         "verdict='CONTRADICTED' and "
+                        "confidence='research-grounded'"
+                    )
+                if not has_citable_evidence(challenge_evidence):
+                    raise jsonschema.ValidationError(
+                        "ad-video intelligence_brief.dimension_verdicts"
+                        f"[{idx}].challenge_evidence must cite a URL, known "
+                        "named source, or specific report/study/campaign "
+                        "anchor when verdict='CONTRADICTED' and "
                         "confidence='research-grounded'"
                     )
 

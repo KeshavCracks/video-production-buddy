@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+import json
+import math
 from typing import Any
 
-from lib.scoring import normalize_task_context, score_provider
+from lib.scoring import (
+    ProductionPathScore,
+    ProviderScore,
+    format_ranking,
+    normalize_task_context,
+    score_provider,
+)
 from tools.base_tool import ToolStatus
 
 
@@ -40,6 +48,22 @@ class _ScoringTool:
 
     def estimate_cost(self, _inputs: dict[str, Any]) -> float:
         return 0.1
+
+
+class _NonFiniteScoringTool(_ScoringTool):
+    def get_info(self) -> dict[str, Any]:
+        info = super().get_info()
+        info.update(
+            {
+                "historical_success_rate": math.nan,
+                "quality_score": math.inf,
+                "latency_p50_seconds": -math.inf,
+            }
+        )
+        return info
+
+    def estimate_cost(self, _inputs: dict[str, Any]) -> float:
+        return math.nan
 
 
 def test_youtube_short_stock_request_does_not_imply_generated_visuals() -> None:
@@ -116,3 +140,118 @@ def test_image_to_video_support_improves_reference_conditioning_score() -> None:
 
     assert image_to_video_score.task_fit > text_score.task_fit
     assert image_to_video_score.control > text_score.control
+
+
+def test_provider_score_replaces_non_finite_tool_telemetry() -> None:
+    score = score_provider(
+        _NonFiniteScoringTool(name="non_finite"),
+        normalize_task_context(
+            None,
+            capability="video_generation",
+            prompt="cinematic launch trailer",
+        ),
+    )
+
+    assert math.isfinite(score.weighted_score)
+    assert 0.0 <= score.weighted_score <= 1.0
+
+    payload = score.to_dict()
+
+    for field in (
+        "task_fit",
+        "output_quality",
+        "control",
+        "reliability",
+        "cost_efficiency",
+        "latency",
+        "continuity",
+        "weighted_score",
+    ):
+        assert math.isfinite(payload[field])
+    json.dumps(payload, allow_nan=False)
+
+
+def test_provider_score_to_dict_is_strict_json_safe_for_non_finite_inputs() -> None:
+    score = ProviderScore(
+        tool_name="direct_provider",
+        provider="direct",
+        task_fit=math.nan,
+        output_quality=math.inf,
+        control=-math.inf,
+        reliability=2.0,
+        cost_efficiency=-1.0,
+        latency=0.5,
+        continuity=math.nan,
+    )
+
+    assert math.isfinite(score.weighted_score)
+    assert 0.0 <= score.weighted_score <= 1.0
+
+    payload = score.to_dict()
+
+    for field in (
+        "task_fit",
+        "output_quality",
+        "control",
+        "reliability",
+        "cost_efficiency",
+        "latency",
+        "continuity",
+        "weighted_score",
+    ):
+        assert math.isfinite(payload[field])
+        assert 0.0 <= payload[field] <= 1.0
+    json.dumps(payload, allow_nan=False)
+
+
+def test_production_path_score_to_dict_is_strict_json_safe_for_non_finite_inputs() -> None:
+    score = ProductionPathScore(
+        path_label="direct_path",
+        delivery_fit=math.nan,
+        quality_fit=math.inf,
+        capability_confidence=-math.inf,
+        fallback_integrity=2.0,
+        budget_fit=-1.0,
+        speed_fit=0.5,
+        controllability=math.nan,
+        consistency_fit=math.inf,
+    )
+
+    assert math.isfinite(score.weighted_score)
+    assert 0.0 <= score.weighted_score <= 1.0
+
+    payload = score.to_dict()
+
+    for field in (
+        "delivery_fit",
+        "quality_fit",
+        "capability_confidence",
+        "fallback_integrity",
+        "budget_fit",
+        "speed_fit",
+        "controllability",
+        "consistency_fit",
+        "weighted_score",
+    ):
+        assert math.isfinite(payload[field])
+        assert 0.0 <= payload[field] <= 1.0
+    json.dumps(payload, allow_nan=False)
+
+
+def test_provider_score_display_helpers_use_sanitized_score_fields() -> None:
+    score = ProviderScore(
+        tool_name="display_provider",
+        provider="direct",
+        task_fit=math.nan,
+        output_quality=math.inf,
+        control=-math.inf,
+        reliability=2.0,
+        cost_efficiency=-1.0,
+        latency=0.5,
+        continuity=math.nan,
+    )
+
+    rendered = "\n".join([score.explain(), format_ranking([score])]).lower()
+
+    assert "nan" not in rendered
+    assert "inf" not in rendered

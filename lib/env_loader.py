@@ -9,16 +9,15 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from dotenv import load_dotenv
+from lib.dotenv_loader import load_dotenv
 
 
 def load_env(project_root: Optional[Path] = None) -> None:
-    """Load .env file from project root."""
+    """Load .env values using the shared non-overwriting project defaults."""
     if project_root is None:
-        project_root = Path(__file__).resolve().parent.parent
-    env_path = project_root / ".env"
-    if env_path.exists():
-        load_dotenv(env_path)
+        load_dotenv()
+        return
+    load_dotenv(Path(project_root) / ".env")
 
 
 def get_env(key: str, default: Optional[str] = None) -> Optional[str]:

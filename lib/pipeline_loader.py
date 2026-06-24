@@ -5,12 +5,13 @@ Loads and validates pipeline YAML manifests from pipeline_defs/.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Optional
 
 import yaml
 import jsonschema
+
+from schemas.artifacts import load_strict_json_object
 
 PIPELINE_DEFS_DIR = Path(__file__).resolve().parent.parent / "pipeline_defs"
 SCHEMA_PATH = (
@@ -22,8 +23,7 @@ SCHEMA_PATH = (
 
 
 def _load_manifest_schema() -> dict:
-    with open(SCHEMA_PATH) as f:
-        return json.load(f)
+    return load_strict_json_object(SCHEMA_PATH, context="pipeline manifest schema")
 
 
 def _sub_stage_is_checkpoint_unit(sub_stage: dict[str, Any]) -> bool:

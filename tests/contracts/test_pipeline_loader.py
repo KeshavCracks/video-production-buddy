@@ -2,6 +2,9 @@
 
 from pathlib import Path
 
+import pytest
+
+import lib.pipeline_loader as pipeline_loader
 from lib.pipeline_loader import get_required_tools, load_pipeline
 
 
@@ -59,6 +62,43 @@ def test_load_pipeline_rejects_forward_artifact_dependencies(tmp_path: Path):
         assert "requires artifact" in str(exc)
     else:
         raise AssertionError("Expected forward artifact dependency to be rejected")
+
+
+def test_load_pipeline_rejects_non_strict_manifest_schema(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    schema_path = tmp_path / "pipeline_manifest.schema.json"
+    schema_path.write_text(
+        """
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["name", "version", "stages"],
+  "properties": {
+    "name": { "type": "string" },
+    "version": { "type": "string" },
+    "stages": { "type": "array" }
+  },
+  "x-non-finite-sentinel": NaN
+}
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (tmp_path / "sample.yaml").write_text(
+        "\n".join(
+            [
+                "name: sample",
+                "version: '1.0'",
+                "stages: []",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(pipeline_loader, "SCHEMA_PATH", schema_path)
+
+    with pytest.raises(ValueError, match="strict JSON"):
+        load_pipeline("sample", defs_dir=tmp_path)
 
 
 def test_get_required_tools_includes_production_mode_tools():

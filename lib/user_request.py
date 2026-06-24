@@ -62,6 +62,17 @@ def _mirror_path(project_dir: Path) -> Path:
     return project_dir / MIRROR_FILENAME
 
 
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"invalid JSON constant {value}")
+
+
+def _validate_project_workspace_dir(project_dir: Path) -> None:
+    if len(project_dir.parts) < 2 or project_dir.parts[-2] != "projects":
+        raise ValueError(
+            "user_request project_dir must be under projects/<project-name>"
+        )
+
+
 def _resolve_project_id(project_dir: Path, project_id: Optional[str]) -> str:
     resolved = project_id or project_dir.name
     if not PROJECT_ID_PATTERN.fullmatch(resolved):
@@ -165,8 +176,13 @@ def _read_payload(project_dir: Path) -> dict[str, Any]:
             f"No user_request.json at {path}. "
             "Call record_user_request() first when initializing a project."
         )
-    with open(path) as f:
-        return json.load(f)
+    try:
+        with open(path, encoding="utf-8") as f:
+            payload = json.load(f, parse_constant=_reject_json_constant)
+        json.dumps(payload, allow_nan=False)
+    except ValueError as exc:
+        raise ValueError(f"user_request must be strict JSON serializable: {exc}") from exc
+    return payload
 
 
 def _write_mirror(project_dir: Path, payload: dict[str, Any]) -> None:
@@ -177,11 +193,17 @@ def _write_mirror(project_dir: Path, payload: dict[str, Any]) -> None:
 
 
 def _write_payload(project_dir: Path, payload: dict[str, Any]) -> Path:
+    _validate_project_workspace_dir(project_dir)
     validate_artifact("user_request", payload)
+    try:
+        serialized = json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"user_request must be strict JSON serializable: {exc}") from exc
+
     artifact_path = _artifact_path(project_dir)
     artifact_path.parent.mkdir(parents=True, exist_ok=True)
     with open(artifact_path, "w") as f:
-        json.dump(payload, f, indent=2, ensure_ascii=False)
+        f.write(serialized)
         f.write("\n")
 
     _write_mirror(project_dir, payload)
@@ -215,6 +237,7 @@ def record_user_request(
         raise ValueError("user_request prompt must be non-empty")
 
     resolved_project_id = _resolve_project_id(project_dir, project_id)
+    _validate_project_workspace_dir(project_dir)
     artifact_path = _artifact_path(project_dir)
     if artifact_path.exists() and not overwrite:
         payload = _read_payload(project_dir)

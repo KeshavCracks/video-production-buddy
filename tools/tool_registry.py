@@ -9,10 +9,99 @@ from __future__ import annotations
 import importlib
 import inspect
 import pkgutil
+from collections.abc import Mapping
 from types import ModuleType
 from typing import Any, Optional
 
-from tools.base_tool import BaseTool, ToolStatus, ToolTier, ToolStability
+from tools.base_tool import (
+    BaseTool,
+    ToolStatus,
+    ToolTier,
+    ToolStability,
+    _coerce_tool_status,
+    _json_safe,
+)
+
+
+def _enum_value(value: Any) -> Any:
+    return getattr(value, "value", value)
+
+
+def _error_message(exc: Exception) -> str:
+    return f"{exc.__class__.__name__}: {exc}"
+
+
+def _safe_attr(tool: BaseTool, attr: str, default: Any) -> Any:
+    try:
+        return getattr(tool, attr)
+    except Exception:
+        return default
+
+
+def _safe_list(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, Mapping):
+        return []
+    try:
+        return list(value)
+    except Exception:
+        return []
+
+
+def _safe_dict(value: Any) -> dict[str, Any]:
+    if isinstance(value, Mapping):
+        return dict(value)
+    return {}
+
+
+def _safe_optional_dict(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    return _safe_dict(value)
+
+
+_LIST_INFO_FIELDS = (
+    "dependencies",
+    "capabilities",
+    "best_for",
+    "not_good_for",
+    "idempotency_key_fields",
+    "side_effects",
+    "fallback_tools",
+    "agent_skills",
+    "related_skills",
+    "user_visible_verification",
+)
+
+_DICT_INFO_FIELDS = (
+    "input_schema",
+    "output_schema",
+    "artifact_schema",
+    "supports",
+    "provider_matrix",
+)
+
+
+def _normalize_info_shape(info: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(info)
+    for field in _LIST_INFO_FIELDS:
+        normalized[field] = _safe_list(normalized.get(field))
+    for field in _DICT_INFO_FIELDS:
+        normalized[field] = _safe_dict(normalized.get(field))
+    normalized["progress_schema"] = _safe_optional_dict(
+        normalized.get("progress_schema")
+    )
+
+    retry_policy = _safe_dict(normalized.get("retry_policy"))
+    if retry_policy:
+        retry_policy["retryable_errors"] = _safe_list(
+            retry_policy.get("retryable_errors")
+        )
+    normalized["retry_policy"] = retry_policy
+    return normalized
 
 
 # Unicode punctuation that breaks on Windows cp1252 stdout. Map each to an
@@ -63,6 +152,13 @@ class ToolRegistry:
         """Register a tool instance."""
         if not tool.name:
             raise ValueError("Tool must have a non-empty name")
+        existing = self._tools.get(tool.name)
+        if existing is not None and existing.__class__ is not tool.__class__:
+            raise ValueError(
+                f"Tool name {tool.name!r} is already registered by "
+                f"{existing.__class__.__module__}.{existing.__class__.__name__}; "
+                f"cannot also register {tool.__class__.__module__}.{tool.__class__.__name__}"
+            )
         self._tools[tool.name] = tool
 
     def clear(self) -> None:
@@ -86,11 +182,9 @@ class ToolRegistry:
     @staticmethod
     def _load_dotenv() -> None:
         """Load .env file into os.environ if present, so tools can find API keys."""
-        from pathlib import Path
-
         from lib.dotenv_loader import load_dotenv as _load
 
-        _load(Path(__file__).resolve().parent.parent / ".env")
+        _load()
 
     def discover(self, package_name: str = "tools") -> list[str]:
         """Import a package tree and register any concrete tools it defines."""
@@ -125,19 +219,28 @@ class ToolRegistry:
 
     def get_by_tier(self, tier: ToolTier) -> list[BaseTool]:
         """Get all tools in a given tier."""
-        return [t for t in self._tools.values() if t.tier == tier]
+        return [
+            t for t in self._tools.values()
+            if _safe_attr(t, "tier", None) == tier
+        ]
 
     def get_by_capability(self, capability: str) -> list[BaseTool]:
         """Get all tools registered for a top-level capability family."""
-        return [t for t in self._tools.values() if t.capability == capability]
+        return [
+            t for t in self._tools.values()
+            if _safe_attr(t, "capability", None) == capability
+        ]
 
     def get_by_provider(self, provider: str) -> list[BaseTool]:
         """Get all tools backed by a specific provider."""
-        return [t for t in self._tools.values() if t.provider == provider]
+        return [
+            t for t in self._tools.values()
+            if _safe_attr(t, "provider", None) == provider
+        ]
 
     def get_by_status(self, status: ToolStatus) -> list[BaseTool]:
         """Get all tools with a given status."""
-        return [t for t in self._tools.values() if t.get_status() == status]
+        return [t for t in self._tools.values() if self._tool_status(t)[0] == status]
 
     def get_available(self) -> list[BaseTool]:
         """Get all tools that are currently available."""
@@ -149,13 +252,16 @@ class ToolRegistry:
 
     def get_by_stability(self, stability: ToolStability) -> list[BaseTool]:
         """Get all tools at a given stability level."""
-        return [t for t in self._tools.values() if t.stability == stability]
+        return [
+            t for t in self._tools.values()
+            if _safe_attr(t, "stability", None) == stability
+        ]
 
     def find_by_capability(self, capability: str) -> list[BaseTool]:
         """Find tools that declare a given capability."""
         return [
             t for t in self._tools.values()
-            if capability in t.capabilities
+            if capability in (_safe_attr(t, "capabilities", []) or [])
         ]
 
     def find_fallback(self, tool_name: str) -> Optional[BaseTool]:
@@ -168,9 +274,111 @@ class ToolRegistry:
             candidates.append(tool.fallback)
         for name in candidates:
             fb = self.get(name)
-            if fb and fb.get_status() == ToolStatus.AVAILABLE:
+            if fb and self._tool_status(fb)[0] == ToolStatus.AVAILABLE:
                 return fb
         return None
+
+    def _tool_status(self, tool: BaseTool) -> tuple[ToolStatus, str | None]:
+        try:
+            return _coerce_tool_status(tool.get_status()), None
+        except Exception as exc:
+            return ToolStatus.DEGRADED, _error_message(exc)
+
+    def _fallback_info(
+        self,
+        tool: BaseTool,
+        error: Exception | None,
+    ) -> dict[str, Any]:
+        status, status_error = self._tool_status(tool)
+        if status_error is None and error is not None:
+            status_error = _error_message(error)
+
+        usage_location: str | None
+        try:
+            usage_location = inspect.getfile(tool.__class__)
+        except Exception:
+            usage_location = None
+
+        resource_profile = _safe_attr(tool, "resource_profile", None)
+        retry_policy = _safe_attr(tool, "retry_policy", None)
+        fallback = _safe_attr(tool, "fallback", None)
+        fallback_tools = _safe_list(_safe_attr(tool, "fallback_tools", []))
+        if fallback and fallback not in fallback_tools:
+            fallback_tools.append(fallback)
+
+        info = {
+            "name": _safe_attr(tool, "name", tool.__class__.__name__),
+            "version": _safe_attr(tool, "version", "unknown"),
+            "tier": _enum_value(_safe_attr(tool, "tier", ToolTier.CORE)),
+            "capability": _safe_attr(tool, "capability", "generic"),
+            "provider": _safe_attr(tool, "provider", "unknown"),
+            "stability": _enum_value(
+                _safe_attr(tool, "stability", ToolStability.EXPERIMENTAL)
+            ),
+            "status": status.value,
+            "status_error": status_error,
+            "execution_mode": _enum_value(_safe_attr(tool, "execution_mode", "unknown")),
+            "determinism": _enum_value(_safe_attr(tool, "determinism", "unknown")),
+            "runtime": _enum_value(_safe_attr(tool, "runtime", "unknown")),
+            "module_path": tool.__class__.__module__,
+            "usage_location": usage_location,
+            "dependencies": _safe_list(_safe_attr(tool, "dependencies", [])),
+            "install_instructions": _safe_attr(tool, "install_instructions", ""),
+            "capabilities": _safe_list(_safe_attr(tool, "capabilities", [])),
+            "input_schema": _safe_dict(_safe_attr(tool, "input_schema", {})),
+            "output_schema": _safe_dict(_safe_attr(tool, "output_schema", {})),
+            "artifact_schema": _safe_dict(_safe_attr(tool, "artifact_schema", {})),
+            "progress_schema": _safe_optional_dict(
+                _safe_attr(tool, "progress_schema", None)
+            ),
+            "supports": _safe_dict(_safe_attr(tool, "supports", {})),
+            "best_for": _safe_list(_safe_attr(tool, "best_for", [])),
+            "not_good_for": _safe_list(_safe_attr(tool, "not_good_for", [])),
+            "provider_matrix": _safe_dict(_safe_attr(tool, "provider_matrix", {})),
+            "resource_profile": {
+                "cpu_cores": _safe_attr(resource_profile, "cpu_cores", 0),
+                "ram_mb": _safe_attr(resource_profile, "ram_mb", 0),
+                "vram_mb": _safe_attr(resource_profile, "vram_mb", 0),
+                "disk_mb": _safe_attr(resource_profile, "disk_mb", 0),
+                "network_required": _safe_attr(resource_profile, "network_required", False),
+            },
+            "retry_policy": {
+                "max_retries": _safe_attr(retry_policy, "max_retries", 0),
+                "backoff_seconds": _safe_attr(retry_policy, "backoff_seconds", 0),
+                "retryable_errors": _safe_list(
+                    _safe_attr(retry_policy, "retryable_errors", [])
+                ),
+            },
+            "resume_support": _enum_value(_safe_attr(tool, "resume_support", "unknown")),
+            "idempotency_key_fields": _safe_list(
+                _safe_attr(tool, "idempotency_key_fields", [])
+            ),
+            "side_effects": _safe_list(_safe_attr(tool, "side_effects", [])),
+            "fallback": fallback,
+            "fallback_tools": fallback_tools,
+            "agent_skills": _safe_list(_safe_attr(tool, "agent_skills", [])),
+            "related_skills": _safe_list(_safe_attr(tool, "agent_skills", [])),
+            "user_visible_verification": _safe_list(
+                _safe_attr(tool, "user_visible_verification", [])
+            ),
+            "quality_score": _safe_attr(tool, "quality_score", None),
+            "historical_success_rate": _safe_attr(tool, "historical_success_rate", None),
+            "latency_p50_seconds": _safe_attr(tool, "latency_p50_seconds", None),
+        }
+        return _json_safe(info)
+
+    def _tool_info(self, tool: BaseTool) -> dict[str, Any]:
+        try:
+            info = tool.get_info()
+            if not isinstance(info, dict):
+                raise TypeError(
+                    f"get_info returned {type(info).__name__}, expected dict"
+                )
+            defaults = self._fallback_info(tool, None)
+            defaults.update(info)
+            return _json_safe(_normalize_info_shape(defaults))
+        except Exception as exc:
+            return self._fallback_info(tool, exc)
 
     def support_envelope(self) -> dict[str, Any]:
         """Generate a full support-envelope report for all tools.
@@ -182,7 +390,7 @@ class ToolRegistry:
         self.ensure_discovered()
         report: dict[str, Any] = {}
         for name, tool in self._tools.items():
-            info = tool.get_info()
+            info = self._tool_info(tool)
             report[name] = info
         return report
 
@@ -191,7 +399,8 @@ class ToolRegistry:
         self.ensure_discovered()
         grouped: dict[str, list[dict[str, Any]]] = {}
         for tool in self._tools.values():
-            grouped.setdefault(tool.capability, []).append(tool.get_info())
+            info = self._tool_info(tool)
+            grouped.setdefault(info["capability"], []).append(info)
         for items in grouped.values():
             items.sort(key=lambda item: (item["provider"], item["name"]))
         return dict(sorted(grouped.items()))
@@ -201,7 +410,8 @@ class ToolRegistry:
         self.ensure_discovered()
         grouped: dict[str, list[dict[str, Any]]] = {}
         for tool in self._tools.values():
-            grouped.setdefault(tool.provider, []).append(tool.get_info())
+            info = self._tool_info(tool)
+            grouped.setdefault(info["provider"], []).append(info)
         for items in grouped.values():
             items.sort(key=lambda item: (item["capability"], item["name"]))
         return dict(sorted(grouped.items()))
@@ -217,7 +427,7 @@ class ToolRegistry:
             tier_tools = self.get_by_tier(tier)
             counts = {"available": 0, "unavailable": 0, "degraded": 0}
             for t in tier_tools:
-                status = t.get_status().value
+                status = self._tool_status(t)[0].value
                 counts[status] = counts.get(status, 0) + 1
             if tier_tools:
                 summary[tier.value] = counts
@@ -244,25 +454,31 @@ class ToolRegistry:
         self.ensure_discovered()
         menu: dict[str, dict[str, Any]] = {}
 
-        # Skip selectors — they aggregate, they aren't providers themselves
-        tools = [t for t in self._tools.values() if t.provider != "selector"]
+        for tool in self._tools.values():
+            info = self._tool_info(tool)
+            # Skip selectors — they aggregate, they aren't providers themselves.
+            if info.get("provider") == "selector":
+                continue
 
-        for tool in tools:
-            cap = tool.capability
+            cap = str(info.get("capability") or "generic")
             if cap not in menu:
                 menu[cap] = {"available": [], "unavailable": [], "total": 0, "configured": 0}
 
-            info = tool.get_info()
-            status = tool.get_status()
+            try:
+                status = ToolStatus(str(info.get("status")))
+            except ValueError:
+                status = ToolStatus.DEGRADED
             entry = {
-                "name": tool.name,
-                "provider": tool.provider,
-                "runtime": tool.runtime.value,
-                "best_for": tool.best_for,
-                "install_instructions": tool.install_instructions,
-                "dependencies": tool.dependencies,
+                "name": info["name"],
+                "provider": info["provider"],
+                "runtime": info["runtime"],
+                "best_for": info["best_for"],
+                "install_instructions": info["install_instructions"],
+                "dependencies": info["dependencies"],
                 "status": status.value,
             }
+            if info.get("status_error"):
+                entry["status_error"] = info["status_error"]
             for extra_key in (
                 "source_provider_menu",
                 "source_provider_summary",
@@ -332,14 +548,14 @@ class ToolRegistry:
         runtime_warnings: list[str] = []
         vc = self._tools.get("video_compose")
         if vc is not None:
-            info = vc.get_info()
+            info = self._tool_info(vc)
             engines = info.get("render_engines") or {}
             comp_runtimes = {k: bool(v) for k, v in engines.items()}
         # If hyperframes_compose is registered, surface its npm-resolve reasons
         # explicitly — those are the "looks available but isn't" failures.
         hf = self._tools.get("hyperframes_compose")
         if hf is not None:
-            hf_info = hf.get_info()
+            hf_info = self._tool_info(hf)
             rc = hf_info.get("hyperframes_runtime") or {}
             for reason in rc.get("reasons") or []:
                 runtime_warnings.append(f"hyperframes: {reason}")
@@ -423,14 +639,18 @@ class ToolRegistry:
         """List tools that require GPU (VRAM > 0)."""
         return [
             t.name for t in self._tools.values()
-            if t.resource_profile.vram_mb > 0
+            if _safe_attr(_safe_attr(t, "resource_profile", None), "vram_mb", 0) > 0
         ]
 
     def network_required_tools(self) -> list[str]:
         """List tools that require network access."""
         return [
             t.name for t in self._tools.values()
-            if t.resource_profile.network_required
+            if _safe_attr(
+                _safe_attr(t, "resource_profile", None),
+                "network_required",
+                False,
+            )
         ]
 
 

@@ -30,6 +30,7 @@ implements the operations the agent names.
 from __future__ import annotations
 
 import json
+import math
 import os
 import tempfile
 import time
@@ -38,6 +39,8 @@ from pathlib import Path
 from typing import Any, Iterable, Optional
 
 import numpy as np
+
+from schemas.artifacts import loads_strict_json
 
 
 EMBED_DIM = 512
@@ -133,48 +136,63 @@ class Corpus:
         """Load existing corpus from disk. Silently starts empty if absent."""
         self.records = []
         self._id_to_row = {}
+        valid_row_indices: list[int] = []
         if self.index_path.is_file():
             with open(self.index_path, encoding="utf-8") as f:
+                data_row_index = 0
                 for line in f:
                     line = line.strip()
                     if not line:
                         continue
-                    data = json.loads(line)
-                    rec = ClipRecord(**data)
+                    row_index = data_row_index
+                    data_row_index += 1
+                    try:
+                        data = loads_strict_json(
+                            line,
+                            context=f"corpus index row {row_index}",
+                        )
+                        rec = _clip_record_from_index_row(data)
+                    except (json.JSONDecodeError, TypeError, ValueError, KeyError):
+                        continue
                     self.records.append(rec)
+                    valid_row_indices.append(row_index)
 
-        self.clip_embeddings = _load_embedding_bank(self.embed_path)
-        self.tag_embeddings = _load_embedding_bank(self.tag_embed_path)
-
-        # Sanity check: if JSONL and the required visual embedding bank drifted
-        # out of sync (e.g. crash mid-add), truncate to the shorter length so
-        # subsequent adds don't alias to the wrong rows. The tag bank is
-        # auxiliary and can be backfilled with zeros for older/partial corpora.
-        n = min(len(self.records), self.clip_embeddings.shape[0])
-        if n != len(self.records):
-            self.records = self.records[:n]
-        if self.clip_embeddings.shape[0] != n:
-            self.clip_embeddings = self.clip_embeddings[:n]
-        if self.tag_embeddings.shape[0] < n:
-            padded = np.zeros((n, EMBED_DIM), dtype=np.float32)
-            if self.tag_embeddings.shape[0] > 0:
-                padded[: self.tag_embeddings.shape[0]] = self.tag_embeddings
-            self.tag_embeddings = padded
-        elif self.tag_embeddings.shape[0] != n:
-            self.tag_embeddings = self.tag_embeddings[:n]
+        clip_bank = _load_embedding_bank(self.embed_path)
+        tag_bank = _load_embedding_bank(self.tag_embed_path)
+        self.records, self.clip_embeddings, self.tag_embeddings = (
+            _filter_loaded_rows_by_valid_index(
+                self.records,
+                valid_row_indices,
+                clip_bank,
+                tag_bank,
+            )
+        )
         self._id_to_row = {r.clip_id: i for i, r in enumerate(self.records)}
 
     def save(self) -> None:
         """Persist index + both embedding stacks atomically-ish."""
         self.ensure_dirs()
+        _validate_persisted_embedding_banks(
+            len(self.records),
+            self.clip_embeddings,
+            self.tag_embeddings,
+        )
+        try:
+            index_lines = [
+                json.dumps(asdict(rec), allow_nan=False) + "\n"
+                for rec in self.records
+            ]
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Corpus index must be strict JSON serializable: {exc}"
+            ) from exc
 
         tmp_paths: list[Path] = []
         try:
             tmp_index = _temp_sibling(self.index_path, ".jsonl.tmp")
             tmp_paths.append(tmp_index)
             with open(tmp_index, "w", encoding="utf-8") as f:
-                for rec in self.records:
-                    f.write(json.dumps(asdict(rec)) + "\n")
+                f.writelines(index_lines)
 
             tmp_embed = _temp_sibling(self.embed_path, ".npy")
             tmp_tag_embed = _temp_sibling(self.tag_embed_path, ".npy")
@@ -217,6 +235,8 @@ class Corpus:
             raise ValueError(
                 f"tag_embedding must be ({EMBED_DIM},), got {tag_embedding.shape}"
             )
+        _require_finite_vector(clip_embedding, "clip_embedding")
+        _require_finite_vector(tag_embedding, "tag_embedding")
         if record.added_at == 0.0:
             record.added_at = time.time()
 
@@ -443,6 +463,95 @@ class Corpus:
             remaining.remove(best_i)
 
         return [self.records[i].clip_id for i in picked]
+
+
+def _clip_record_from_index_row(data: dict[str, Any]) -> ClipRecord:
+    """Build a ClipRecord from one JSONL row, rejecting non-strict JSON values."""
+    allowed_fields = ClipRecord.__dataclass_fields__
+    record_data = {
+        key: value
+        for key, value in data.items()
+        if key in allowed_fields
+    }
+    record = ClipRecord(**record_data)
+    record.duration = _finite_float(record.duration)
+    record.motion_score = _finite_float(record.motion_score)
+    record.added_at = _finite_float(record.added_at)
+    record.width = _finite_int(record.width)
+    record.height = _finite_int(record.height)
+    json.dumps(asdict(record), allow_nan=False)
+    return record
+
+
+def _finite_float(value: Any) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError("corpus numeric fields must be finite")
+    return parsed
+
+
+def _finite_int(value: Any) -> int:
+    return int(_finite_float(value))
+
+
+def _require_finite_vector(vector: np.ndarray, label: str) -> None:
+    if not np.all(np.isfinite(vector)):
+        raise ValueError(f"{label} must contain only finite values")
+
+
+def _validate_persisted_embedding_banks(
+    record_count: int,
+    clip_bank: np.ndarray,
+    tag_bank: np.ndarray,
+) -> None:
+    expected_shape = (record_count, EMBED_DIM)
+    if clip_bank.shape != expected_shape or tag_bank.shape != expected_shape:
+        raise ValueError(
+            "Corpus records and embedding banks must align before save: "
+            f"records={record_count}, "
+            f"clip_embeddings={clip_bank.shape}, "
+            f"tag_embeddings={tag_bank.shape}"
+        )
+    if not np.all(np.isfinite(clip_bank)):
+        raise ValueError("clip_embeddings must contain only finite values")
+    if not np.all(np.isfinite(tag_bank)):
+        raise ValueError("tag_embeddings must contain only finite values")
+
+
+def _filter_loaded_rows_by_valid_index(
+    records: list[ClipRecord],
+    valid_row_indices: list[int],
+    clip_bank: np.ndarray,
+    tag_bank: np.ndarray,
+) -> tuple[list[ClipRecord], np.ndarray, np.ndarray]:
+    """Filter records and embedding banks by original JSONL row positions.
+
+    The visual embedding bank is required. Rows without a corresponding visual
+    vector are dropped instead of aliasing to a different row. The tag bank is
+    auxiliary, so missing tag rows are backfilled with zeros.
+    """
+    kept_records: list[ClipRecord] = []
+    kept_row_indices: list[int] = []
+    for record, row_index in zip(records, valid_row_indices):
+        if row_index >= clip_bank.shape[0]:
+            continue
+        if not np.all(np.isfinite(clip_bank[row_index])):
+            continue
+        kept_records.append(record)
+        kept_row_indices.append(row_index)
+
+    if not kept_records:
+        empty = np.zeros((0, EMBED_DIM), dtype=np.float32)
+        return [], empty, empty.copy()
+
+    row_array = np.array(kept_row_indices, dtype=np.int64)
+    filtered_clip_bank = clip_bank[row_array].astype(np.float32, copy=False)
+    filtered_tag_bank = np.zeros((len(kept_records), EMBED_DIM), dtype=np.float32)
+    for output_index, row_index in enumerate(kept_row_indices):
+        if row_index < tag_bank.shape[0] and np.all(np.isfinite(tag_bank[row_index])):
+            filtered_tag_bank[output_index] = tag_bank[row_index]
+
+    return kept_records, filtered_clip_bank, filtered_tag_bank
 
 
 def _load_embedding_bank(path: Path) -> np.ndarray:

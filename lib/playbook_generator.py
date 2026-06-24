@@ -16,6 +16,8 @@ from typing import Any
 
 import jsonschema
 
+from schemas.artifacts import load_strict_json_object
+
 PLAYBOOK_SCHEMA_PATH = (
     Path(__file__).resolve().parent.parent
     / "schemas" / "styles" / "playbook.schema.json"
@@ -25,8 +27,7 @@ CUSTOM_STYLES_DIR = STYLES_DIR / "custom"
 
 
 def _load_playbook_schema() -> dict:
-    with open(PLAYBOOK_SCHEMA_PATH) as f:
-        return json.load(f)
+    return load_strict_json_object(PLAYBOOK_SCHEMA_PATH, context="style playbook schema")
 
 
 def load_existing_playbook(name: str) -> dict[str, Any]:
@@ -212,6 +213,16 @@ def save_playbook(
     """
     schema = _load_playbook_schema()
     jsonschema.validate(instance=playbook, schema=schema)
+    try:
+        json.dumps(playbook, allow_nan=False)
+        serialized = yaml.safe_dump(
+            playbook,
+            default_flow_style=False,
+            allow_unicode=True,
+            sort_keys=False,
+        )
+    except (TypeError, ValueError, yaml.YAMLError) as exc:
+        raise ValueError(f"style playbook must be strict JSON serializable: {exc}") from exc
 
     name = project_name or playbook["identity"]["name"]
     filename = name.lower().replace(" ", "-").replace("_", "-")
@@ -219,7 +230,7 @@ def save_playbook(
     CUSTOM_STYLES_DIR.mkdir(parents=True, exist_ok=True)
     path = CUSTOM_STYLES_DIR / f"{filename}.yaml"
 
-    with open(path, "w") as f:
-        yaml.dump(playbook, f, default_flow_style=False, allow_unicode=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(serialized)
 
     return path

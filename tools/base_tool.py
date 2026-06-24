@@ -6,18 +6,25 @@ interface for discovery, execution, cost estimation, and health reporting.
 
 from __future__ import annotations
 
+import base64
+import copy
 import hashlib
 import inspect
 import json
+import math
 import os
 import platform
 import subprocess
 import shutil
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, is_dataclass
+from datetime import date, datetime
+from decimal import Decimal
 from enum import Enum
-from pathlib import Path
+from fractions import Fraction
+from pathlib import Path, PurePath
 from typing import Any, Callable, Optional
+from uuid import UUID
 
 
 def _load_dotenv() -> None:
@@ -27,7 +34,7 @@ def _load_dotenv() -> None:
     """
     from lib.dotenv_loader import load_dotenv as _load
 
-    _load(Path(__file__).resolve().parent.parent / ".env")
+    _load()
 
 
 _load_dotenv()
@@ -98,6 +105,67 @@ class RetryPolicy:
     retryable_errors: list[str] = field(default_factory=list)
 
 
+def _coerce_tool_status(value: Any) -> ToolStatus:
+    """Normalize loose status values into the ToolStatus enum."""
+    try:
+        raw_value = getattr(value, "value", value)
+    except Exception:
+        return ToolStatus.DEGRADED
+    try:
+        return ToolStatus(str(raw_value))
+    except (TypeError, ValueError):
+        return ToolStatus.DEGRADED
+
+
+def _json_safe_key(value: Any) -> Any:
+    if isinstance(value, str):
+        return value
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)
+    return str(value)
+
+
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, PurePath):
+        return str(value)
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, Decimal):
+        return str(value) if value.is_finite() else None
+    if isinstance(value, Fraction):
+        return str(value)
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        raw = bytes(value)
+        return {
+            "encoding": "base64",
+            "data": base64.b64encode(raw).decode("ascii"),
+            "size_bytes": len(raw),
+        }
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if isinstance(value, Enum):
+        return _json_safe(value.value)
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if is_dataclass(value) and not isinstance(value, type):
+        return {
+            field_name: _json_safe(getattr(value, field_name))
+            for field_name in value.__dataclass_fields__
+        }
+    if isinstance(value, dict):
+        return {
+            _json_safe_key(key): _json_safe(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    if isinstance(value, set):
+        return [_json_safe(item) for item in sorted(value, key=repr)]
+    return str(value)
+
+
 @dataclass
 class ToolResult:
     """Standard result returned by tool execution."""
@@ -110,9 +178,33 @@ class ToolResult:
     seed: Optional[int] = None
     model: Optional[str] = None
 
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON-safe snapshot for checkpoint/report persistence."""
+        return _json_safe(self)
+
 
 class BaseTool(ABC):
     """Abstract base class for all Video Production Buddy tools."""
+
+    _MUTABLE_CONTRACT_ATTRS = (
+        "dependencies",
+        "capabilities",
+        "input_schema",
+        "output_schema",
+        "artifact_schema",
+        "progress_schema",
+        "supports",
+        "best_for",
+        "not_good_for",
+        "provider_matrix",
+        "resource_profile",
+        "retry_policy",
+        "idempotency_key_fields",
+        "side_effects",
+        "fallback_tools",
+        "agent_skills",
+        "user_visible_verification",
+    )
 
     # --- Identity (override in subclasses) ---
     name: str = ""
@@ -132,8 +224,8 @@ class BaseTool(ABC):
     capability: str = "generic"
     provider: str = "video_production_buddy"
     capabilities: list[str] = []
-    input_schema: dict = {}
-    output_schema: dict = {}
+    input_schema: dict = {"type": "object", "properties": {}}
+    output_schema: dict = {"type": "object", "properties": {}}
     artifact_schema: dict = {}
     progress_schema: Optional[dict] = None
     supports: dict[str, Any] = {}
@@ -170,6 +262,13 @@ class BaseTool(ABC):
     quality_score: Optional[float] = None
     historical_success_rate: Optional[float] = None
     latency_p50_seconds: Optional[float] = None
+
+    def __init__(self) -> None:
+        for attr in self._MUTABLE_CONTRACT_ATTRS:
+            descriptor = inspect.getattr_static(self.__class__, attr, None)
+            if isinstance(descriptor, property):
+                continue
+            setattr(self, attr, copy.deepcopy(getattr(self.__class__, attr)))
 
     # ---- Status reporting ----
 
@@ -231,29 +330,36 @@ class BaseTool(ABC):
     def get_info(self) -> dict[str, Any]:
         """Return full tool contract info for registry/discovery."""
         usage_location = inspect.getfile(self.__class__)
-        return {
+        status_error: str | None = None
+        try:
+            status = _coerce_tool_status(self.get_status())
+        except Exception as exc:
+            status = ToolStatus.DEGRADED
+            status_error = f"{exc.__class__.__name__}: {exc}"
+        info = {
             "name": self.name,
             "version": self.version,
             "tier": self.tier.value,
             "capability": self.capability,
             "provider": self.provider,
             "stability": self.stability.value,
-            "status": self.get_status().value,
+            "status": status.value,
             "execution_mode": self.execution_mode.value,
             "determinism": self.determinism.value,
             "runtime": self.runtime.value,
             "module_path": self.__class__.__module__,
             "usage_location": usage_location,
-            "dependencies": self.dependencies,
+            "dependencies": copy.deepcopy(self.dependencies),
             "install_instructions": self.install_instructions,
-            "capabilities": self.capabilities,
-            "input_schema": self.input_schema,
-            "output_schema": self.output_schema,
-            "artifact_schema": self.artifact_schema,
-            "supports": self.supports,
-            "best_for": self.best_for,
-            "not_good_for": self.not_good_for,
-            "provider_matrix": self.provider_matrix,
+            "capabilities": copy.deepcopy(self.capabilities),
+            "input_schema": copy.deepcopy(self.input_schema),
+            "output_schema": copy.deepcopy(self.output_schema),
+            "artifact_schema": copy.deepcopy(self.artifact_schema),
+            "progress_schema": copy.deepcopy(self.progress_schema),
+            "supports": copy.deepcopy(self.supports),
+            "best_for": copy.deepcopy(self.best_for),
+            "not_good_for": copy.deepcopy(self.not_good_for),
+            "provider_matrix": copy.deepcopy(self.provider_matrix),
             "resource_profile": {
                 "cpu_cores": self.resource_profile.cpu_cores,
                 "ram_mb": self.resource_profile.ram_mb,
@@ -261,17 +367,28 @@ class BaseTool(ABC):
                 "disk_mb": self.resource_profile.disk_mb,
                 "network_required": self.resource_profile.network_required,
             },
+            "retry_policy": {
+                "max_retries": self.retry_policy.max_retries,
+                "backoff_seconds": self.retry_policy.backoff_seconds,
+                "retryable_errors": copy.deepcopy(self.retry_policy.retryable_errors),
+            },
             "resume_support": self.resume_support.value,
-            "side_effects": self.side_effects,
+            "idempotency_key_fields": copy.deepcopy(self.idempotency_key_fields),
+            "side_effects": copy.deepcopy(self.side_effects),
             "fallback": self.fallback,
-            "fallback_tools": self.fallback_tools or ([self.fallback] if self.fallback else []),
-            "agent_skills": self.agent_skills,
-            "related_skills": self.agent_skills,
-            "user_visible_verification": self.user_visible_verification,
+            "fallback_tools": copy.deepcopy(
+                self.fallback_tools or ([self.fallback] if self.fallback else [])
+            ),
+            "agent_skills": copy.deepcopy(self.agent_skills),
+            "related_skills": copy.deepcopy(self.agent_skills),
+            "user_visible_verification": copy.deepcopy(self.user_visible_verification),
             "quality_score": self.quality_score,
             "historical_success_rate": self.historical_success_rate,
             "latency_p50_seconds": self.latency_p50_seconds,
         }
+        if status_error:
+            info["status_error"] = status_error
+        return _json_safe(info)
 
     # ---- Cost estimation ----
 
@@ -283,12 +400,25 @@ class BaseTool(ABC):
         """Estimate runtime in seconds. Override for long-running tools."""
         return 0.0
 
+    @staticmethod
+    def _safe_estimate(
+        label: str,
+        estimator: Callable[[dict[str, Any]], Any],
+        inputs: dict[str, Any],
+        errors: dict[str, str],
+    ) -> Any:
+        try:
+            return estimator(inputs)
+        except Exception as exc:
+            errors[label] = f"{exc.__class__.__name__}: {exc}"
+            return None
+
     # ---- Idempotency ----
 
     def idempotency_key(self, inputs: dict[str, Any]) -> str:
         """Compute a cache key from idempotency fields."""
         key_data = {k: inputs.get(k) for k in self.idempotency_key_fields}
-        raw = json.dumps(key_data, sort_keys=True)
+        raw = json.dumps(_json_safe(key_data), sort_keys=True, allow_nan=False)
         return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
     # ---- Execution ----
@@ -300,13 +430,39 @@ class BaseTool(ABC):
 
     def dry_run(self, inputs: dict[str, Any]) -> dict[str, Any]:
         """Preflight check without side effects. Override for paid/publishing tools."""
-        return {
+        status_error: str | None = None
+        try:
+            status = _coerce_tool_status(self.get_status())
+        except Exception as exc:
+            status = ToolStatus.DEGRADED
+            status_error = f"{exc.__class__.__name__}: {exc}"
+        estimate_errors: dict[str, str] = {}
+        estimated_cost = self._safe_estimate(
+            "estimated_cost_usd",
+            self.estimate_cost,
+            inputs,
+            estimate_errors,
+        )
+        estimated_runtime = self._safe_estimate(
+            "estimated_runtime_seconds",
+            self.estimate_runtime,
+            inputs,
+            estimate_errors,
+        )
+        if estimate_errors and status == ToolStatus.AVAILABLE:
+            status = ToolStatus.DEGRADED
+        payload = {
             "tool": self.name,
-            "estimated_cost_usd": self.estimate_cost(inputs),
-            "estimated_runtime_seconds": self.estimate_runtime(inputs),
-            "status": self.get_status().value,
-            "would_execute": True,
+            "estimated_cost_usd": estimated_cost,
+            "estimated_runtime_seconds": estimated_runtime,
+            "status": status.value,
+            "would_execute": status == ToolStatus.AVAILABLE,
         }
+        if status_error:
+            payload["status_error"] = status_error
+        if estimate_errors:
+            payload["estimate_errors"] = estimate_errors
+        return _json_safe(payload)
 
     # ---- CLI helper ----
 

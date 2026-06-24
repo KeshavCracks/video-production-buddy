@@ -11,13 +11,23 @@ import os
 from pathlib import Path
 
 
-def load_dotenv(env_path: Path | None = None) -> None:
-    """Load a .env file into os.environ (non-overwriting).
+def _default_env_paths() -> list[Path]:
+    """Return default .env search paths in precedence order."""
+    candidates = [
+        Path.cwd() / ".env",
+        Path(__file__).resolve().parent.parent / ".env",
+    ]
+    paths: list[Path] = []
+    seen: set[Path] = set()
+    for candidate in candidates:
+        resolved = candidate.resolve()
+        if resolved not in seen:
+            seen.add(resolved)
+            paths.append(candidate)
+    return paths
 
-    Only sets variables that are not already present in the environment.
-    """
-    if env_path is None:
-        env_path = Path(__file__).resolve().parent.parent / ".env"
+
+def _load_env_path(env_path: Path) -> None:
     if not env_path.is_file():
         return
     with open(env_path, encoding="utf-8", errors="ignore") as f:
@@ -47,3 +57,18 @@ def load_dotenv(env_path: Path | None = None) -> None:
                     value = ""
             if key and key not in os.environ:
                 os.environ[key] = value
+
+
+def load_dotenv(env_path: Path | None = None) -> None:
+    """Load a .env file into os.environ (non-overwriting).
+
+    When no explicit path is provided, project-local .env in the current
+    working directory takes precedence over the package/source-root .env.
+    Only sets variables that are not already present in the environment.
+    """
+    if env_path is not None:
+        _load_env_path(env_path)
+        return
+
+    for candidate in _default_env_paths():
+        _load_env_path(candidate)
