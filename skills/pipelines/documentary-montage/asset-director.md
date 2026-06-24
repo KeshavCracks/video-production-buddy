@@ -22,7 +22,7 @@ slot filling where CLIP similarity ranking matters.
 1. **Search and download** — use `direct_clip_search` to fan out
    across all available providers and download 2-3 clips per query.
    No CLIP embeddings, no corpus index, no .npy files.
-2. **Inspect thumbnails** — browse the extracted thumbnails (or use a
+2. **Inspect thumbnails** — review the extracted thumbnail file list (or use a
    sub-agent) to verify visual matches against slot descriptions.
 3. **Map clips to slots** — manually assign the best clip to each slot
    based on visual inspection.
@@ -151,8 +151,9 @@ direct_clip_search.execute({
 
 ### F2. Inspect Thumbnails
 
-Browse `<output_dir>/thumbnails/` to verify each clip. Use a sub-agent
-to read thumbnail images for visual confirmation if needed.
+Review the `<output_dir>/thumbnails/` file list to verify each clip has
+sample frames. Use a sub-agent to read thumbnail images for visual confirmation
+if needed.
 
 For each slot, pick the best-matching clip from the downloaded set.
 

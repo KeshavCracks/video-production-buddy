@@ -23,6 +23,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class MusicGen(BaseTool):
@@ -59,7 +60,7 @@ class MusicGen(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {
                 "type": "string",
@@ -78,6 +79,25 @@ class MusicGen(BaseTool):
             "output_path": {"type": "string"},
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "prompt",
+            "duration_seconds",
+            "format",
+            "output",
+            "output_path",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "elevenlabs"},
+            "prompt": {"type": "string"},
+            "duration_seconds": {"type": "number", "minimum": 0},
+            "format": {"type": "string", "const": "mp3"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=256, vram_mb=0, disk_mb=50, network_required=True
@@ -86,7 +106,7 @@ class MusicGen(BaseTool):
     idempotency_key_fields = ["prompt", "output_path", "duration_seconds"]
     side_effects = ["writes audio file to output_path", "calls ElevenLabs API"]
     user_visible_verification = [
-        "Listen to generated music for mood and quality",
+        "Inspect audio metadata, duration, tags, and waveform metrics for mood and quality fit",
     ]
 
     _AUTH_FAILED_KEY_PREFIXES: set[str] = set()
@@ -112,33 +132,6 @@ class MusicGen(BaseTool):
         return round(duration / 30 * 0.05, 4)
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
-        api_key = os.environ.get("ELEVENLABS_API_KEY")
-        if not api_key:
-            return ToolResult(
-                success=False,
-                error="No ElevenLabs API key. " + self.install_instructions,
-            )
-
-        start = time.time()
-
-        try:
-            result = self._generate(inputs, api_key)
-        except Exception as e:
-            return ToolResult(success=False, error=f"Music generation failed: {e}")
-
-        result.duration_seconds = round(time.time() - start, 2)
-        if not result.success:
-            return result
-        result.cost_usd = self.estimate_cost(inputs)
-        return result
-
-    def _generate(self, inputs: dict[str, Any], api_key: str) -> ToolResult:
-        import logging
-        import requests
-
-        logger = logging.getLogger(__name__)
-
-        prompt = inputs["prompt"]
         duration = inputs.get("duration_seconds")
         if duration is None:
             return ToolResult(
@@ -150,6 +143,48 @@ class MusicGen(BaseTool):
                     "must match the actual video duration."
                 ),
             )
+
+        output_path, output_error = require_explicit_output_path(
+            inputs, self.name, artifact_label="generated music audio"
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+
+        api_key = os.environ.get("ELEVENLABS_API_KEY")
+        if not api_key:
+            return ToolResult(
+                success=False,
+                error="No ElevenLabs API key. " + self.install_instructions,
+            )
+
+        start = time.time()
+
+        try:
+            result = self._generate(inputs, api_key, output_path)
+        except Exception as e:
+            return ToolResult(success=False, error=f"Music generation failed: {e}")
+
+        result.duration_seconds = round(time.time() - start, 2)
+        if not result.success:
+            return result
+        result.cost_usd = self.estimate_cost(inputs)
+        result.data.setdefault("output_path", str(output_path))
+        return result
+
+    def _generate(
+        self,
+        inputs: dict[str, Any],
+        api_key: str,
+        output_path: Path,
+    ) -> ToolResult:
+        import logging
+        import requests
+
+        logger = logging.getLogger(__name__)
+
+        prompt = inputs["prompt"]
+        duration = inputs.get("duration_seconds")
 
         url = "https://api.elevenlabs.io/v1/music"
 
@@ -170,7 +205,6 @@ class MusicGen(BaseTool):
             self.__class__._AUTH_FAILED_KEY_PREFIXES.add(api_key[:8])
         response.raise_for_status()
 
-        output_path = Path(inputs.get("output_path", "music_output.mp3"))
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(response.content)
 

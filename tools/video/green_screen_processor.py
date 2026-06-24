@@ -31,6 +31,7 @@ from tools.base_tool import (
     ToolStability,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class GreenScreenProcessor(BaseTool):
@@ -71,7 +72,10 @@ class GreenScreenProcessor(BaseTool):
             },
             "output_path": {
                 "type": "string",
-                "description": "Path for keyed output video",
+                "description": (
+                    "Project-scoped path for keyed output video, e.g. "
+                    "projects/<project-name>/renders/keyed-speaker.mp4"
+                ),
             },
             "method": {
                 "type": "string",
@@ -94,6 +98,27 @@ class GreenScreenProcessor(BaseTool):
                 "default": 0,
                 "description": "Limit frames to process (0 = all)",
             },
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "method_used",
+            "frame_count",
+            "duration",
+            "output_path",
+            "resolution",
+            "fps",
+            "bg_color",
+        ],
+        "properties": {
+            "method_used": {"type": "string", "enum": ["chromakey", "rembg"]},
+            "frame_count": {"type": "integer"},
+            "duration": {"type": "number"},
+            "output_path": {"type": "string"},
+            "resolution": {"type": "string"},
+            "fps": {"type": "integer"},
+            "bg_color": {"type": "string"},
         },
     }
 
@@ -121,11 +146,18 @@ class GreenScreenProcessor(BaseTool):
     _null_device = "NUL" if platform.system() == "Windows" else "/dev/null"
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="keyed output video",
+        )
+        if output_error:
+            return output_error
+
         input_path = Path(inputs["input_path"])
         if not input_path.exists():
             return ToolResult(success=False, error=f"Input not found: {input_path}")
 
-        output_path = Path(inputs["output_path"])
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         method = inputs.get("method", "auto")

@@ -1,7 +1,7 @@
 """Photo-to-talking-head video generation tool.
 
 Animates a still face photo to appear as if speaking provided audio.
-Uses SadTalker or MuseTalk models for audio-driven face animation.
+Currently uses SadTalker for audio-driven face animation.
 """
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class TalkingHead(BaseTool):
@@ -46,6 +47,7 @@ class TalkingHead(BaseTool):
 
     agent_skills = ["ffmpeg"]
     fallback = "lip_sync"
+    fallback_tools = ["lip_sync"]
 
     capabilities = [
         "photo_to_video",
@@ -59,7 +61,7 @@ class TalkingHead(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["image_path", "audio_path"],
+        "required": ["image_path", "audio_path", "output_path"],
         "properties": {
             "image_path": {
                 "type": "string",
@@ -71,7 +73,10 @@ class TalkingHead(BaseTool):
             },
             "output_path": {
                 "type": "string",
-                "description": "Output video path (default: {stem}_talking.mp4)",
+                "description": (
+                    "Explicit project-scoped output video path under "
+                    "projects/<project-name>/assets/... or projects/<project-name>/renders/..."
+                ),
             },
             "model": {
                 "type": "string",
@@ -97,6 +102,31 @@ class TalkingHead(BaseTool):
             },
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "model",
+            "image",
+            "audio",
+            "output",
+            "output_path",
+            "expression_scale",
+            "still_mode",
+            "preprocess",
+            "format",
+        ],
+        "properties": {
+            "model": {"type": "string", "enum": ["sadtalker"]},
+            "image": {"type": "string"},
+            "audio": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "expression_scale": {"type": "number"},
+            "still_mode": {"type": "boolean"},
+            "preprocess": {"type": "string", "enum": ["crop", "resize", "full"]},
+            "format": {"type": "string", "enum": ["mp4"]},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=2, ram_mb=4096, vram_mb=4096, disk_mb=2000
@@ -112,7 +142,7 @@ class TalkingHead(BaseTool):
     ]
     side_effects = ["writes video file to output_path"]
     user_visible_verification = [
-        "Watch generated video for lip-sync accuracy",
+        "Inspect sampled frames and timing metadata for lip-sync accuracy",
         "Check for face distortion or unnatural artifacts",
     ]
 
@@ -160,24 +190,28 @@ class TalkingHead(BaseTool):
         if not audio_path.exists():
             return ToolResult(success=False, error=f"Audio not found: {audio_path}")
 
-        model = inputs.get("model", "sadtalker")
-        output_path = Path(
-            inputs.get("output_path", str(image_path.with_stem(f"{image_path.stem}_talking").with_suffix(".mp4")))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="talking-head video",
         )
+        if output_error:
+            return output_error
+        assert output_path is not None
+
+        model = inputs.get("model", "sadtalker")
+        if model != "sadtalker":
+            return ToolResult(
+                success=False,
+                error=f"Unknown model: {model}. Supported: sadtalker",
+            )
+
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         start = time.time()
 
         try:
-            if model == "sadtalker":
-                result = self._run_sadtalker(inputs, image_path, audio_path, output_path)
-            elif model == "musetalk":
-                result = self._run_musetalk(inputs, image_path, audio_path, output_path)
-            else:
-                return ToolResult(
-                    success=False,
-                    error=f"Unknown model: {model}. Supported: sadtalker, musetalk",
-                )
+            result = self._run_sadtalker(inputs, image_path, audio_path, output_path)
         except Exception as e:
             return ToolResult(success=False, error=f"Talking head generation failed: {e}")
 
@@ -244,6 +278,7 @@ class TalkingHead(BaseTool):
                 "image": str(image_path),
                 "audio": str(audio_path),
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "expression_scale": expression_scale,
                 "still_mode": still_mode,
                 "preprocess": preprocess,

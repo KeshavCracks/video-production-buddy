@@ -21,6 +21,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_project_sidecar_path
 
 
 METHODS = ["content", "threshold", "adaptive"]
@@ -55,7 +56,7 @@ class SceneDetect(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["input_path"],
+        "required": ["input_path", "output_path"],
         "properties": {
             "input_path": {"type": "string"},
             "method": {
@@ -72,7 +73,38 @@ class SceneDetect(BaseTool):
                 "minimum": 0.1,
                 "default": 1.0,
             },
-            "output_path": {"type": "string", "description": "Path for scene list JSON"},
+            "output_path": {
+                "type": "string",
+                "description": "Project-scoped scene list JSON path under projects/<project-name>/artifacts/..., assets/..., or renders/...",
+            },
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["scene_count", "scenes", "method", "output", "output_path"],
+        "properties": {
+            "scene_count": {"type": "integer", "minimum": 0},
+            "scenes": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": [
+                        "index",
+                        "start_seconds",
+                        "end_seconds",
+                        "duration_seconds",
+                    ],
+                    "properties": {
+                        "index": {"type": "integer", "minimum": 0},
+                        "start_seconds": {"type": "number"},
+                        "end_seconds": {"type": "number"},
+                        "duration_seconds": {"type": "number", "minimum": 0},
+                    },
+                },
+            },
+            "method": {"type": "string", "enum": ["pyscenedetect", "ffmpeg"]},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
         },
     }
 
@@ -104,6 +136,16 @@ class SceneDetect(BaseTool):
         if method not in METHODS:
             return ToolResult(success=False, error=f"Unknown method: {method}")
 
+        output_path, output_error = require_explicit_project_sidecar_path(
+            inputs,
+            "output_path",
+            self.name,
+            artifact_label="scene detection metadata",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+
         start = time.time()
 
         if self._has_pyscenedetect():
@@ -113,12 +155,15 @@ class SceneDetect(BaseTool):
 
         elapsed = time.time() - start
 
-        # Write scene list
-        output_path = Path(
-            inputs.get("output_path", str(input_path.with_suffix(".scenes.json")))
-        )
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(json.dumps({"scenes": scenes}, indent=2), encoding="utf-8")
+        try:
+            serialized = json.dumps({"scenes": scenes}, indent=2, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            return ToolResult(
+                success=False,
+                error=f"Scene detection result must be strict JSON serializable: {exc}",
+            )
+        output_path.write_text(serialized, encoding="utf-8")
 
         return ToolResult(
             success=True,
@@ -127,6 +172,7 @@ class SceneDetect(BaseTool):
                 "scenes": scenes,
                 "method": "pyscenedetect" if self._has_pyscenedetect() else "ffmpeg",
                 "output": str(output_path),
+                "output_path": str(output_path),
             },
             artifacts=[str(output_path)],
             duration_seconds=round(elapsed, 2),

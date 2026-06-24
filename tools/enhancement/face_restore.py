@@ -21,6 +21,7 @@ from tools.base_tool import (
     ToolStability,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 MODELS = ["CodeFormer", "GFPGAN"]
@@ -56,7 +57,7 @@ class FaceRestore(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["input_path"],
+        "required": ["input_path", "output_path"],
         "properties": {
             "input_path": {
                 "type": "string",
@@ -64,7 +65,7 @@ class FaceRestore(BaseTool):
             },
             "output_path": {
                 "type": "string",
-                "description": "Output path (defaults to {stem}_restored.{ext})",
+                "description": "Project-scoped output path under projects/<project-name>/assets/... or projects/<project-name>/renders/...",
             },
             "model": {
                 "type": "string",
@@ -91,6 +92,29 @@ class FaceRestore(BaseTool):
             },
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "input",
+            "output",
+            "output_path",
+            "model",
+            "faces_detected",
+            "upscale",
+            "fidelity",
+            "bg_upsampler",
+        ],
+        "properties": {
+            "input": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "model": {"type": "string", "enum": MODELS},
+            "faces_detected": {"type": "integer"},
+            "upscale": {"type": "integer"},
+            "fidelity": {"type": ["number", "null"]},
+            "bg_upsampler": {"type": "boolean"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=2, ram_mb=2048, vram_mb=2048, disk_mb=1000
@@ -114,12 +138,14 @@ class FaceRestore(BaseTool):
         if not input_path.exists():
             return ToolResult(success=False, error=f"Input not found: {input_path}")
 
-        output_path = Path(
-            inputs.get(
-                "output_path",
-                str(input_path.with_stem(f"{input_path.stem}_restored")),
-            )
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="restored face image",
         )
+        if output_error:
+            return output_error
+        assert output_path is not None
         model_name = inputs.get("model", "CodeFormer")
         fidelity = inputs.get("fidelity", 0.5)
         upscale = inputs.get("upscale", 2)
@@ -231,6 +257,7 @@ class FaceRestore(BaseTool):
             data={
                 "input": str(input_path),
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "model": model_name,
                 "faces_detected": faces_detected,
                 "upscale": upscale,

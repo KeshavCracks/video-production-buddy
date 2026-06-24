@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import base64
 import builtins
+import sys
+from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
+import jsonschema
 import pytest
 
 from lib.scoring import ProviderScore
@@ -93,6 +98,7 @@ def test_image_selector_does_not_drop_edit_request_when_no_edit_provider(monkeyp
             "generation_mode": "edit",
             "image_url": "https://example.test/product.png",
             "allowed_providers": ["plain"],
+            "output_path": "projects/demo/assets/images/edited.png",
         }
     )
 
@@ -123,6 +129,7 @@ def test_image_selector_preserves_primary_image_for_multi_reference_edits(monkey
             "image_url": "https://example.test/product.png",
             "image_urls": ["https://example.test/style.png"],
             "allowed_providers": ["bailian"],
+            "output_path": "projects/demo/assets/images/composite.png",
         }
     )
 
@@ -168,6 +175,144 @@ def test_grok_rejects_unknown_generation_mode_before_network(monkeypatch):
     assert calls == []
 
 
+@pytest.mark.parametrize(
+    "inputs",
+    [
+        {"prompt": "product hero image"},
+        {"prompt": "product hero image", "output_path": "grok_image.png"},
+        {"prompt": "product hero image", "output_path": "/tmp/grok_image.png"},
+    ],
+)
+def test_grok_requires_project_output_path_before_network(
+    inputs: dict[str, object],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("XAI_API_KEY", "test-key")
+    calls: list[object] = []
+
+    def fake_post(*args: object, **kwargs: object) -> object:
+        calls.append((args, kwargs))
+        raise AssertionError("network should not be called for invalid output_path")
+
+    monkeypatch.setattr("requests.post", fake_post)
+
+    result = GrokImage().execute(inputs)
+
+    assert not result.success
+    assert "output_path" in (result.error or "")
+    assert "projects/<project-name>/" in (result.error or "")
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    "inputs",
+    [
+        {"prompt": "product hero image"},
+        {"prompt": "product hero image", "output_path": "wanx_image.png"},
+        {"prompt": "product hero image", "output_path": "/tmp/wanx_image.png"},
+    ],
+)
+def test_wanx_requires_project_output_path_before_network(
+    inputs: dict[str, object],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "test-key")
+    calls: list[object] = []
+
+    def fake_post(*args: object, **kwargs: object) -> object:
+        calls.append((args, kwargs))
+        raise AssertionError("network should not be called for invalid output_path")
+
+    monkeypatch.setattr("requests.post", fake_post)
+
+    result = WanxImage().execute(inputs)
+
+    assert not result.success
+    assert "output_path" in (result.error or "")
+    assert "projects/<project-name>/" in (result.error or "")
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("tool", "inputs", "env_vars"),
+    [
+        (FluxImage(), {"prompt": "product hero image", "output_path": "flux.png"}, ("FAL_KEY", "FAL_AI_API_KEY")),
+        (GoogleImagen(), {"prompt": "product hero image", "output_path": "imagen.png"}, ("GOOGLE_API_KEY", "GEMINI_API_KEY")),
+        (GrokImage(), {"prompt": "product hero image", "output_path": "grok.png"}, ("XAI_API_KEY",)),
+        (OpenAIImage(), {"prompt": "product hero image", "output_path": "openai.png"}, ("OPENAI_API_KEY",)),
+        (PexelsImage(), {"query": "product photography", "output_path": "pexels.jpg"}, ("PEXELS_API_KEY",)),
+        (PixabayImage(), {"query": "product photography", "output_path": "pixabay.jpg"}, ("PIXABAY_API_KEY",)),
+        (RecraftImage(), {"prompt": "product hero image", "output_path": "recraft.png"}, ("FAL_KEY", "FAL_AI_API_KEY")),
+        (WanxImage(), {"prompt": "product hero image", "output_path": "wanx.png"}, ("DASHSCOPE_API_KEY",)),
+    ],
+)
+def test_api_image_generators_reject_non_project_output_path_before_credentials(
+    tool: Any,
+    inputs: dict[str, object],
+    env_vars: tuple[str, ...],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for env_var in env_vars:
+        monkeypatch.delenv(env_var, raising=False)
+
+    result = tool.execute(inputs)
+
+    assert not result.success
+    assert "output_path" in (result.error or "")
+    assert "projects/<project-name>/" in (result.error or "")
+
+
+@pytest.mark.parametrize(
+    ("tool", "env_var", "base"),
+    [
+        (
+            PexelsImage(),
+            "PEXELS_API_KEY",
+            {"query": "product photography", "orientation": "landscape", "size": "large"},
+        ),
+        (
+            PixabayImage(),
+            "PIXABAY_API_KEY",
+            {"query": "product photography", "image_type": "photo", "orientation": "horizontal"},
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "output_path",
+    [
+        None,
+        "stock-image.jpg",
+        "/tmp/stock-image.jpg",
+    ],
+)
+def test_stock_image_requires_project_output_path_before_network(
+    tool: Any,
+    env_var: str,
+    base: dict[str, object],
+    output_path: str | None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(env_var, "test-key")
+    calls: list[object] = []
+
+    def fake_get(*args: object, **kwargs: object) -> object:
+        calls.append((args, kwargs))
+        raise AssertionError("network should not be called for invalid output_path")
+
+    monkeypatch.setattr("requests.get", fake_get)
+
+    inputs = dict(base)
+    if output_path is not None:
+        inputs["output_path"] = output_path
+
+    result = tool.execute(inputs)
+
+    assert not result.success
+    assert "output_path" in (result.error or "")
+    assert "projects/<project-name>/" in (result.error or "")
+    assert calls == []
+
+
 def test_wanx_multi_reference_rejects_missing_local_paths_before_network(monkeypatch):
     monkeypatch.setenv("DASHSCOPE_API_KEY", "test-key")
     calls: list[object] = []
@@ -184,6 +329,7 @@ def test_wanx_multi_reference_rejects_missing_local_paths_before_network(monkeyp
             "operation": "multi_image_reference",
             "model": "wan2.7-image-pro",
             "ref_images": ["/tmp/does-not-exist-video-production-buddy.png"],
+            "output_path": "projects/demo/assets/images/wanx-missing-ref.png",
         }
     )
 
@@ -205,6 +351,750 @@ def test_local_diffusion_status_requires_torch_runtime_dependency(monkeypatch):
     monkeypatch.setattr(builtins, "__import__", fake_import)
 
     assert LocalDiffusion().get_status() == ToolStatus.UNAVAILABLE
+
+
+def test_legacy_image_gen_requires_project_output_path_before_client_creation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    calls: list[str] = []
+
+    class FakeOpenAI:
+        def __init__(self) -> None:
+            calls.append("client")
+            raise AssertionError("OpenAI client should not be created for invalid output_path")
+
+    monkeypatch.setitem(sys.modules, "openai", type("OpenAIModule", (), {"OpenAI": FakeOpenAI})())
+
+    result = ImageGen().execute({"prompt": "product hero image", "provider": "openai"})
+
+    assert result.success is False
+    assert "output_path" in (result.error or "")
+    assert "projects/<project-name>/" in (result.error or "")
+    assert calls == []
+
+
+def test_local_diffusion_requires_project_output_path_before_dependency_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    def fake_status(self: LocalDiffusion) -> ToolStatus:
+        calls.append("status")
+        return ToolStatus.UNAVAILABLE
+
+    monkeypatch.setattr(LocalDiffusion, "get_status", fake_status)
+
+    result = LocalDiffusion().execute({"prompt": "product hero image"})
+
+    assert result.success is False
+    assert "output_path" in (result.error or "")
+    assert "projects/<project-name>/" in (result.error or "")
+    assert calls == []
+
+
+def _image_bytes_b64() -> str:
+    return base64.b64encode(b"png").decode("ascii")
+
+
+@pytest.mark.parametrize(
+    ("tool", "env_var", "fake_post"),
+    [
+        (
+            FluxImage(),
+            "FAL_KEY",
+            lambda: SimpleNamespace(
+                json=lambda: {"images": [{"url": "https://example.test/flux.png"}], "seed": 123},
+                raise_for_status=lambda: None,
+            ),
+        ),
+        (
+            RecraftImage(),
+            "FAL_KEY",
+            lambda: SimpleNamespace(
+                json=lambda: {"images": [{"url": "https://example.test/recraft.png"}]},
+                raise_for_status=lambda: None,
+            ),
+        ),
+        (
+            GoogleImagen(),
+            "GOOGLE_API_KEY",
+            lambda: SimpleNamespace(
+                json=lambda: {"predictions": [{"bytesBase64Encoded": _image_bytes_b64()}]},
+                raise_for_status=lambda: None,
+            ),
+        ),
+        (
+            GrokImage(),
+            "XAI_API_KEY",
+            lambda: SimpleNamespace(
+                json=lambda: {"data": [{"b64_json": _image_bytes_b64()}]},
+                raise_for_status=lambda: None,
+            ),
+        ),
+    ],
+)
+def test_api_image_success_payload_includes_output_path(
+    tool: Any,
+    env_var: str,
+    fake_post: Any,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    output_path = f"projects/demo/assets/images/{tool.name}.png"
+
+    monkeypatch.setenv(env_var, "test-key")
+    monkeypatch.setattr("requests.post", lambda *args, **kwargs: fake_post())
+    monkeypatch.setattr(
+        "requests.get",
+        lambda *args, **kwargs: SimpleNamespace(
+            content=b"png",
+            raise_for_status=lambda: None,
+        ),
+    )
+
+    result = tool.execute({"prompt": "product hero image", "output_path": output_path})
+
+    assert result.success
+    assert result.data["output_path"] == output_path
+    assert result.artifacts[0] == output_path
+
+
+@pytest.mark.parametrize(
+    ("tool", "env_var", "fake_post", "expected_properties"),
+    [
+        (
+            FluxImage(),
+            "FAL_KEY",
+            lambda: SimpleNamespace(
+                json=lambda: {
+                    "images": [{"url": "https://example.test/flux.png"}],
+                    "seed": 123,
+                },
+                raise_for_status=lambda: None,
+            ),
+            {"provider", "model", "prompt", "output", "output_path", "seed"},
+        ),
+        (
+            RecraftImage(),
+            "FAL_KEY",
+            lambda: SimpleNamespace(
+                json=lambda: {"images": [{"url": "https://example.test/recraft.png"}]},
+                raise_for_status=lambda: None,
+            ),
+            {"provider", "model", "prompt", "output", "output_path"},
+        ),
+        (
+            GoogleImagen(),
+            "GOOGLE_API_KEY",
+            lambda: SimpleNamespace(
+                json=lambda: {
+                    "predictions": [{"bytesBase64Encoded": _image_bytes_b64()}]
+                },
+                raise_for_status=lambda: None,
+            ),
+            {
+                "provider",
+                "model",
+                "prompt",
+                "aspect_ratio",
+                "output",
+                "output_path",
+                "images_generated",
+            },
+        ),
+        (
+            GrokImage(),
+            "XAI_API_KEY",
+            lambda: SimpleNamespace(
+                json=lambda: {"data": [{"b64_json": _image_bytes_b64()}]},
+                raise_for_status=lambda: None,
+            ),
+            {
+                "provider",
+                "model",
+                "prompt",
+                "generation_mode",
+                "output",
+                "output_path",
+                "outputs",
+                "images_generated",
+            },
+        ),
+    ],
+)
+def test_api_image_success_payload_matches_output_schema(
+    tool: Any,
+    env_var: str,
+    fake_post: Any,
+    expected_properties: set[str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    output_path = f"projects/demo/assets/images/{tool.name}-schema.png"
+
+    monkeypatch.setenv(env_var, "test-key")
+    monkeypatch.setattr("requests.post", lambda *args, **kwargs: fake_post())
+    monkeypatch.setattr(
+        "requests.get",
+        lambda *args, **kwargs: SimpleNamespace(
+            content=b"png",
+            raise_for_status=lambda: None,
+        ),
+    )
+
+    output_properties = tool.output_schema["properties"]
+    assert expected_properties <= set(output_properties)
+
+    result = tool.execute({"prompt": "product hero image", "output_path": output_path})
+
+    assert result.success is True
+    assert result.artifacts[0] == output_path
+    jsonschema.validate(instance=result.data, schema=tool.output_schema)
+
+
+def test_openai_image_success_payload_includes_output_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    output_path = "projects/demo/assets/images/openai.png"
+
+    class FakeOpenAI:
+        def __init__(self) -> None:
+            self.images = SimpleNamespace(
+                generate=lambda **kwargs: SimpleNamespace(
+                    data=[SimpleNamespace(b64_json=_image_bytes_b64())]
+                )
+            )
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=FakeOpenAI))
+
+    result = OpenAIImage().execute(
+        {"prompt": "product hero image", "output_path": output_path}
+    )
+
+    assert result.success
+    assert result.data["output_path"] == output_path
+    assert result.artifacts == [output_path]
+
+
+def test_openai_image_success_payload_matches_output_schema(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    output_path = "projects/demo/assets/images/openai-schema.png"
+
+    class FakeOpenAI:
+        def __init__(self) -> None:
+            self.images = SimpleNamespace(
+                generate=lambda **kwargs: SimpleNamespace(
+                    data=[SimpleNamespace(b64_json=_image_bytes_b64())]
+                )
+            )
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=FakeOpenAI))
+
+    output_properties = OpenAIImage.output_schema["properties"]
+    assert {"provider", "model", "prompt", "output", "output_path"} <= set(
+        output_properties
+    )
+
+    result = OpenAIImage().execute(
+        {"prompt": "product hero image", "output_path": output_path}
+    )
+
+    assert result.success is True
+    assert result.artifacts == [output_path]
+    jsonschema.validate(instance=result.data, schema=OpenAIImage.output_schema)
+
+
+def test_legacy_image_gen_success_payload_includes_output_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    output_path = "projects/demo/assets/images/legacy.png"
+
+    class FakeOpenAI:
+        def __init__(self) -> None:
+            self.images = SimpleNamespace(
+                generate=lambda **kwargs: SimpleNamespace(
+                    data=[SimpleNamespace(b64_json=_image_bytes_b64())]
+                )
+            )
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=FakeOpenAI))
+
+    result = ImageGen().execute(
+        {
+            "prompt": "product hero image",
+            "provider": "openai",
+            "output_path": output_path,
+        }
+    )
+
+    assert result.success
+    assert result.data["output_path"] == output_path
+    assert result.artifacts == [output_path]
+
+
+def test_legacy_image_gen_success_payload_matches_output_schema(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    output_path = "projects/demo/assets/images/legacy-schema.png"
+
+    class FakeOpenAI:
+        def __init__(self) -> None:
+            self.images = SimpleNamespace(
+                generate=lambda **kwargs: SimpleNamespace(
+                    data=[SimpleNamespace(b64_json=_image_bytes_b64())]
+                )
+            )
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setitem(sys.modules, "openai", SimpleNamespace(OpenAI=FakeOpenAI))
+
+    output_properties = ImageGen.output_schema["properties"]
+    assert {"provider", "prompt", "output", "output_path", "model", "seed"} <= set(
+        output_properties
+    )
+
+    result = ImageGen().execute(
+        {
+            "prompt": "product hero image",
+            "provider": "openai",
+            "output_path": output_path,
+        }
+    )
+
+    assert result.success is True
+    assert result.artifacts == [output_path]
+    jsonschema.validate(instance=result.data, schema=ImageGen.output_schema)
+
+
+def test_local_diffusion_success_payload_includes_output_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    output_path = "projects/demo/assets/images/local.png"
+
+    class FakeImage:
+        def save(self, path: str) -> None:
+            Path(path).write_bytes(b"png")
+
+    class FakePipeline:
+        @classmethod
+        def from_pretrained(cls, *args: object, **kwargs: object) -> "FakePipeline":
+            return cls()
+
+        def to(self, device: str) -> "FakePipeline":
+            return self
+
+        def __call__(self, *args: object, **kwargs: object) -> SimpleNamespace:
+            return SimpleNamespace(images=[FakeImage()])
+
+    fake_torch = SimpleNamespace(
+        float16=object(),
+        float32=object(),
+        cuda=SimpleNamespace(is_available=lambda: False),
+        Generator=lambda device=None: SimpleNamespace(
+            manual_seed=lambda seed: SimpleNamespace(seed=seed)
+        ),
+    )
+
+    monkeypatch.setattr(LocalDiffusion, "get_status", lambda self: ToolStatus.AVAILABLE)
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setitem(
+        sys.modules,
+        "diffusers",
+        SimpleNamespace(StableDiffusionPipeline=FakePipeline),
+    )
+
+    result = LocalDiffusion().execute(
+        {"prompt": "product hero image", "output_path": output_path}
+    )
+
+    assert result.success
+    assert result.data["output_path"] == output_path
+    assert result.artifacts == [output_path]
+
+
+def test_local_diffusion_success_payload_matches_output_schema(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    output_path = "projects/demo/assets/images/local-schema.png"
+
+    class FakeImage:
+        def save(self, path: str) -> None:
+            Path(path).write_bytes(b"png")
+
+    class FakePipeline:
+        @classmethod
+        def from_pretrained(cls, *args: object, **kwargs: object) -> "FakePipeline":
+            return cls()
+
+        def to(self, device: str) -> "FakePipeline":
+            return self
+
+        def __call__(self, *args: object, **kwargs: object) -> SimpleNamespace:
+            return SimpleNamespace(images=[FakeImage()])
+
+    fake_torch = SimpleNamespace(
+        float16=object(),
+        float32=object(),
+        cuda=SimpleNamespace(is_available=lambda: False),
+        Generator=lambda device=None: SimpleNamespace(
+            manual_seed=lambda seed: SimpleNamespace(seed=seed)
+        ),
+    )
+
+    monkeypatch.setattr(LocalDiffusion, "get_status", lambda self: ToolStatus.AVAILABLE)
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setitem(
+        sys.modules,
+        "diffusers",
+        SimpleNamespace(StableDiffusionPipeline=FakePipeline),
+    )
+
+    output_properties = LocalDiffusion.output_schema["properties"]
+    assert {"provider", "model", "prompt", "output", "output_path"} <= set(
+        output_properties
+    )
+
+    result = LocalDiffusion().execute(
+        {"prompt": "product hero image", "output_path": output_path}
+    )
+
+    assert result.success is True
+    assert result.artifacts == [output_path]
+    jsonschema.validate(instance=result.data, schema=LocalDiffusion.output_schema)
+
+
+@pytest.mark.parametrize(
+    ("tool", "env_var", "search_payload"),
+    [
+        (
+            PexelsImage(),
+            "PEXELS_API_KEY",
+            {
+                "photos": [
+                    {
+                        "id": 101,
+                        "src": {"large2x": "https://example.test/pexels.jpg"},
+                        "photographer": "Author",
+                        "width": 1280,
+                        "height": 720,
+                    }
+                ],
+                "total_results": 1,
+            },
+        ),
+        (
+            PixabayImage(),
+            "PIXABAY_API_KEY",
+            {
+                "hits": [
+                    {
+                        "id": 202,
+                        "largeImageURL": "https://example.test/pixabay.jpg",
+                        "user": "Author",
+                        "imageWidth": 1280,
+                        "imageHeight": 720,
+                    }
+                ],
+                "total": 1,
+            },
+        ),
+    ],
+)
+def test_stock_image_success_payload_includes_output_path(
+    tool: Any,
+    env_var: str,
+    search_payload: dict[str, object],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    output_path = f"projects/demo/assets/images/{tool.name}.jpg"
+    calls = 0
+
+    def fake_get(*args: object, **kwargs: object) -> SimpleNamespace:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return SimpleNamespace(
+                json=lambda: search_payload,
+                raise_for_status=lambda: None,
+            )
+        return SimpleNamespace(content=b"jpg", raise_for_status=lambda: None)
+
+    monkeypatch.setenv(env_var, "test-key")
+    monkeypatch.setattr("requests.get", fake_get)
+
+    result = tool.execute({"query": "product photography", "output_path": output_path})
+
+    assert result.success
+    assert result.data["output_path"] == output_path
+    assert result.artifacts == [output_path]
+
+
+@pytest.mark.parametrize(
+    ("tool", "env_var", "search_payload", "expected_properties"),
+    [
+        (
+            PexelsImage(),
+            "PEXELS_API_KEY",
+            {
+                "photos": [
+                    {
+                        "id": 101,
+                        "src": {"large2x": "https://example.test/pexels.jpg"},
+                        "photographer": "Author",
+                        "photographer_url": "https://example.test/author",
+                        "alt": "Product on a desk",
+                        "width": 1280,
+                        "height": 720,
+                        "url": "https://example.test/photo",
+                    }
+                ],
+                "total_results": 1,
+            },
+            {
+                "provider",
+                "photo_id",
+                "photographer",
+                "photographer_url",
+                "alt",
+                "width",
+                "height",
+                "query",
+                "output",
+                "output_path",
+                "total_results",
+                "results_returned",
+                "license",
+                "pexels_url",
+            },
+        ),
+        (
+            PixabayImage(),
+            "PIXABAY_API_KEY",
+            {
+                "hits": [
+                    {
+                        "id": 202,
+                        "largeImageURL": "https://example.test/pixabay.jpg",
+                        "user": "Author",
+                        "tags": "product, desk",
+                        "imageWidth": 1280,
+                        "imageHeight": 720,
+                        "pageURL": "https://example.test/photo",
+                    }
+                ],
+                "total": 1,
+            },
+            {
+                "provider",
+                "image_id",
+                "user",
+                "tags",
+                "image_width",
+                "image_height",
+                "query",
+                "output",
+                "output_path",
+                "total_results",
+                "results_returned",
+                "license",
+                "page_url",
+            },
+        ),
+    ],
+)
+def test_stock_image_success_payload_matches_output_schema(
+    tool: Any,
+    env_var: str,
+    search_payload: dict[str, object],
+    expected_properties: set[str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    output_path = f"projects/demo/assets/images/{tool.name}-schema.jpg"
+    calls = 0
+
+    def fake_get(*args: object, **kwargs: object) -> SimpleNamespace:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return SimpleNamespace(
+                json=lambda: search_payload,
+                raise_for_status=lambda: None,
+            )
+        return SimpleNamespace(content=b"jpg", raise_for_status=lambda: None)
+
+    monkeypatch.setenv(env_var, "test-key")
+    monkeypatch.setattr("requests.get", fake_get)
+
+    output_properties = tool.output_schema["properties"]
+    assert expected_properties <= set(output_properties)
+
+    result = tool.execute({"query": "product photography", "output_path": output_path})
+
+    assert result.success is True
+    assert (tmp_path / output_path).read_bytes() == b"jpg"
+    assert result.artifacts == [output_path]
+    jsonschema.validate(instance=result.data, schema=tool.output_schema)
+
+
+def test_wanx_success_payload_includes_output_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    output_path = "projects/demo/assets/images/wanx.png"
+
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "requests.post",
+        lambda *args, **kwargs: SimpleNamespace(
+            json=lambda: {"output": {"task_id": "task-1"}},
+            raise_for_status=lambda: None,
+        ),
+    )
+    monkeypatch.setattr(
+        WanxImage,
+        "_poll_task",
+        lambda self, task_id, api_key, api_style: (
+            "SUCCEEDED",
+            [{"url": "https://example.test/wanx.png", "seed": 123}],
+        ),
+    )
+
+    def fake_download(
+        self: WanxImage,
+        results: list[dict[str, object]],
+        base_output_path: str,
+        model: str,
+    ) -> list[str]:
+        path = Path(base_output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"png")
+        return [str(path)]
+
+    monkeypatch.setattr(WanxImage, "_download_images", fake_download)
+
+    result = WanxImage().execute({"prompt": "product hero", "output_path": output_path})
+
+    assert result.success
+    assert result.data["output_path"] == output_path
+    assert result.artifacts == [output_path]
+
+
+def test_wanx_success_payload_matches_output_schema(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    output_path = "projects/demo/assets/images/wanx-schema.png"
+
+    monkeypatch.setenv("DASHSCOPE_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "requests.post",
+        lambda *args, **kwargs: SimpleNamespace(
+            json=lambda: {"output": {"task_id": "task-1"}},
+            raise_for_status=lambda: None,
+        ),
+    )
+    monkeypatch.setattr(
+        WanxImage,
+        "_poll_task",
+        lambda self, task_id, api_key, api_style: (
+            "SUCCEEDED",
+            [{"url": "https://example.test/wanx.png", "seed": 123}],
+        ),
+    )
+
+    def fake_download(
+        self: WanxImage,
+        results: list[dict[str, object]],
+        base_output_path: str,
+        model: str,
+    ) -> list[str]:
+        path = Path(base_output_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"png")
+        return [str(path)]
+
+    monkeypatch.setattr(WanxImage, "_download_images", fake_download)
+
+    output_properties = WanxImage.output_schema["properties"]
+    assert {
+        "provider",
+        "model",
+        "model_name",
+        "operation",
+        "prompt",
+        "size",
+        "n",
+        "output",
+        "output_path",
+        "outputs",
+        "seed",
+    } <= set(output_properties)
+
+    result = WanxImage().execute({"prompt": "product hero", "output_path": output_path})
+
+    assert result.success is True
+    assert result.artifacts == [output_path]
+    jsonschema.validate(instance=result.data, schema=WanxImage.output_schema)
+
+
+@pytest.mark.parametrize(
+    "tool_cls",
+    [
+        FluxImage,
+        GoogleImagen,
+        GrokImage,
+        ImageGen,
+        LocalDiffusion,
+        OpenAIImage,
+        RecraftImage,
+        WanxImage,
+    ],
+)
+def test_legacy_image_generator_schemas_require_output_path(
+    tool_cls: type[Any],
+) -> None:
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            instance={"prompt": "product hero image"},
+            schema=tool_cls.input_schema,
+        )
+
+
+@pytest.mark.parametrize(
+    "tool_cls",
+    [PexelsImage, PixabayImage],
+)
+def test_stock_image_schemas_require_output_path(tool_cls: type[Any]) -> None:
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            instance={"query": "product photography"},
+            schema=tool_cls.input_schema,
+        )
 
 
 @pytest.mark.parametrize(

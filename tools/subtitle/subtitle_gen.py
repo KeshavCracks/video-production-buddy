@@ -21,6 +21,7 @@ from tools.base_tool import (
     ToolStability,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class SubtitleGen(BaseTool):
@@ -45,7 +46,7 @@ class SubtitleGen(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["segments"],
+        "required": ["segments", "output_path"],
         "properties": {
             "segments": {
                 "type": "array",
@@ -75,6 +76,16 @@ class SubtitleGen(BaseTool):
             },
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": ["format", "cue_count", "output", "output_path"],
+        "properties": {
+            "format": {"type": "string", "enum": ["srt", "vtt", "json"]},
+            "cue_count": {"type": "integer", "minimum": 0},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+        },
+    }
 
     resource_profile = ResourceProfile(cpu_cores=1, ram_mb=128, vram_mb=0, disk_mb=10)
     idempotency_key_fields = [
@@ -88,7 +99,7 @@ class SubtitleGen(BaseTool):
     ]
     side_effects = ["writes subtitle file to output_path"]
     user_visible_verification = [
-        "Play video with generated subtitles and verify timing",
+        "Inspect subtitle timing against transcript/video timestamps",
     ]
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
@@ -97,7 +108,6 @@ class SubtitleGen(BaseTool):
         max_words = inputs.get("max_words_per_cue", 8)
         max_chars = inputs.get("max_chars_per_line", 42)
         highlight_style = inputs.get("highlight_style", "none")
-        output_path = inputs.get("output_path")
         corrections = inputs.get("corrections")
 
         start = time.time()
@@ -117,19 +127,31 @@ class SubtitleGen(BaseTool):
 
         if fmt == "srt":
             content = self._render_srt(cues, highlight_style)
-            ext = ".srt"
         elif fmt == "vtt":
             content = self._render_vtt(cues, highlight_style)
-            ext = ".vtt"
         elif fmt == "json":
-            content = json.dumps({"cues": cues, "highlight_style": highlight_style}, indent=2)
-            ext = ".caption.json"
+            try:
+                content = json.dumps(
+                    {"cues": cues, "highlight_style": highlight_style},
+                    indent=2,
+                    allow_nan=False,
+                )
+            except (TypeError, ValueError) as exc:
+                return ToolResult(
+                    success=False,
+                    error=f"Caption JSON must be strict JSON serializable: {exc}",
+                )
         else:
             return ToolResult(success=False, error=f"Unknown format: {fmt}")
 
-        if output_path is None:
-            output_path = f"subtitles{ext}"
-        out = Path(output_path)
+        out, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="subtitle file",
+        )
+        if output_error:
+            return output_error
+        assert out is not None
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(content, encoding="utf-8")
 
@@ -141,6 +163,7 @@ class SubtitleGen(BaseTool):
                 "format": fmt,
                 "cue_count": len(cues),
                 "output": str(out),
+                "output_path": str(out),
             },
             artifacts=[str(out)],
             duration_seconds=round(elapsed, 2),

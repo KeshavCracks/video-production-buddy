@@ -10,6 +10,7 @@ DEFAULT MODEL:    wav2lip (faster, good sync accuracy)
 HIGHER QUALITY:   wav2lip_gan (better visual quality, slower)
 FACE PADDING:     [0, 10, 0, 0] (top, bottom, left, right)
 INPUT:            Video with visible face + audio to sync to
+OUTPUT_PATH:      Required; write under projects/<project-name>/assets/... or projects/<project-name>/renders/...
 RESIZE FACTOR:    1 = full res (best), 2 = half res (recommended for drafts)
 KEY RULE:         Use lip_sync for VIDEO input; use talking_head for PHOTO input
 ```
@@ -131,3 +132,4 @@ When using the `lip_sync` tool in post-production:
 5. **Check that audio length matches video length before syncing** -- trim or pad audio if needed to stay within 10% of video duration
 6. **Face padding `[0, 10, 0, 0]` works for 90% of talking-head footage** -- only adjust if you see cropping artifacts
 7. **For close-up shots, always use `wav2lip_gan`** -- the quality difference is visible at this framing
+8. **Pass an explicit `output_path`** such as `projects/<project-name>/assets/video/en_lipsync.mp4`; do not rely on input-adjacent defaults

@@ -10,11 +10,10 @@ Tests the full compliance workflow for all checkpoint families:
 Tests both passing and failing scenarios using realistic artifact shapes
 that mirror actual pipeline data.
 
-Run: python3 tests/tools/test_preproduction_integration.py
+Run: VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider tests/tools/test_preproduction_integration.py -q
 """
 
 import sys
-import traceback
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
@@ -767,67 +766,3 @@ def test_audio_video_duration_alignment():
             "audio stream is more than 1s shorter than the target duration. "
             "Check for corrupt TTS files or broken sidechaincompress filter graph."
         )
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Standalone runner
-# ─────────────────────────────────────────────────────────────────────────────
-
-if __name__ == "__main__":
-    tests = [
-        # Script timing
-        test_script_B1_timing_passes,
-        test_script_B2_timing_passes,
-        test_script_B5_timing_passes,
-        test_script_B1_timing_fails_too_long,
-        test_script_timing_ignores_other_beats,
-        test_script_timing_sums_split_sections,
-        test_script_timing_works_with_maps_to_beat,
-        test_script_timing_empty_sections_fails,
-        test_script_semantic_cp_rejected,
-        # Prohibited elements
-        test_script_prohibited_elements_clean,
-        test_script_prohibited_element_found,
-        test_script_prohibited_case_insensitive,
-        test_script_prohibited_partial_match,
-        # Scene motif presence
-        test_scene_clock_imagery_passes_count,
-        test_scene_clock_imagery_fails_count,
-        test_scene_notification_avalanche_passes,
-        test_scene_notification_avalanche_absent,
-        # Scene beat mapping
-        test_scene_app_reveal_mapped_to_B3_passes,
-        test_scene_logo_cta_mapped_to_B5_passes,
-        test_scene_app_reveal_missing_from_B3,
-        test_scene_beat_mapping_wrong_beat,
-        # Brand constraints
-        test_scene_brand_in_final_scene_passes,
-        test_scene_brand_missing_from_all_scenes,
-        # Asset manifest
-        test_asset_manifest_mandatory_elements_pass,
-        test_asset_manifest_missing_mandatory_elements,
-        # Edit rhythm confidence
-        test_edit_pattern_inferred_is_revise_level,
-        test_edit_default_heuristic_is_flag_level,
-        # Result structure
-        test_result_always_includes_checkpoint_id,
-        test_pass_result_has_null_deviation,
-        test_fail_result_has_non_null_deviation,
-        test_result_includes_actual_value,
-        test_research_grounded_maps_to_revise,
-        test_all_checkpoint_types_covered,
-        test_all_stages_covered,
-        test_audio_video_duration_alignment,
-    ]
-    passed = failed = 0
-    for t in tests:
-        try:
-            t()
-            print(f"[PASS] {t.__name__}")
-            passed += 1
-        except Exception as e:
-            print(f"[FAIL] {t.__name__}: {e}")
-            import traceback; traceback.print_exc()
-            failed += 1
-    print(f"\n{passed}/{passed + failed} tests passed")
-    import sys; sys.exit(0 if failed == 0 else 1)

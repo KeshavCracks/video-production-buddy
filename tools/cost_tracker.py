@@ -10,6 +10,7 @@ Implements the budget governance rules from the spec:
 from __future__ import annotations
 
 import json
+import math
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
@@ -17,6 +18,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from lib.config_model import BudgetMode
+from schemas.artifacts import load_strict_json_object
 
 
 class EntryStatus(str, Enum):
@@ -100,13 +102,14 @@ class CostTracker:
 
     def estimate(self, tool: str, operation: str, estimated_usd: float) -> str:
         """Record an estimate. Returns entry ID."""
+        estimated = self._strict_usd(estimated_usd, "estimated_usd")
         entry_id = self._new_id()
         self.entries.append({
             "id": entry_id,
             "tool": tool,
             "operation": operation,
             "status": EntryStatus.ESTIMATED.value,
-            "estimated_usd": round(estimated_usd, 4),
+            "estimated_usd": estimated,
             "reserved_usd": 0.0,
             "actual_usd": 0.0,
             "timestamp": self._now(),
@@ -171,10 +174,11 @@ class CostTracker:
 
     def reconcile(self, entry_id: str, actual_usd: float, success: bool = True) -> None:
         """Reconcile actual spend after tool execution."""
+        actual = self._strict_usd(actual_usd, "actual_usd")
         entry = self._find(entry_id)
         self._require_status(entry, EntryStatus.RESERVED, "reconciled")
         entry["status"] = EntryStatus.COMPLETED.value if success else EntryStatus.FAILED.value
-        entry["actual_usd"] = round(actual_usd, 4)
+        entry["actual_usd"] = actual
         entry["reserved_usd"] = 0.0
         entry["timestamp"] = self._now()
         self._save()
@@ -507,13 +511,16 @@ class CostTracker:
                 "approved_tools": sorted(self._approved_tools),
             },
         }
+        serialized = json.dumps(data, indent=2, allow_nan=False)
         self.cost_log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.cost_log_path, "w") as f:
-            json.dump(data, f, indent=2)
+            f.write(serialized)
 
     def _load(self) -> None:
-        with open(self.cost_log_path) as f:  # type: ignore[arg-type]
-            data = json.load(f)
+        data = load_strict_json_object(
+            self.cost_log_path,  # type: ignore[arg-type]
+            context=f"cost log {self.cost_log_path}",
+        )
         self.entries = data.get("entries", [])
         self.budget_total_usd = data.get("budget_total_usd", self.budget_total_usd)
         metadata = data.get("metadata", {})
@@ -555,3 +562,15 @@ class CostTracker:
     @staticmethod
     def _now() -> str:
         return datetime.now(timezone.utc).isoformat()
+
+    @staticmethod
+    def _strict_usd(value: float, field_name: str) -> float:
+        try:
+            amount = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"{field_name} must be a finite strict JSON number"
+            ) from exc
+        if not math.isfinite(amount):
+            raise ValueError(f"{field_name} must be a finite strict JSON number")
+        return round(amount, 4)

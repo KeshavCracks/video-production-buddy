@@ -24,6 +24,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_project_sidecar_path
 
 
 class FaceTracker(BaseTool):
@@ -57,12 +58,12 @@ class FaceTracker(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["input_path"],
+        "required": ["input_path", "output_path"],
         "properties": {
             "input_path": {"type": "string"},
             "output_path": {
                 "type": "string",
-                "description": "Path for face tracking JSON output",
+                "description": "Project-scoped face tracking JSON path under projects/<project-name>/artifacts/..., assets/..., or renders/...",
             },
             "sample_fps": {
                 "type": "number",
@@ -80,32 +81,27 @@ class FaceTracker(BaseTool):
 
     output_schema = {
         "type": "object",
+        "required": [
+            "output",
+            "output_path",
+            "video_width",
+            "video_height",
+            "fps",
+            "duration_seconds",
+            "frames_sampled",
+            "faces_detected",
+            "method",
+        ],
         "properties": {
-            "frame_count": {"type": "integer"},
-            "face_detected_count": {"type": "integer"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
             "video_width": {"type": "integer"},
             "video_height": {"type": "integer"},
             "fps": {"type": "number"},
             "duration_seconds": {"type": "number"},
-            "faces": {
-                "type": "array",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "frame_index": {"type": "integer"},
-                        "timestamp_seconds": {"type": "number"},
-                        "bbox": {
-                            "type": "object",
-                            "properties": {
-                                "x": {"type": "number"},
-                                "y": {"type": "number"},
-                                "width": {"type": "number"},
-                                "height": {"type": "number"},
-                            },
-                        },
-                    },
-                },
-            },
+            "frames_sampled": {"type": "integer"},
+            "faces_detected": {"type": "integer"},
+            "method": {"type": "string", "enum": ["mediapipe", "opencv_haar"]},
         },
     }
 
@@ -149,15 +145,22 @@ class FaceTracker(BaseTool):
         if not input_path.exists():
             return ToolResult(success=False, error=f"Input not found: {input_path}")
 
+        output_path, output_error = require_explicit_project_sidecar_path(
+            inputs,
+            "output_path",
+            self.name,
+            artifact_label="face tracking metadata",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+
         if not self._has_opencv():
             return ToolResult(
                 success=False,
                 error="opencv-python is required. Install: pip install opencv-python",
             )
 
-        output_path = Path(
-            inputs.get("output_path", str(input_path.with_suffix(".faces.json")))
-        )
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         sample_fps = inputs.get("sample_fps", 5)
@@ -172,12 +175,20 @@ class FaceTracker(BaseTool):
 
         elapsed = time.time() - start
 
-        output_path.write_text(json.dumps(result_data, indent=2), encoding="utf-8")
+        try:
+            serialized = json.dumps(result_data, indent=2, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            return ToolResult(
+                success=False,
+                error=f"Face tracking result must be strict JSON serializable: {exc}",
+            )
+        output_path.write_text(serialized, encoding="utf-8")
 
         return ToolResult(
             success=True,
             data={
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "video_width": result_data["video_width"],
                 "video_height": result_data["video_height"],
                 "fps": result_data["fps"],

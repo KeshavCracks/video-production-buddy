@@ -20,6 +20,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 # Theme presets mapping to Pygments styles and background colors
@@ -89,7 +90,7 @@ class CodeSnippet(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["code"],
+        "required": ["code", "output_path"],
         "properties": {
             "code": {"type": "string"},
             "language": {"type": "string", "default": "python"},
@@ -103,8 +104,35 @@ class CodeSnippet(BaseTool):
             "border_radius": {"type": "integer", "default": 12},
             "line_numbers": {"type": "boolean", "default": True},
             "title": {"type": "string", "description": "Optional title bar text"},
-            "output_path": {"type": "string"},
+            "output_path": {
+                "type": "string",
+                "description": (
+                    "Explicit project-scoped output image path under "
+                    "projects/<project-name>/assets/... or projects/<project-name>/renders/..."
+                ),
+            },
             "width": {"type": "integer", "description": "Force specific width"},
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "output",
+            "output_path",
+            "language",
+            "theme",
+            "width",
+            "height",
+            "line_count",
+        ],
+        "properties": {
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "language": {"type": "string"},
+            "theme": {"type": "string", "enum": list(THEMES.keys())},
+            "width": {"type": "integer", "minimum": 1},
+            "height": {"type": "integer", "minimum": 1},
+            "line_count": {"type": "integer", "minimum": 1},
         },
     }
 
@@ -134,6 +162,15 @@ class CodeSnippet(BaseTool):
             return ToolStatus.UNAVAILABLE
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="code snippet image",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+
         try:
             from PIL import Image, ImageDraw, ImageFont
             from pygments import highlight
@@ -154,7 +191,6 @@ class CodeSnippet(BaseTool):
         padding = inputs.get("padding", 40)
         line_numbers = inputs.get("line_numbers", True)
         title = inputs.get("title")
-        output_path = Path(inputs.get("output_path", "code_snippet.png"))
 
         theme = THEMES.get(theme_name, THEMES["monokai"])
 
@@ -192,6 +228,7 @@ class CodeSnippet(BaseTool):
             success=True,
             data={
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "language": language,
                 "theme": theme_name,
                 "width": img.width,

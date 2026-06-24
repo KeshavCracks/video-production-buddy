@@ -90,7 +90,7 @@ Before rendering, present the user with audio options and get their preferences.
        'text': narration_script,
        'voice': '<user-chosen or agent-recommended>',
        'instructions': '<voice direction matching video tone>',
-       'output_path': 'path/to/narration.mp3',
+       'output_path': 'projects/<project-name>/assets/audio/narration.mp3',
    })
    # CRITICAL: Check result.data['audio_duration_seconds'] vs video duration
    # If narration exceeds video by >1s: shorten script and regenerate
@@ -103,7 +103,7 @@ Before rendering, present the user with audio options and get their preferences.
        'query': '<mood/genre matching video topic>',
        'min_duration': video_duration_seconds,
        'max_duration': 300,
-       'output_path': 'path/to/music.mp3',
+       'output_path': 'projects/<project-name>/assets/audio/music.mp3',
    })
    ```
 
@@ -111,9 +111,10 @@ Before rendering, present the user with audio options and get their preferences.
    ```python
    from tools.analysis.transcriber import Transcriber
    result = Transcriber().execute({
-       'input_path': 'path/to/narration.mp3',
+       'input_path': 'projects/<project-name>/assets/audio/narration.mp3',
        'model_size': 'base',
        'language': 'en',
+       'output_dir': 'projects/<project>/artifacts/transcripts',
    })
    # Convert word_timestamps to Remotion caption format:
    # [{ "word": "Hello", "startMs": 0, "endMs": 340 }, ...]
@@ -123,8 +124,8 @@ Before rendering, present the user with audio options and get their preferences.
    ```json
    {
      "audio": {
-       "narration": { "src": "path/to/narration.mp3", "volume": 1 },
-       "music": { "src": "path/to/music.mp3", "volume": 0.1, "fadeInSeconds": 2, "fadeOutSeconds": 3 }
+       "narration": { "src": "projects/<project-name>/assets/audio/narration.mp3", "volume": 1 },
+       "music": { "src": "projects/<project-name>/assets/audio/music.mp3", "volume": 0.1, "fadeInSeconds": 2, "fadeOutSeconds": 3 }
      },
      "captions": [ ... word-level captions from WhisperX ... ]
    }
@@ -280,7 +281,7 @@ If Remotion is not available, fall back to SRT generation + FFmpeg burn:
 ```python
 from tools.analysis.composition_validator import CompositionValidator
 result = CompositionValidator().execute({
-    'composition_path': 'path/to/composition.json',
+    'composition_path': 'projects/<project-name>/artifacts/composition.json',
     'assets_root': 'remotion-composer/public',
 })
 # result.data['valid'] MUST be True before proceeding to render
@@ -320,10 +321,10 @@ the video to the user. Fix the audio configuration and re-render.**
 from tools.analysis.frame_sampler import FrameSampler
 midpoints = [(cut['in_seconds'] + cut['out_seconds']) / 2 for cut in cuts]
 FrameSampler().execute({
-    'input_path': 'path/to/rendered_video.mp4',
+    'input_path': f'projects/{project_id}/renders/final.mp4',
     'strategy': 'timestamps',
     'timestamps': midpoints,
-    'output_dir': 'path/to/review-frames',
+    'output_dir': f'projects/{project_id}/assets/review_frames',
     'format': 'png',
 })
 ```
@@ -332,10 +333,10 @@ FrameSampler().execute({
 ```python
 from tools.analysis.transcriber import Transcriber
 result = Transcriber().execute({
-    'input_path': 'path/to/rendered_video.mp4',
+    'input_path': f'projects/{project_id}/renders/final.mp4',
     'model_size': 'base',
     'language': 'en',
-    'output_dir': 'path/to/review-frames',
+    'output_dir': f'projects/{project_id}/artifacts/transcripts',
 })
 # If result returns 0 words: audio is silent/missing — STOP and fix
 # If word count < 80% of script word count: audio is cut off — investigate

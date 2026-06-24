@@ -18,7 +18,14 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
-from tools.video._shared import HEYGEN_PROVIDERS, estimate_quality_cost, estimate_speed_runtime, generate_heygen_video
+from tools.video._shared import (
+    HEYGEN_PROVIDERS,
+    estimate_quality_cost,
+    estimate_speed_runtime,
+    generate_heygen_video,
+    require_generated_video_output_path,
+    validate_video_operation,
+)
 
 
 class HeyGenVideo(BaseTool):
@@ -63,7 +70,7 @@ class HeyGenVideo(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {"type": "string"},
             "operation": {
@@ -86,6 +93,35 @@ class HeyGenVideo(BaseTool):
             "output_path": {"type": "string"},
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "provider_variant",
+            "provider_name",
+            "mode",
+            "prompt",
+            "aspect_ratio",
+            "operation",
+            "execution_id",
+            "output",
+            "output_path",
+            "format",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "heygen"},
+            "provider_variant": {"type": "string"},
+            "provider_name": {"type": "string"},
+            "mode": {"type": "string", "const": "api"},
+            "prompt": {"type": "string"},
+            "aspect_ratio": {"type": "string"},
+            "operation": {"type": "string", "enum": ["text_to_video", "image_to_video"]},
+            "execution_id": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "format": {"type": "string", "const": "mp4"},
+        },
+    }
 
     resource_profile = ResourceProfile(cpu_cores=1, ram_mb=512, vram_mb=0, disk_mb=500, network_required=True)
     retry_policy = RetryPolicy(max_retries=2, backoff_seconds=10.0, retryable_errors=["rate_limit", "timeout", "server_error"])
@@ -99,7 +135,7 @@ class HeyGenVideo(BaseTool):
         "aspect_ratio",
     ]
     side_effects = ["writes video file to output_path", "calls HeyGen API"]
-    user_visible_verification = ["Watch generated clip for motion quality and prompt adherence"]
+    user_visible_verification = ["Inspect sampled frames for motion quality and prompt adherence"]
 
     def get_status(self) -> ToolStatus:
         return ToolStatus.AVAILABLE if os.environ.get("HEYGEN_API_KEY") else ToolStatus.UNAVAILABLE
@@ -113,6 +149,30 @@ class HeyGenVideo(BaseTool):
         return estimate_speed_runtime(meta["speed"])
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        provider = inputs.get("provider_variant", "veo_3_1")
+        if provider not in HEYGEN_PROVIDERS:
+            return ToolResult(
+                success=False,
+                error=(
+                    f"Unknown provider_variant: {provider}. "
+                    f"Available: {', '.join(sorted(HEYGEN_PROVIDERS))}"
+                ),
+            )
+        operation = inputs.get("operation", "text_to_video")
+        operation_error = validate_video_operation(operation, {"text_to_video", "image_to_video"})
+        if operation_error:
+            return ToolResult(success=False, error=operation_error)
+        if operation == "image_to_video" and not (
+            inputs.get("reference_image_url") or inputs.get("reference_image_path")
+        ):
+            return ToolResult(
+                success=False,
+                error="image_to_video requires reference_image_url or reference_image_path",
+            )
+        _, output_error = require_generated_video_output_path(inputs, self.name)
+        if output_error:
+            return output_error
+
         if self.get_status() != ToolStatus.AVAILABLE:
             return ToolResult(success=False, error="HeyGen video generation is unavailable. " + self.install_instructions)
         start = time.time()
@@ -123,4 +183,3 @@ class HeyGenVideo(BaseTool):
         result.duration_seconds = round(time.time() - start, 2)
         result.cost_usd = self.estimate_cost(inputs)
         return result
-

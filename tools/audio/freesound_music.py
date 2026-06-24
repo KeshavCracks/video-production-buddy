@@ -26,6 +26,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class FreesoundMusic(BaseTool):
@@ -71,7 +72,7 @@ class FreesoundMusic(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["query"],
+        "required": ["query", "output_path"],
         "properties": {
             "query": {
                 "type": "string",
@@ -91,8 +92,44 @@ class FreesoundMusic(BaseTool):
             },
             "output_path": {
                 "type": "string",
-                "description": "File path to save the downloaded MP3",
+                "description": (
+                    "Explicit project-scoped output MP3 path under "
+                    "projects/<project-name>/assets/... or projects/<project-name>/renders/..."
+                ),
             },
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "sound_id",
+            "name",
+            "duration_seconds",
+            "avg_rating",
+            "tags",
+            "query",
+            "format",
+            "output",
+            "output_path",
+            "license",
+            "freesound_url",
+            "results_found",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "freesound"},
+            "sound_id": {"type": ["integer", "string", "null"]},
+            "name": {"type": "string"},
+            "duration_seconds": {"type": ["number", "null"], "minimum": 0},
+            "avg_rating": {"type": ["number", "null"]},
+            "tags": {"type": "array", "items": {"type": "string"}},
+            "query": {"type": "string"},
+            "format": {"type": "string", "const": "mp3"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "license": {"type": "string"},
+            "freesound_url": {"type": "string"},
+            "results_found": {"type": "integer", "minimum": 0},
         },
     }
 
@@ -103,7 +140,7 @@ class FreesoundMusic(BaseTool):
     idempotency_key_fields = ["query", "output_path", "min_duration", "max_duration"]
     side_effects = ["writes audio file to output_path", "calls Freesound API"]
     user_visible_verification = [
-        "Listen to downloaded track for mood and quality",
+        "Inspect audio metadata, duration, tags, and waveform metrics for mood and quality fit",
         "Check Creative Commons license terms for your use case",
     ]
 
@@ -118,6 +155,17 @@ class FreesoundMusic(BaseTool):
         return 0.0  # Freesound is free
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="downloaded music track",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+        inputs = dict(inputs)
+        inputs["output_path"] = str(output_path)
+
         api_key = os.environ.get("FREESOUND_API_KEY")
         if not api_key:
             return ToolResult(
@@ -162,6 +210,7 @@ class FreesoundMusic(BaseTool):
                 "tags": sound.get("tags", []),
                 "query": inputs["query"],
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "format": "mp3",
                 "license": "Creative Commons (check individual sound license)",
                 "freesound_url": f"https://freesound.org/people/{sound.get('username', '')}/sounds/{sound.get('id', '')}/",
@@ -211,11 +260,7 @@ class FreesoundMusic(BaseTool):
                 f"No preview URL available for sound {sound.get('id')} ({sound.get('name')})"
             )
 
-        # Build output path
-        sound_name = sound.get("name", f"freesound_{sound.get('id', 'unknown')}")
-        safe_name = "".join(c if c.isalnum() or c in "._- " else "_" for c in sound_name)
-        default_filename = f"freesound_{sound.get('id')}_{safe_name}.mp3"
-        output_path = Path(inputs.get("output_path", default_filename))
+        output_path = Path(inputs["output_path"])
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         request = urllib.request.Request(

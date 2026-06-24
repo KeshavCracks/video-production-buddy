@@ -6,6 +6,7 @@ from pathlib import Path
 import jsonschema
 import pytest
 
+from tools.base_tool import ToolResult, ToolStatus
 from tools.video.video_stitch import VideoStitch
 
 
@@ -73,6 +74,343 @@ def test_video_stitch_idempotency_key_includes_output_and_render_parameters():
 
     for variant in variants:
         assert tool.idempotency_key({**base, **variant}) != base_key
+
+
+def test_video_stitch_dry_run_would_execute_reflects_dependency_status(monkeypatch):
+    tool = VideoStitch()
+    monkeypatch.setattr(tool, "get_status", lambda: ToolStatus.UNAVAILABLE)
+
+    result = tool.dry_run({"operation": "stitch", "clips": []})
+
+    assert result["status"] == ToolStatus.UNAVAILABLE.value
+    assert result["would_execute"] is False
+
+
+@pytest.mark.parametrize("output_kind", ["missing", "relative", "absolute"])
+def test_video_stitch_requires_project_output_path_before_probe_or_stitch(
+    output_kind: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    clip_a = tmp_path / "a.mp4"
+    clip_b = tmp_path / "b.mp4"
+    clip_a.write_bytes(b"a")
+    clip_b.write_bytes(b"b")
+    tool = VideoStitch()
+    probe_calls: list[str] = []
+    stitch_calls: list[Path] = []
+
+    def fake_probe(path: str) -> dict[str, object]:
+        probe_calls.append(path)
+        return {
+            "width": 640,
+            "height": 360,
+            "fps": 24,
+            "duration": 1.0,
+            "video_codec": "h264",
+            "audio_codec": "aac",
+            "sample_rate": 44100,
+        }
+
+    def fake_stitch_cut(
+        clips: list[str],
+        output_path: Path,
+        temp_dir: Path,
+        temp_files: list[Path],
+    ) -> dict[str, object]:
+        stitch_calls.append(output_path)
+        output_path.write_bytes(b"stitched")
+        return {"method": "concat_demuxer"}
+
+    monkeypatch.setattr(tool, "_probe_clip", fake_probe)
+    monkeypatch.setattr(tool, "_stitch_cut", fake_stitch_cut)
+    inputs: dict[str, object] = {
+        "operation": "stitch",
+        "clips": [str(clip_a), str(clip_b)],
+    }
+    if output_kind == "relative":
+        inputs["output_path"] = "stitched.mp4"
+        forbidden_output = tmp_path / "stitched.mp4"
+    elif output_kind == "absolute":
+        forbidden_output = tmp_path / "stitched.mp4"
+        inputs["output_path"] = str(forbidden_output)
+    else:
+        forbidden_output = tmp_path / "stitched_output.mp4"
+
+    result = tool.execute(inputs)
+
+    assert result.success is False
+    assert "output_path" in (result.error or "")
+    assert "projects/<project-name>/" in (result.error or "")
+    assert probe_calls == []
+    assert stitch_calls == []
+    assert not forbidden_output.exists()
+
+
+@pytest.mark.parametrize("output_kind", ["missing", "relative", "absolute"])
+def test_video_stitch_preview_requires_project_output_path_before_stitch(
+    output_kind: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    clip_a = tmp_path / "a.mp4"
+    clip_b = tmp_path / "b.mp4"
+    clip_a.write_bytes(b"a")
+    clip_b.write_bytes(b"b")
+    tool = VideoStitch()
+    stitch_inputs: list[dict[str, object]] = []
+
+    def fake_stitch(inputs: dict[str, object]) -> ToolResult:
+        stitch_inputs.append(inputs)
+        output_path = Path(str(inputs["output_path"]))
+        output_path.write_bytes(b"preview")
+        return ToolResult(success=True, data={"operation": "stitch"})
+
+    monkeypatch.setattr(tool, "_stitch", fake_stitch)
+    inputs: dict[str, object] = {
+        "operation": "preview_stitch",
+        "clips": [str(clip_a), str(clip_b)],
+    }
+    if output_kind == "relative":
+        inputs["output_path"] = "preview.mp4"
+        forbidden_output = tmp_path / "preview.mp4"
+    elif output_kind == "absolute":
+        forbidden_output = tmp_path / "preview.mp4"
+        inputs["output_path"] = str(forbidden_output)
+    else:
+        forbidden_output = tmp_path / "stitch_preview.mp4"
+
+    result = tool.execute(inputs)
+
+    assert result.success is False
+    assert "output_path" in (result.error or "")
+    assert "projects/<project-name>/" in (result.error or "")
+    assert stitch_inputs == []
+    assert not forbidden_output.exists()
+
+
+@pytest.mark.parametrize("output_kind", ["missing", "relative", "absolute"])
+def test_video_stitch_spatial_requires_project_output_path_before_render(
+    output_kind: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    clip_a = tmp_path / "a.mp4"
+    clip_b = tmp_path / "b.mp4"
+    clip_a.write_bytes(b"a")
+    clip_b.write_bytes(b"b")
+    tool = VideoStitch()
+    ensure_calls: list[list[str]] = []
+    render_calls: list[Path] = []
+    probe_calls: list[str] = []
+
+    def fake_ensure(
+        clips: list[str],
+        temp_dir: Path,
+        temp_files: list[Path],
+    ) -> list[str]:
+        ensure_calls.append(list(clips))
+        return list(clips)
+
+    def fake_side_by_side(
+        clips: list[str],
+        output_path: Path,
+        codec: str,
+        crf: int,
+    ) -> None:
+        render_calls.append(output_path)
+        output_path.write_bytes(b"spatial")
+
+    def fake_probe(path: str) -> dict[str, object]:
+        probe_calls.append(path)
+        return {"duration": 1.0}
+
+    monkeypatch.setattr(tool, "_ensure_audio_for_clips", fake_ensure)
+    monkeypatch.setattr(tool, "_spatial_side_by_side", fake_side_by_side)
+    monkeypatch.setattr(tool, "_probe_clip", fake_probe)
+    inputs: dict[str, object] = {
+        "operation": "spatial",
+        "clips": [str(clip_a), str(clip_b)],
+        "layout": "side_by_side",
+    }
+    if output_kind == "relative":
+        inputs["output_path"] = "spatial.mp4"
+        forbidden_output = tmp_path / "spatial.mp4"
+    elif output_kind == "absolute":
+        forbidden_output = tmp_path / "spatial.mp4"
+        inputs["output_path"] = str(forbidden_output)
+    else:
+        forbidden_output = tmp_path / "spatial_output.mp4"
+
+    result = tool.execute(inputs)
+
+    assert result.success is False
+    assert "output_path" in (result.error or "")
+    assert "projects/<project-name>/" in (result.error or "")
+    assert ensure_calls == []
+    assert render_calls == []
+    assert probe_calls == []
+    assert not forbidden_output.exists()
+
+
+def test_video_stitch_success_payload_includes_output_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    clip_a = tmp_path / "a.mp4"
+    clip_b = tmp_path / "b.mp4"
+    clip_a.write_bytes(b"a")
+    clip_b.write_bytes(b"b")
+    output_path = Path("projects/demo/renders/stitched.mp4")
+    tool = VideoStitch()
+
+    def fake_probe(path: str) -> dict[str, object]:
+        return {
+            "width": 640,
+            "height": 360,
+            "fps": 24,
+            "duration": 2.0,
+            "video_codec": "h264",
+            "audio_codec": "aac",
+            "sample_rate": 44100,
+        }
+
+    def fake_stitch_cut(
+        clips: list[str],
+        output_path: Path,
+        temp_dir: Path,
+        temp_files: list[Path],
+    ) -> dict[str, object]:
+        output_path.write_bytes(b"stitched")
+        return {"method": "concat_demuxer"}
+
+    monkeypatch.setattr(tool, "_probe_clip", fake_probe)
+    monkeypatch.setattr(tool, "_stitch_cut", fake_stitch_cut)
+
+    result = tool.execute(
+        {
+            "operation": "stitch",
+            "clips": [str(clip_a), str(clip_b)],
+            "output_path": str(output_path),
+        }
+    )
+
+    assert result.success is True
+    assert result.data is not None
+    assert result.data["output"] == str(output_path)
+    assert result.data["output_path"] == str(output_path)
+    assert result.artifacts == [str(output_path)]
+    assert {
+        "operation",
+        "clip_count",
+        "transition",
+        "transition_duration",
+        "auto_normalized",
+        "output",
+        "output_path",
+        "duration",
+        "file_size_bytes",
+        "method",
+        "layout",
+    } <= set(VideoStitch.output_schema["properties"])
+    jsonschema.validate(instance=result.data, schema=VideoStitch.output_schema)
+
+
+def test_video_stitch_spatial_success_payload_includes_output_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    clip_a = tmp_path / "a.mp4"
+    clip_b = tmp_path / "b.mp4"
+    clip_a.write_bytes(b"a")
+    clip_b.write_bytes(b"b")
+    output_path = Path("projects/demo/renders/spatial.mp4")
+    tool = VideoStitch()
+
+    def fake_ensure(
+        clips: list[str],
+        temp_dir: Path,
+        temp_files: list[Path],
+    ) -> list[str]:
+        return list(clips)
+
+    def fake_side_by_side(
+        clips: list[str],
+        output_path: Path,
+        codec: str,
+        crf: int,
+    ) -> None:
+        output_path.write_bytes(b"spatial")
+
+    def fake_probe(path: str) -> dict[str, object]:
+        return {"duration": 2.0}
+
+    monkeypatch.setattr(tool, "_ensure_audio_for_clips", fake_ensure)
+    monkeypatch.setattr(tool, "_spatial_side_by_side", fake_side_by_side)
+    monkeypatch.setattr(tool, "_probe_clip", fake_probe)
+
+    result = tool.execute(
+        {
+            "operation": "spatial",
+            "clips": [str(clip_a), str(clip_b)],
+            "layout": "side_by_side",
+            "output_path": str(output_path),
+        }
+    )
+
+    assert result.success is True
+    assert result.data is not None
+    assert result.data["output"] == str(output_path)
+    assert result.data["output_path"] == str(output_path)
+    assert result.artifacts == [str(output_path)]
+    jsonschema.validate(instance=result.data, schema=VideoStitch.output_schema)
+
+
+def test_video_stitch_validate_success_payload_matches_output_schema(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    clip_a = tmp_path / "a.mp4"
+    clip_b = tmp_path / "b.mp4"
+    clip_a.write_bytes(b"a")
+    clip_b.write_bytes(b"b")
+    tool = VideoStitch()
+
+    def fake_probe(path: str) -> dict[str, object]:
+        return {
+            "path": path,
+            "width": 640,
+            "height": 360,
+            "fps": 24,
+            "duration": 1.5,
+            "video_codec": "h264",
+            "pixel_format": "yuv420p",
+            "audio_codec": "aac",
+            "sample_rate": 44100,
+            "audio_channels": 2,
+        }
+
+    monkeypatch.setattr(tool, "_probe_clip", fake_probe)
+
+    result = tool.execute(
+        {
+            "operation": "validate",
+            "clips": [str(clip_a), str(clip_b)],
+        }
+    )
+
+    assert result.success is True
+    assert result.data is not None
+    assert result.data["operation"] == "validate"
+    assert result.data["compatible"] is True
+    assert result.data["total_duration"] == 3.0
+    jsonschema.validate(instance=result.data, schema=VideoStitch.output_schema)
 
 
 @pytest.mark.parametrize("operation", ["stitch", "preview_stitch", "spatial"])

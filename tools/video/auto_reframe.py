@@ -19,6 +19,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from schemas.artifacts import load_strict_json_object
 from tools.base_tool import (
     BaseTool,
     Determinism,
@@ -30,6 +31,7 @@ from tools.base_tool import (
     ToolStability,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 # Common target aspect ratios
@@ -78,10 +80,13 @@ class AutoReframe(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["input_path"],
+        "required": ["input_path", "output_path"],
         "properties": {
             "input_path": {"type": "string"},
-            "output_path": {"type": "string"},
+            "output_path": {
+                "type": "string",
+                "description": "Project-scoped output path under projects/<project-name>/assets/... or projects/<project-name>/renders/...",
+            },
             "target_aspect": {
                 "type": "string",
                 "enum": list(ASPECT_PRESETS.keys()),
@@ -122,6 +127,21 @@ class AutoReframe(BaseTool):
             "crf": {"type": "integer", "default": 18},
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": ["output", "output_path"],
+        "properties": {
+            "message": {"type": "string"},
+            "input": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "source_resolution": {"type": "string"},
+            "crop_resolution": {"type": "string"},
+            "output_resolution": {"type": "string"},
+            "method": {"type": "string"},
+            "target_aspect": {"type": "string"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=4, ram_mb=2048, vram_mb=0, disk_mb=4000, network_required=False
@@ -143,7 +163,7 @@ class AutoReframe(BaseTool):
     ]
     side_effects = ["writes reframed video to output_path"]
     user_visible_verification = [
-        "Play reframed output — verify face stays centered and framing is smooth",
+        "Inspect sampled frames to verify face stays centered and framing is smooth",
         "Check that no important content is cropped out",
     ]
 
@@ -166,9 +186,14 @@ class AutoReframe(BaseTool):
             return ToolResult(success=False, error=f"Unknown target_aspect: {aspect_name}")
 
         target_w, target_h = self._compute_crop_size(inputs, src_w, src_h)
-        output_path = Path(
-            inputs.get("output_path", str(input_path.with_stem(f"{input_path.stem}_{aspect_name}")))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="reframed video",
         )
+        if output_error:
+            return output_error
+        assert output_path is not None
 
         # If source already matches target aspect, no crop needed
         if target_w == src_w and target_h == src_h:
@@ -182,6 +207,7 @@ class AutoReframe(BaseTool):
                 data={
                     "message": "Source already matches target aspect ratio",
                     "output": str(artifact_path),
+                    "output_path": str(artifact_path),
                 },
                 artifacts=[str(artifact_path)],
             )
@@ -239,6 +265,7 @@ class AutoReframe(BaseTool):
             data={
                 "input": str(input_path),
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "source_resolution": f"{src_w}x{src_h}",
                 "crop_resolution": f"{target_w}x{target_h}",
                 "output_resolution": f"{out_w}x{out_h}",
@@ -337,7 +364,7 @@ class AutoReframe(BaseTool):
         if tracking_json:
             p = Path(tracking_json)
             if p.exists():
-                data = json.loads(p.read_text(encoding="utf-8"))
+                data = load_strict_json_object(p, context=f"face tracking JSON {p}")
                 return data.get("faces", [])
 
         # Try to run face_tracker internally
@@ -355,7 +382,10 @@ class AutoReframe(BaseTool):
                 # Read the generated JSON
                 output_file = result.data.get("output")
                 if output_file:
-                    data = json.loads(Path(output_file).read_text(encoding="utf-8"))
+                    data = load_strict_json_object(
+                        output_file,
+                        context=f"face tracking output {output_file}",
+                    )
                     return data.get("faces", [])
         except Exception:
             pass

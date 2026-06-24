@@ -1,6 +1,8 @@
 """Contract tests for the local character-animation pipeline."""
 
+import shutil
 import sys
+import types
 from pathlib import Path
 
 import pytest
@@ -21,6 +23,24 @@ from tools.character.character_animation import (
 from tools.tool_registry import registry
 from tools.video.hyperframes_compose import HyperFramesCompose
 from tools.video.video_compose import VideoCompose
+
+
+@pytest.fixture
+def project_renders_dir(tmp_path):
+    project_dir = PROJECT_ROOT / "projects" / f"pytest-character-animation-{tmp_path.name}"
+    shutil.rmtree(project_dir, ignore_errors=True)
+    renders_dir = project_dir / "renders"
+    yield renders_dir
+    shutil.rmtree(project_dir, ignore_errors=True)
+
+
+@pytest.fixture
+def project_artifacts_dir(tmp_path):
+    project_dir = PROJECT_ROOT / "projects" / f"pytest-character-animation-artifacts-{tmp_path.name}"
+    shutil.rmtree(project_dir, ignore_errors=True)
+    artifacts_dir = project_dir / "artifacts"
+    yield artifacts_dir
+    shutil.rmtree(project_dir, ignore_errors=True)
 
 
 def test_character_animation_manifest_contract():
@@ -59,6 +79,136 @@ def test_character_artifacts_are_registered():
     }.issubset(set(ARTIFACT_NAMES))
 
 
+def test_character_compose_browser_qa_is_headless_by_default():
+    director = (
+        PROJECT_ROOT
+        / "skills"
+        / "pipelines"
+        / "character-animation"
+        / "compose-director.md"
+    ).read_text(encoding="utf-8").lower()
+
+    assert "open the preview" not in director
+    assert "headless" in director
+    assert "do not launch" in director
+    assert "explicitly requests" in director
+
+
+def test_character_preview_video_renderer_launches_playwright_headless(
+    tmp_path, monkeypatch
+):
+    import tools.character.character_animation as character_animation
+
+    launch_calls: list[dict] = []
+
+    class FakePage:
+        def goto(self, *_args, **_kwargs):
+            return None
+
+        def wait_for_timeout(self, *_args, **_kwargs):
+            return None
+
+        def screenshot(self, *, path: str):
+            Path(path).write_bytes(b"frame")
+
+    class FakeBrowser:
+        def new_page(self, **_kwargs):
+            return FakePage()
+
+        def close(self):
+            return None
+
+    class FakeChromium:
+        def launch(self, **kwargs):
+            launch_calls.append(kwargs)
+            return FakeBrowser()
+
+    class FakePlaywright:
+        chromium = FakeChromium()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+    sync_api = types.ModuleType("playwright.sync_api")
+    sync_api.sync_playwright = lambda: FakePlaywright()
+    monkeypatch.setitem(sys.modules, "playwright", types.ModuleType("playwright"))
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", sync_api)
+    monkeypatch.setattr(character_animation.shutil, "which", lambda _cmd: "/usr/bin/ffmpeg")
+    monkeypatch.setattr(
+        character_animation.subprocess,
+        "run",
+        lambda *_args, **_kwargs: types.SimpleNamespace(returncode=0, stderr=""),
+    )
+
+    preview_path = tmp_path / "preview.html"
+    preview_path.write_text("<html></html>", encoding="utf-8")
+
+    character_animation._render_preview_mp4(
+        preview_path,
+        tmp_path / "preview.mp4",
+        duration_seconds=0.1,
+        fps=1,
+    )
+
+    assert launch_calls == [{"headless": True}]
+    assert not (tmp_path / "preview_frames").exists()
+
+
+def test_character_preview_video_renderer_closes_browser_on_capture_failure(
+    tmp_path, monkeypatch
+):
+    import tools.character.character_animation as character_animation
+
+    close_calls: list[bool] = []
+
+    class FakePage:
+        def goto(self, *_args, **_kwargs):
+            raise RuntimeError("capture failed")
+
+    class FakeBrowser:
+        def new_page(self, **_kwargs):
+            return FakePage()
+
+        def close(self):
+            close_calls.append(True)
+
+    class FakeChromium:
+        def launch(self, **_kwargs):
+            return FakeBrowser()
+
+    class FakePlaywright:
+        chromium = FakeChromium()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+    sync_api = types.ModuleType("playwright.sync_api")
+    sync_api.sync_playwright = lambda: FakePlaywright()
+    monkeypatch.setitem(sys.modules, "playwright", types.ModuleType("playwright"))
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", sync_api)
+    monkeypatch.setattr(character_animation.shutil, "which", lambda _cmd: "/usr/bin/ffmpeg")
+
+    preview_path = tmp_path / "preview.html"
+    preview_path.write_text("<html></html>", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="capture failed"):
+        character_animation._render_preview_mp4(
+            preview_path,
+            tmp_path / "preview.mp4",
+            duration_seconds=0.1,
+            fps=1,
+        )
+
+    assert close_calls == [True]
+    assert not (tmp_path / "preview_frames").exists()
+
+
 def test_character_tools_discover_in_registry():
     registry.discover()
 
@@ -73,7 +223,85 @@ def test_character_tools_discover_in_registry():
     }.issubset(names)
 
 
-def test_character_animation_smoke_flow(tmp_path):
+@pytest.mark.parametrize(
+    ("tool", "inputs", "filename"),
+    [
+        (
+            CharacterSpecGenerator(),
+            {"characters": [{"id": "lead", "role": "host", "body_type": "round"}]},
+            "character_design.json",
+        ),
+        (
+            SvgRigBuilder(),
+            {
+                "character_design": {
+                    "version": "1.0",
+                    "characters": [{"id": "lead", "required_actions": ["idle"]}],
+                }
+            },
+            "rig_plan.json",
+        ),
+        (
+            PoseLibraryBuilder(),
+            {
+                "rig_plan": {
+                    "version": "1.0",
+                    "characters": [
+                        {
+                            "character_id": "lead",
+                            "required_actions": ["idle"],
+                        }
+                    ],
+                }
+            },
+            "pose_library.json",
+        ),
+        (
+            ActionTimelineCompiler(),
+            {
+                "scene_plan": {
+                    "version": "1.0",
+                    "scenes": [
+                        {
+                            "id": "scene-1",
+                            "start_seconds": 0,
+                            "end_seconds": 1,
+                        }
+                    ],
+                }
+            },
+            "action_timeline.json",
+        ),
+        (
+            CharacterAnimationReviewer(),
+            {
+                "preview_path": "missing-preview.html",
+                "rig_plan": {},
+                "pose_library": {},
+                "action_timeline": {},
+            },
+            "character_qa_report.json",
+        ),
+    ],
+)
+def test_character_json_tools_reject_non_project_output_path(
+    tool,
+    inputs,
+    filename,
+    tmp_path,
+):
+    forbidden_path = tmp_path / filename
+
+    result = tool.execute({**inputs, "output_path": str(forbidden_path)})
+
+    assert result.success is False
+    assert "output_path" in (result.error or "")
+    assert "projects/<project-name>/artifacts/" in (result.error or "")
+    assert not forbidden_path.exists()
+
+
+def test_character_animation_smoke_flow(project_renders_dir):
+    artifact_dir = project_renders_dir.parent / "artifacts"
     character_result = CharacterSpecGenerator().execute(
         {
             "characters": [
@@ -90,7 +318,7 @@ def test_character_animation_smoke_flow(tmp_path):
                     "required_actions": ["idle", "wing_flap", "react"],
                 },
             ],
-            "output_path": str(tmp_path / "character_design.json"),
+            "output_path": str(artifact_dir / "character_design.json"),
         }
     )
     assert character_result.success
@@ -100,7 +328,7 @@ def test_character_animation_smoke_flow(tmp_path):
     rig_result = SvgRigBuilder().execute(
         {
             "character_design": character_design,
-            "output_path": str(tmp_path / "rig_plan.json"),
+            "output_path": str(artifact_dir / "rig_plan.json"),
         }
     )
     assert rig_result.success
@@ -108,7 +336,7 @@ def test_character_animation_smoke_flow(tmp_path):
     validate_artifact("rig_plan", rig_plan)
 
     pose_result = PoseLibraryBuilder().execute(
-        {"rig_plan": rig_plan, "output_path": str(tmp_path / "pose_library.json")}
+        {"rig_plan": rig_plan, "output_path": str(artifact_dir / "pose_library.json")}
     )
     assert pose_result.success
     pose_library = pose_result.data["pose_library"]
@@ -144,7 +372,7 @@ def test_character_animation_smoke_flow(tmp_path):
         {
             "scene_plan": scene_plan,
             "character_ids": ["mouse_lead", "bird_friend"],
-            "output_path": str(tmp_path / "action_timeline.json"),
+            "output_path": str(artifact_dir / "action_timeline.json"),
         }
     )
     assert timeline_result.success
@@ -155,7 +383,7 @@ def test_character_animation_smoke_flow(tmp_path):
         "bird_friend",
     }
 
-    preview_path = tmp_path / "preview.html"
+    preview_path = project_renders_dir / "preview.html"
     render_result = CharacterRigRenderer().execute(
         {
             "rig_plan": rig_plan,
@@ -182,7 +410,7 @@ def test_character_animation_smoke_flow(tmp_path):
             "pose_library": pose_library,
             "action_timeline": action_timeline,
             "preview_path": str(preview_path),
-            "output_path": str(tmp_path / "character_qa_report.json"),
+            "output_path": str(artifact_dir / "character_qa_report.json"),
         }
     )
     assert qa_result.success
@@ -192,7 +420,7 @@ def test_character_animation_smoke_flow(tmp_path):
     assert qa_report["checks"]["schema_valid"] is True
 
 
-def test_character_style_is_normalized_for_schema(tmp_path):
+def test_character_style_is_normalized_for_schema(project_artifacts_dir):
     result = CharacterSpecGenerator().execute(
         {
             "characters": [{"id": "style_test", "role": "lead", "body_type": "round"}],
@@ -201,7 +429,7 @@ def test_character_style_is_normalized_for_schema(tmp_path):
                 "palette": ["#ff8f68", "#75b8ff"],
                 "unexpected": "should not leak into artifact",
             },
-            "output_path": str(tmp_path / "character_design.json"),
+            "output_path": str(project_artifacts_dir / "character_design.json"),
         }
     )
 
@@ -214,7 +442,7 @@ def test_character_style_is_normalized_for_schema(tmp_path):
     }
 
 
-def test_character_renderer_can_handoff_to_video_compose(tmp_path):
+def test_character_renderer_can_handoff_to_video_compose(tmp_path, project_renders_dir):
     hyperframes = HyperFramesCompose()
     runtime = hyperframes._runtime_check()
     if not runtime["runtime_available"]:
@@ -254,8 +482,8 @@ def test_character_renderer_can_handoff_to_video_compose(tmp_path):
             "rig_plan": rig_plan,
             "pose_library": pose_library,
             "action_timeline": action_timeline,
-            "output_path": str(tmp_path / "preview.html"),
-            "workspace_path": str(tmp_path / "hyperframes"),
+            "output_path": str(project_renders_dir / "preview.html"),
+            "workspace_path": str(project_renders_dir / "hyperframes"),
         }
     )
     assert render_result.success
@@ -271,7 +499,7 @@ def test_character_renderer_can_handoff_to_video_compose(tmp_path):
     assert "https://cdn.jsdelivr.net/npm/gsap@" in preview_html
     assert "gsap.min.js" in preview_html
 
-    output_path = tmp_path / "renders" / "final.mp4"
+    output_path = project_renders_dir / "final.mp4"
     compose_result = VideoCompose().execute(
         {
             "operation": "render",

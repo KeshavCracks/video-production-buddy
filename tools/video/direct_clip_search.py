@@ -54,6 +54,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_project_source_media_destination
 from tools.video.stock_sources import safe_clip_file_name
 
 
@@ -77,7 +78,7 @@ class DirectClipSearch(BaseTool):
         "  UNSPLASH_ACCESS_KEY for Unsplash (see https://unsplash.com/documentation)\n"
         "  archive.org, nasa, and wikimedia work without API keys"
     )
-    agent_skills = []
+    agent_skills = ["stock-sourcing", "video-understand"]
 
     capabilities = [
         "multi_source_search",
@@ -184,6 +185,31 @@ class DirectClipSearch(BaseTool):
             },
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "output_dir",
+            "clips_downloaded",
+            "clips_reused",
+            "total_clips",
+            "per_source_counts",
+            "queries_run",
+            "resolved_sources",
+            "clips",
+            "errors",
+        ],
+        "properties": {
+            "output_dir": {"type": "string"},
+            "clips_downloaded": {"type": "integer", "minimum": 0},
+            "clips_reused": {"type": "integer", "minimum": 0},
+            "total_clips": {"type": "integer", "minimum": 0},
+            "per_source_counts": {"type": "object"},
+            "queries_run": {"type": "integer", "minimum": 0},
+            "resolved_sources": {"type": "array", "items": {"type": "string"}},
+            "clips": {"type": "array", "items": {"type": "object"}},
+            "errors": {"type": "array", "items": {"type": "object"}},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=512, vram_mb=0, disk_mb=2000, network_required=True
@@ -204,8 +230,8 @@ class DirectClipSearch(BaseTool):
         "calls external stock APIs",
     ]
     user_visible_verification = [
-        "Browse <output_dir>/thumbnails/ to visually verify clip matches",
-        "Play clips from <output_dir>/clips/ to check quality",
+        "Confirm sampled thumbnail files were written under <output_dir>/thumbnails/",
+        "Inspect clip metadata and sampled thumbnail paths from <output_dir>/clips/ to check quality",
     ]
 
     def get_status(self) -> ToolStatus:
@@ -243,6 +269,15 @@ class DirectClipSearch(BaseTool):
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
         start = time.time()
         try:
+            output_dir, output_error = require_explicit_project_source_media_destination(
+                inputs,
+                "output_dir",
+                self.name,
+                artifact_label="acquired source clips",
+            )
+            if output_error:
+                return output_error
+
             from tools.video.stock_sources import (
                 SearchFilters,
                 all_sources,
@@ -251,19 +286,13 @@ class DirectClipSearch(BaseTool):
                 source_summary,
             )
 
-            output_dir = Path(inputs["output_dir"])
+            assert output_dir is not None
             queries: list[dict] = list(inputs["queries"])
             source_names: Optional[list[str]] = inputs.get("sources")
             filters_in: dict = inputs.get("filters") or {}
             clips_per_query = int(inputs.get("clips_per_query", 3))
             extract_thumbs = bool(inputs.get("extract_thumbnails", True))
             skip_existing = bool(inputs.get("skip_existing", True))
-
-            clips_dir = output_dir / "clips"
-            thumbs_dir = output_dir / "thumbnails"
-            clips_dir.mkdir(parents=True, exist_ok=True)
-            if extract_thumbs:
-                thumbs_dir.mkdir(parents=True, exist_ok=True)
 
             # --- Resolve sources ---
             if source_names:
@@ -302,6 +331,12 @@ class DirectClipSearch(BaseTool):
                     success=False,
                     error="No stock sources available. " + self.install_instructions,
                 )
+
+            clips_dir = output_dir / "clips"
+            thumbs_dir = output_dir / "thumbnails"
+            clips_dir.mkdir(parents=True, exist_ok=True)
+            if extract_thumbs:
+                thumbs_dir.mkdir(parents=True, exist_ok=True)
 
             # --- Search and download ---
             downloaded: list[dict] = []

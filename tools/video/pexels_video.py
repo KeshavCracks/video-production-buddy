@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import time
-from pathlib import Path
 from typing import Any
 
 from tools.base_tool import (
@@ -19,6 +18,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class PexelsVideo(BaseTool):
@@ -37,7 +37,7 @@ class PexelsVideo(BaseTool):
         "Set PEXELS_API_KEY to your Pexels API key.\n"
         "  Get one free at https://www.pexels.com/api/"
     )
-    agent_skills = []
+    agent_skills = ["stock-sourcing"]
 
     capabilities = ["search_video", "download_video", "stock_video"]
     supports = {
@@ -59,7 +59,7 @@ class PexelsVideo(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["query"],
+        "required": ["query", "output_path"],
         "properties": {
             "query": {"type": "string", "description": "Search term"},
             "orientation": {
@@ -89,14 +89,61 @@ class PexelsVideo(BaseTool):
             "output_path": {"type": "string"},
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "video_id",
+            "user",
+            "duration_seconds",
+            "width",
+            "height",
+            "fps",
+            "quality",
+            "query",
+            "output",
+            "output_path",
+            "total_results",
+            "results_returned",
+            "license",
+            "pexels_url",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "pexels"},
+            "video_id": {"type": ["integer", "string"]},
+            "user": {"type": "string"},
+            "duration_seconds": {"type": ["number", "null"], "minimum": 0},
+            "width": {"type": ["integer", "null"], "minimum": 0},
+            "height": {"type": ["integer", "null"], "minimum": 0},
+            "fps": {"type": ["number", "null"], "minimum": 0},
+            "quality": {"type": ["string", "null"]},
+            "query": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "total_results": {"type": "integer", "minimum": 0},
+            "results_returned": {"type": "integer", "minimum": 0},
+            "license": {"type": "string"},
+            "pexels_url": {"type": "string"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=256, vram_mb=0, disk_mb=200, network_required=True
     )
     retry_policy = RetryPolicy(max_retries=2, retryable_errors=["rate_limit", "timeout"])
-    idempotency_key_fields = ["query", "output_path", "orientation", "size", "page"]
+    idempotency_key_fields = [
+        "query",
+        "output_path",
+        "orientation",
+        "size",
+        "min_duration",
+        "max_duration",
+        "per_page",
+        "page",
+        "preferred_quality",
+    ]
     side_effects = ["writes video file to output_path", "calls Pexels API"]
-    user_visible_verification = ["Watch downloaded clip to verify it matches the intended scene"]
+    user_visible_verification = ["Inspect sampled frames to verify the downloaded clip matches the intended scene"]
 
     def get_status(self) -> ToolStatus:
         if os.environ.get("PEXELS_API_KEY"):
@@ -107,6 +154,14 @@ class PexelsVideo(BaseTool):
         return 0.0
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="stock video",
+        )
+        if output_error:
+            return output_error
+
         api_key = os.environ.get("PEXELS_API_KEY")
         if not api_key:
             return ToolResult(
@@ -182,7 +237,6 @@ class PexelsVideo(BaseTool):
             video_response = requests.get(video_url, timeout=120)
             video_response.raise_for_status()
 
-            output_path = Path(inputs.get("output_path", f"pexels_video_{video['id']}.mp4"))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(video_response.content)
 
@@ -202,6 +256,7 @@ class PexelsVideo(BaseTool):
                 "quality": selected_file.get("quality"),
                 "query": query,
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "total_results": data.get("total_results", 0),
                 "results_returned": len(videos),
                 "license": "Pexels License (free, no attribution required)",

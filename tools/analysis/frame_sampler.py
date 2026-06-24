@@ -22,6 +22,7 @@ from tools.base_tool import (
     ToolStability,
     ToolTier,
 )
+from tools.output_paths import require_explicit_project_media_directory_destination
 
 
 STRATEGIES = ["interval", "count", "timestamps", "scene_guided"]
@@ -57,7 +58,7 @@ class FrameSampler(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["input_path", "strategy"],
+        "required": ["input_path", "strategy", "output_dir"],
         "properties": {
             "input_path": {"type": "string"},
             "strategy": {
@@ -96,9 +97,36 @@ class FrameSampler(BaseTool):
                 "default": 20,
                 "description": "Max frames to extract (for scene_guided strategy)",
             },
-            "output_dir": {"type": "string"},
+            "output_dir": {
+                "type": "string",
+                "description": (
+                    "Project-scoped directory for extracted frames under "
+                    "projects/<project-name>/assets/... or projects/<project-name>/renders/..."
+                ),
+            },
             "format": {"type": "string", "enum": FORMATS, "default": "jpg"},
             "quality": {"type": "integer", "minimum": 1, "maximum": 31, "default": 2},
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["strategy", "frame_count", "frames", "output_dir"],
+        "properties": {
+            "strategy": {"type": "string", "enum": STRATEGIES},
+            "frame_count": {"type": "integer", "minimum": 0},
+            "frames": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["path", "timestamp_seconds", "index"],
+                    "properties": {
+                        "path": {"type": "string"},
+                        "timestamp_seconds": {"type": "number"},
+                        "index": {"type": "integer", "minimum": 0},
+                    },
+                },
+            },
+            "output_dir": {"type": "string"},
         },
     }
 
@@ -128,7 +156,15 @@ class FrameSampler(BaseTool):
         quality = inputs.get("quality", 2)
         if fmt not in FORMATS:
             return ToolResult(success=False, error=f"Unknown format: {fmt}")
-        output_dir = Path(inputs.get("output_dir", input_path.parent / "frames"))
+        output_dir, output_error = require_explicit_project_media_directory_destination(
+            inputs,
+            "output_dir",
+            self.name,
+            artifact_label="extracted review frames",
+        )
+        if output_error:
+            return output_error
+        assert output_dir is not None
         output_dir.mkdir(parents=True, exist_ok=True)
 
         start = time.time()

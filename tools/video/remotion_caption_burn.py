@@ -47,6 +47,7 @@ from tools.base_tool import (
     ToolStability,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class RemotionCaptionBurn(BaseTool):
@@ -86,7 +87,10 @@ class RemotionCaptionBurn(BaseTool):
             },
             "output_path": {
                 "type": "string",
-                "description": "Path for the output video with captions burned in.",
+                "description": (
+                    "Project-scoped path for the output video with captions burned "
+                    "in, e.g. projects/<project-name>/renders/captioned.mp4"
+                ),
             },
             "segments": {
                 "type": "array",
@@ -145,6 +149,21 @@ class RemotionCaptionBurn(BaseTool):
             },
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": ["method", "output", "output_path", "caption_count"],
+        "properties": {
+            "method": {"type": "string", "enum": ["remotion", "ffmpeg_fallback"]},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "duration_seconds": {"type": "number", "minimum": 0},
+            "total_frames": {"type": "integer", "minimum": 0},
+            "caption_count": {"type": "integer", "minimum": 0},
+            "overlay_count": {"type": "integer", "minimum": 0},
+            "words_per_page": {"type": "integer", "minimum": 1},
+            "note": {"type": "string"},
+        },
+    }
 
     resource_profile = ResourceProfile(cpu_cores=4, ram_mb=2048, vram_mb=0, disk_mb=500)
     idempotency_key_fields = [
@@ -161,7 +180,7 @@ class RemotionCaptionBurn(BaseTool):
     ]
     side_effects = ["writes captioned video to output_path"]
     user_visible_verification = [
-        "Play the output video and verify captions appear at the bottom of the frame",
+        "Inspect sampled frames to verify captions appear at the bottom of the frame",
         "Check that the active word is highlighted in the specified color",
         "Verify face is not occluded by caption text",
     ]
@@ -338,7 +357,14 @@ class RemotionCaptionBurn(BaseTool):
         props_dir = root / "public" / "demo-props"
         props_dir.mkdir(parents=True, exist_ok=True)
         props_file = props_dir / f"caption-burn-{Path(input_path).stem}.json"
-        props_file.write_text(json.dumps(props, indent=2), encoding="utf-8")
+        try:
+            serialized_props = json.dumps(props, indent=2, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            return ToolResult(
+                success=False,
+                error=f"Remotion caption props must be strict JSON serializable: {exc}",
+            )
+        props_file.write_text(serialized_props, encoding="utf-8")
 
         # Render (use npx.cmd on Windows for subprocess compatibility)
         import sys
@@ -362,6 +388,7 @@ class RemotionCaptionBurn(BaseTool):
             data={
                 "method": "remotion",
                 "output": output_path,
+                "output_path": output_path,
                 "duration_seconds": round(duration_s, 2),
                 "total_frames": total_frames,
                 "caption_count": len(captions),
@@ -445,6 +472,7 @@ class RemotionCaptionBurn(BaseTool):
             data={
                 "method": "ffmpeg_fallback",
                 "output": output_path,
+                "output_path": output_path,
                 "caption_count": len(captions),
                 "note": "Used FFmpeg fallback. Install Remotion for animated captions.",
             },
@@ -464,8 +492,16 @@ class RemotionCaptionBurn(BaseTool):
     # ------------------------------------------------------------------ #
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="captioned video",
+        )
+        if output_error:
+            return output_error
+
         input_path = inputs["input_path"]
-        output_path = inputs["output_path"]
+        output_path_str = str(output_path)
         corrections = inputs.get("corrections")
         force_ffmpeg = inputs.get("force_ffmpeg", False)
         words_per_page = inputs.get("words_per_page", 4)
@@ -475,7 +511,7 @@ class RemotionCaptionBurn(BaseTool):
         if not Path(input_path).exists():
             return ToolResult(success=False, error=f"Input video not found: {input_path}")
 
-        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         start = time.time()
 
         # Build word captions from segments or SRT
@@ -500,12 +536,12 @@ class RemotionCaptionBurn(BaseTool):
         # Choose render method
         if not force_ffmpeg and self._remotion_available():
             result = self._render_remotion(
-                input_path, output_path, captions,
+                input_path, output_path_str, captions,
                 words_per_page, font_size, highlight_color,
                 overlays=overlays,
             )
         else:
-            result = self._render_ffmpeg(input_path, output_path, captions)
+            result = self._render_ffmpeg(input_path, output_path_str, captions)
 
         result.duration_seconds = round(time.time() - start, 2)
         return result

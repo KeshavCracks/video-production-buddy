@@ -19,6 +19,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class PiperTTS(BaseTool):
@@ -63,7 +64,7 @@ class PiperTTS(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["text"],
+        "required": ["text", "output_path"],
         "properties": {
             "text": {"type": "string"},
             "model": {
@@ -85,6 +86,27 @@ class PiperTTS(BaseTool):
             "output_path": {"type": "string"},
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "model",
+            "speaker_id",
+            "text_length",
+            "format",
+            "output",
+            "output_path",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "piper"},
+            "model": {"type": "string"},
+            "speaker_id": {"type": "integer"},
+            "text_length": {"type": "integer", "minimum": 0},
+            "format": {"type": "string", "const": "wav"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=2, ram_mb=512, vram_mb=0, disk_mb=200, network_required=False
@@ -99,7 +121,7 @@ class PiperTTS(BaseTool):
         "sentence_silence",
     ]
     side_effects = ["writes audio file to output_path"]
-    user_visible_verification = ["Listen to generated audio for intelligibility"]
+    user_visible_verification = ["Inspect transcript alignment, duration, and waveform metrics for intelligibility"]
 
     def get_status(self) -> ToolStatus:
         return super().get_status()
@@ -108,16 +130,25 @@ class PiperTTS(BaseTool):
         return 0.0
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        output_path, output_error = require_explicit_output_path(
+            inputs, self.name, artifact_label="generated speech audio"
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+
         if self.get_status() != ToolStatus.AVAILABLE:
             return ToolResult(success=False, error="Piper TTS not available. " + self.install_instructions)
 
         start = time.time()
         try:
-            result = self._generate(inputs)
+            result = self._generate(inputs, output_path)
         except Exception as exc:
             return ToolResult(success=False, error=f"Local TTS generation failed: {exc}")
 
         result.duration_seconds = round(time.time() - start, 2)
+        if result.success:
+            result.data.setdefault("output_path", str(output_path))
         return result
 
     def _resolve_model_path(self, model: str) -> str:
@@ -133,8 +164,7 @@ class PiperTTS(BaseTool):
                 return str(candidate)
         return model  # fall back and let piper error naturally
 
-    def _generate(self, inputs: dict[str, Any]) -> ToolResult:
-        output_path = Path(inputs.get("output_path", "tts_output.wav"))
+    def _generate(self, inputs: dict[str, Any], output_path: Path) -> ToolResult:
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         model = self._resolve_model_path(inputs.get("model", "en_US-lessac-medium"))

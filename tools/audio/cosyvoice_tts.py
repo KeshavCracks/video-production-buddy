@@ -1,8 +1,8 @@
 """Bailian TTS via Alibaba Cloud Bailian / DashScope API.
 
 Supports qwen3-tts-flash and qwen3-tts-instruct-flash via the native DashScope
-multimodal endpoint, and CosyVoice v3 models via the OpenAI-compatible
-audio/speech endpoint.
+multimodal endpoint, and CosyVoice models (latest v3.5-plus/flash, plus v3 and
+legacy v2) via the OpenAI-compatible audio/speech endpoint.
 Both use DASHSCOPE_API_KEY.
 """
 
@@ -25,15 +25,20 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 # qwen3-tts-* uses the native multimodal generation endpoint.
 _QWEN_TTS_URL = (
     "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation"
 )
-# CosyVoice models work via the OpenAI-compatible audio/speech endpoint.
+# CosyVoice models use the DashScope native SpeechSynthesizer endpoint.
+# NOTE: cosyvoice-v3.5-plus and cosyvoice-v3.5-flash have NO system voices — they
+# only accept a cloned/designed voice_id (created via the CosyVoice clone/design
+# API). cosyvoice-v3-plus/v3-flash/v2 accept system voices. CosyVoice models must
+# also be enabled in the Bailian console; an un-enabled model returns engine error 418.
 _COSYVOICE_URL = (
-    "https://dashscope.aliyuncs.com/compatible-mode/v1/audio/speech"
+    "https://dashscope.aliyuncs.com/api/v1/services/audio/tts/SpeechSynthesizer"
 )
 
 # ── Model registry ─────────────────────────────────────────────────────────────
@@ -54,20 +59,36 @@ _MODELS: dict[str, dict[str, Any]] = {
         "cost_per_char": 0.000014,
         "note": "Supports 'instructions' parameter for delivery style control",
     },
-    # CosyVoice v3 (international: v3-flash/plus; China mainland: v3.5-flash/plus also available)
+    # CosyVoice v3.5 (latest flagship — best cloning similarity, free-style instruct control)
+    "cosyvoice-v3.5-plus": {
+        "name": "CosyVoice v3.5 Plus",
+        "family": "cosyvoice",
+        "quality": "highest",
+        "speed": "medium",
+        "cost_per_char": 0.000020,
+        "note": "Latest flagship: upgraded cloning similarity, free-style instruction control",
+    },
+    "cosyvoice-v3.5-flash": {
+        "name": "CosyVoice v3.5 Flash",
+        "family": "cosyvoice",
+        "quality": "high",
+        "speed": "fast",
+        "cost_per_char": 0.000014,
+    },
+    # CosyVoice v3 (previous generation)
+    "cosyvoice-v3-plus": {
+        "name": "CosyVoice v3 Plus",
+        "family": "cosyvoice",
+        "quality": "high",
+        "speed": "medium",
+        "cost_per_char": 0.000020,
+    },
     "cosyvoice-v3-flash": {
         "name": "CosyVoice v3 Flash",
         "family": "cosyvoice",
         "quality": "high",
         "speed": "fast",
         "cost_per_char": 0.000014,
-    },
-    "cosyvoice-v3-plus": {
-        "name": "CosyVoice v3 Plus",
-        "family": "cosyvoice",
-        "quality": "highest",
-        "speed": "medium",
-        "cost_per_char": 0.000020,
     },
     # CosyVoice v2 (legacy, kept for backward compat)
     "cosyvoice-v2": {
@@ -137,15 +158,16 @@ class CosyVoiceTTS(BaseTool):
         "Chinese-language narration with natural Mandarin pronunciation",
         "English narration for Chinese-style productions — Dylan (warm baritone), Ethan (steady), Kai (clear)",
         "bilingual Chinese/English video production",
+        "highest-quality narration with free-style delivery control via cosyvoice-v3.5-plus (latest flagship)",
         "first fallback when ElevenLabs is unavailable — uses DASHSCOPE_API_KEY already set for Wan video generation",
-        "fast low-cost TTS via qwen3-tts-flash",
+        "fast low-cost TTS via qwen3-tts-flash / cosyvoice-v3.5-flash",
         "delivery-controlled ad narration via qwen3-tts-instruct-flash",
     ]
     not_good_for = ["fully offline production", "voice clone matching"]
 
     input_schema = {
         "type": "object",
-        "required": ["text"],
+        "required": ["text", "output_path"],
         "properties": {
             "text": {"type": "string", "description": "Text to convert to speech"},
             "voice": {
@@ -189,6 +211,33 @@ class CosyVoiceTTS(BaseTool):
             "output_path": {"type": "string"},
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "model",
+            "model_name",
+            "voice",
+            "voice_description",
+            "text_length",
+            "format",
+            "actual_api_format",
+            "output",
+            "output_path",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "bailian"},
+            "model": {"type": "string", "enum": list(_MODELS.keys())},
+            "model_name": {"type": "string"},
+            "voice": {"type": "string"},
+            "voice_description": {"type": "string"},
+            "text_length": {"type": "integer", "minimum": 0},
+            "format": {"type": "string", "enum": ["mp3", "wav"]},
+            "actual_api_format": {"type": "string", "enum": ["mp3", "wav"]},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=256, vram_mb=0, disk_mb=50, network_required=True
@@ -205,7 +254,7 @@ class CosyVoiceTTS(BaseTool):
         "output_path",
     ]
     side_effects = ["writes audio file to output_path", "calls Bailian/DashScope API"]
-    user_visible_verification = ["Listen to generated audio for natural speech quality"]
+    user_visible_verification = ["Inspect transcript alignment, duration, and waveform metrics for natural speech quality"]
 
     def _get_api_key(self) -> str | None:
         return os.environ.get("DASHSCOPE_API_KEY")
@@ -221,6 +270,20 @@ class CosyVoiceTTS(BaseTool):
         return round(len(inputs.get("text", "")) * cost_per_char, 5)
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        model = inputs.get("model", "qwen3-tts-flash")
+        if model not in _MODELS:
+            return ToolResult(success=False, error=f"Unsupported model {model!r}.")
+        family = _MODELS[model].get("family", "qwen")
+
+        output_path, output_error = require_explicit_output_path(
+            inputs, self.name, artifact_label="generated speech audio"
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+        inputs = dict(inputs)
+        inputs["output_path"] = str(output_path)
+
         api_key = self._get_api_key()
         if not api_key:
             return ToolResult(
@@ -229,10 +292,6 @@ class CosyVoiceTTS(BaseTool):
             )
 
         start = time.time()
-        model = inputs.get("model", "qwen3-tts-flash")
-        if model not in _MODELS:
-            return ToolResult(success=False, error=f"Unsupported model {model!r}.")
-        family = _MODELS[model].get("family", "qwen")
 
         # Honor self.retry_policy. Retry on exceptions whose str(exc) contains
         # any retryable_errors pattern as a substring; surface non-retryable
@@ -248,6 +307,8 @@ class CosyVoiceTTS(BaseTool):
                     result = self._generate_cosyvoice(inputs, api_key, model)
                 result.duration_seconds = round(time.time() - start, 2)
                 result.cost_usd = self.estimate_cost(inputs)
+                if result.success:
+                    result.data.setdefault("output_path", str(output_path))
                 return result
             except Exception as exc:
                 err = str(exc)
@@ -347,7 +408,7 @@ class CosyVoiceTTS(BaseTool):
         audio_url = audio_info.get("url", "")
         audio_b64 = audio_info.get("data", "")
 
-        output_path = Path(inputs.get("output_path", f"qwen_tts_output.{fmt}"))
+        output_path = Path(inputs["output_path"])
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         if audio_url:
@@ -381,11 +442,13 @@ class CosyVoiceTTS(BaseTool):
         )
 
     def _generate_cosyvoice(self, inputs: dict[str, Any], api_key: str, model: str) -> ToolResult:
-        """cosyvoice-* via OpenAI-compatible audio/speech endpoint.
+        """cosyvoice-* via the DashScope native SpeechSynthesizer endpoint.
 
-        The endpoint returns raw PCM/WAV bytes regardless of the requested format.
-        _ensure_audio_format detects the actual container from magic bytes and
-        transcodes via FFmpeg so the output file extension always matches its content.
+        Request shape: {model, input:{text}, parameters:{voice, format, rate, ...}}.
+        The endpoint may return either raw audio bytes or a JSON envelope with a
+        base64 `output.audio`; both are handled. _ensure_audio_format detects the
+        actual container from magic bytes and transcodes via FFmpeg so the output
+        file extension always matches its content.
         """
         import requests
 
@@ -394,13 +457,11 @@ class CosyVoiceTTS(BaseTool):
         speed = inputs.get("speed", 1.0)
         fmt = inputs.get("format", "mp3")
 
-        payload: dict[str, Any] = {
-            "model": model,
-            "input": text,
-            "voice": voice,
-        }
+        parameters: dict[str, Any] = {"voice": voice, "format": fmt}
         if speed != 1.0:
-            payload["speed"] = speed
+            parameters["rate"] = speed
+
+        payload = {"model": model, "input": {"text": text}, "parameters": parameters}
 
         resp = requests.post(
             _COSYVOICE_URL,
@@ -413,8 +474,8 @@ class CosyVoiceTTS(BaseTool):
         )
         resp.raise_for_status()
 
-        content = resp.content
-        output_path = Path(inputs.get("output_path", f"cosyvoice_output.{fmt}"))
+        content = self._extract_cosyvoice_audio(resp)
+        output_path = Path(inputs["output_path"])
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         actual_fmt = self._ensure_audio_format(content, fmt, output_path)
@@ -435,3 +496,16 @@ class CosyVoiceTTS(BaseTool):
             artifacts=[str(output_path)],
             model=model,
         )
+
+    @staticmethod
+    def _extract_cosyvoice_audio(resp) -> bytes:
+        """SpeechSynthesizer may return raw audio bytes or a JSON {output:{audio:b64}}."""
+        ctype = resp.headers.get("content-type", "")
+        if "application/json" in ctype:
+            import base64
+            data = resp.json()
+            audio_b64 = data.get("output", {}).get("audio", "")
+            if audio_b64:
+                return base64.b64decode(audio_b64)
+            raise ValueError(f"No audio in CosyVoice JSON response: {data}")
+        return resp.content

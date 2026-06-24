@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """QA Test 09: HyperFrames end-to-end — scaffold + lint + validate + render.
 
-This test hits the real HyperFrames CLI via `npx @hyperframes/cli`. On first
-run, npm fetches the package (slow — ~30-90s) and then Chrome downloads its
+This test hits the real HyperFrames CLI via `npx hyperframes`. On first
+run, npm fetches the published `hyperframes` package (slow — ~30-90s)
+and then Chrome downloads its
 browser for validation (~30s extra, cached thereafter). Skip unless
 HYPERFRAMES_QA=1 is set so CI doesn't pay the cost on every run.
 
@@ -20,7 +21,6 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
-import shutil
 from pathlib import Path
 
 import pytest
@@ -32,14 +32,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from tools.video.hyperframes_compose import HyperFramesCompose
 
 
-OUT = Path(__file__).resolve().parent / "output"
-OUT.mkdir(parents=True, exist_ok=True)
-
-
 _SKIP_REASON = (
     "HyperFrames QA is opt-in. Set HYPERFRAMES_QA=1 to run scaffold+lint+validate, "
     "and HYPERFRAMES_QA_RENDER=1 to additionally run the real render."
 )
+
+
+def test_hyperframes_qa_docstring_names_published_cli_package():
+    body = __doc__ or ""
+
+    assert "npx hyperframes" in body
+    assert "npx @hyperframes/cli" not in body
 
 
 def _runtime_ready() -> bool:
@@ -68,7 +71,7 @@ def _minimal_scenario(workspace: Path, asset: Path) -> dict:
     return {
         "operation": "render",
         "workspace_path": str(workspace),
-        "output_path": str(workspace / "renders" / "smoke.mp4"),
+        "output_path": "projects/hyperframes-qa/renders/smoke.mp4",
         "edit_decisions": {
             "version": "1.0",
             "renderer_family": "animation-first",
@@ -103,6 +106,17 @@ def _minimal_scenario(workspace: Path, asset: Path) -> dict:
     }
 
 
+def test_hyperframes_qa_render_scenario_uses_project_output_path(tmp_path: Path):
+    asset = tmp_path / "assets_src" / "hero.png"
+    workspace = tmp_path / "hyperframes"
+    inputs = _minimal_scenario(workspace, asset)
+
+    assert Path(inputs["workspace_path"]) == workspace
+    output_path = Path(inputs["output_path"])
+    assert output_path.parts[:3] == ("projects", "hyperframes-qa", "renders")
+    assert output_path.name == "smoke.mp4"
+
+
 @pytest.mark.skipif(not os.environ.get("HYPERFRAMES_QA"), reason=_SKIP_REASON)
 def test_hyperframes_scaffold_lint_validate(tmp_path: Path):
     if not _runtime_ready():
@@ -131,6 +145,15 @@ def test_hyperframes_scaffold_lint_validate(tmp_path: Path):
         f"generator contract violation.\nError: {lint.error}\n"
         f"Stdout tail: {lint.data.get('stdout_tail')}\n"
         f"Stderr tail: {lint.data.get('stderr_tail')}"
+    )
+    report = lint.data.get("report") or {}
+    findings = report.get("findings") or []
+    finding_codes = [finding.get("code") for finding in findings]
+    assert report.get("errorCount") == 0, (
+        f"Fresh scaffold produced HyperFrames lint errors: {finding_codes}"
+    )
+    assert report.get("warningCount") == 0, (
+        f"Fresh scaffold produced HyperFrames lint warnings: {finding_codes}"
     )
 
     # 3. Validate — browser-based. Skip contrast since our placeholder colors

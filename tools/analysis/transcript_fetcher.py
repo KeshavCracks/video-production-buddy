@@ -81,11 +81,22 @@ class TranscriptFetcher(BaseTool):
 
     output_schema = {
         "type": "object",
+        "required": [
+            "transcript",
+            "full_text",
+            "language",
+            "is_auto_generated",
+            "word_count",
+            "source",
+            "video_id",
+            "segment_count",
+        ],
         "properties": {
             "transcript": {
                 "type": "array",
                 "items": {
                     "type": "object",
+                    "required": ["text", "start", "duration"],
                     "properties": {
                         "text": {"type": "string"},
                         "start": {"type": "number"},
@@ -98,6 +109,9 @@ class TranscriptFetcher(BaseTool):
             "is_auto_generated": {"type": "boolean"},
             "word_count": {"type": "integer"},
             "source": {"type": "string"},
+            "video_id": {"type": "string"},
+            "fallback_suggested": {"type": "string"},
+            "segment_count": {"type": "integer"},
         },
     }
 
@@ -112,6 +126,7 @@ class TranscriptFetcher(BaseTool):
     ]
     side_effects = []
     fallback = "transcriber"
+    fallback_tools = ["transcriber"]
     user_visible_verification = [
         "Spot-check transcript accuracy against video audio",
     ]

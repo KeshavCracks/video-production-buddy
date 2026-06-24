@@ -21,6 +21,10 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import (
+    require_explicit_output_path,
+    require_optional_project_sidecar_path,
+)
 
 
 class DoubaoTTS(BaseTool):
@@ -71,7 +75,7 @@ class DoubaoTTS(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["text"],
+        "required": ["text", "output_path"],
         "properties": {
             "text": {"type": "string", "description": "Text to convert to speech"},
             "voice_id": {
@@ -135,13 +139,41 @@ class DoubaoTTS(BaseTool):
 
     output_schema = {
         "type": "object",
+        "required": [
+            "provider",
+            "model",
+            "resource_id",
+            "voice_id",
+            "format",
+            "sample_rate",
+            "speech_rate",
+            "text_length",
+            "output",
+            "output_path",
+            "metadata_path",
+            "task_id",
+            "sentences",
+        ],
         "properties": {
+            "provider": {"type": "string"},
+            "model": {"type": "string"},
+            "resource_id": {"type": "string"},
+            "voice_id": {"type": "string"},
+            "format": {"type": "string"},
+            "sample_rate": {"type": "integer"},
+            "speech_rate": {"type": "number"},
+            "text_length": {"type": "integer"},
             "output": {"type": "string"},
+            "output_path": {"type": "string"},
             "metadata_path": {"type": "string"},
             "task_id": {"type": "string"},
+            "task_status": {"type": ["string", "integer", "null"]},
+            "req_text_length": {"type": ["integer", "null"]},
+            "synthesize_text_length": {"type": ["integer", "null"]},
             "audio_duration_seconds": {"type": ["number", "null"]},
             "sentences": {"type": "array"},
             "usage": {"type": ["object", "null"]},
+            "url_expire_time": {"type": ["integer", "string", "null"]},
         },
     }
     artifact_schema = {
@@ -160,6 +192,7 @@ class DoubaoTTS(BaseTool):
     idempotency_key_fields = [
         "text",
         "output_path",
+        "metadata_path",
         "voice_id",
         "resource_id",
         "format",
@@ -171,11 +204,11 @@ class DoubaoTTS(BaseTool):
     ]
     side_effects = [
         "writes audio file to output_path",
-        "writes Doubao query metadata JSON next to output_path",
+        "writes Doubao query metadata JSON to metadata_path when provided, otherwise next to output_path",
         "calls Volcengine Doubao Speech API",
     ]
     user_visible_verification = [
-        "Listen to generated audio for Mandarin naturalness and pacing",
+        "Inspect transcript alignment, duration, and waveform metrics for Mandarin pacing",
         "Check timestamp JSON before building subtitles",
     ]
     quality_score = 0.88
@@ -197,10 +230,6 @@ class DoubaoTTS(BaseTool):
         return round(len(inputs.get("text", "")) * 0.000015, 4)
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
-        api_key = os.environ.get("DOUBAO_SPEECH_API_KEY")
-        if not api_key:
-            return ToolResult(success=False, error="No Doubao Speech API key. " + self.install_instructions)
-
         voice_id = inputs.get("voice_id") or os.environ.get(self.DEFAULT_VOICE_ENV)
         if not voice_id:
             return ToolResult(
@@ -211,6 +240,30 @@ class DoubaoTTS(BaseTool):
                 ),
             )
 
+        output_path, output_error = require_explicit_output_path(
+            inputs, self.name, artifact_label="generated speech audio"
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+
+        metadata_path, metadata_error = require_optional_project_sidecar_path(
+            inputs,
+            "metadata_path",
+            self.name,
+            artifact_label="Doubao query metadata",
+        )
+        if metadata_error:
+            return metadata_error
+        inputs = dict(inputs)
+        inputs["output_path"] = str(output_path)
+        if metadata_path is not None:
+            inputs["metadata_path"] = str(metadata_path)
+
+        api_key = os.environ.get("DOUBAO_SPEECH_API_KEY")
+        if not api_key:
+            return ToolResult(success=False, error="No Doubao Speech API key. " + self.install_instructions)
+
         start = time.time()
         try:
             result = self._generate(inputs, api_key=api_key, voice_id=voice_id)
@@ -220,6 +273,8 @@ class DoubaoTTS(BaseTool):
         result.duration_seconds = round(time.time() - start, 2)
         if not result.cost_usd:
             result.cost_usd = self.estimate_cost(inputs)
+        if result.success:
+            result.data.setdefault("output_path", str(output_path))
         return result
 
     def _generate(self, inputs: dict[str, Any], *, api_key: str, voice_id: str) -> ToolResult:
@@ -228,7 +283,7 @@ class DoubaoTTS(BaseTool):
         text = inputs["text"]
         fmt = inputs.get("format", "mp3")
         resource_id = inputs.get("resource_id", self.DEFAULT_RESOURCE_ID)
-        output_path = Path(inputs.get("output_path", f"doubao_tts.{self._extension_for_format(fmt)}"))
+        output_path = Path(inputs["output_path"])
         metadata_path = Path(
             inputs.get("metadata_path") or output_path.with_suffix(output_path.suffix + ".json")
         )
@@ -266,10 +321,21 @@ class DoubaoTTS(BaseTool):
         if not audio_url:
             raise RuntimeError("Doubao task completed but did not return data.audio_url")
 
+        try:
+            serialized_metadata = (
+                json.dumps(query_data, ensure_ascii=False, indent=2, allow_nan=False)
+                + "\n"
+            )
+        except (TypeError, ValueError) as exc:
+            return ToolResult(
+                success=False,
+                error=f"Doubao query metadata must be strict JSON serializable: {exc}",
+            )
+
         audio_response = requests.get(audio_url, timeout=(10, 120))
         audio_response.raise_for_status()
         output_path.write_bytes(audio_response.content)
-        metadata_path.write_text(json.dumps(query_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        metadata_path.write_text(serialized_metadata, encoding="utf-8")
 
         audio_duration = self._audio_duration(output_path)
         usage = data.get("usage")
@@ -337,7 +403,7 @@ class DoubaoTTS(BaseTool):
                 "text": inputs["text"],
                 "speaker": voice_id,
                 "audio_params": audio_params,
-                "additions": json.dumps(additions, ensure_ascii=False),
+                "additions": json.dumps(additions, ensure_ascii=False, allow_nan=False),
             },
         }
 

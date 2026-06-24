@@ -416,6 +416,21 @@ def test_skill_index_lists_meta_skills() -> None:
     )
 
 
+def test_skill_index_lists_registry_capabilities() -> None:
+    """Every live tool capability must be discoverable from the Layer 2 index."""
+    index = _skill_index_text()
+
+    registry.clear()
+    registry.discover()
+    missing = [
+        capability
+        for capability in sorted({tool.capability for tool in registry._tools.values()})
+        if f"`{capability}`" not in index
+    ]
+
+    assert missing == []
+
+
 @pytest.mark.parametrize(
     "skill_path", _all_skill_files(), ids=lambda p: str(p.relative_to(SKILLS_DIR))
 )

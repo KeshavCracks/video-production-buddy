@@ -28,6 +28,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_optional_project_sidecar_path
 
 _ASR_URL = (
     "https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation"
@@ -105,8 +106,30 @@ class QwenASR(BaseTool):
             },
             "output_path": {
                 "type": "string",
-                "description": "Optional path to write the transcript as a .txt file",
+                "description": (
+                    "Optional project-scoped path to write the transcript as a .txt "
+                    "sidecar, e.g. projects/<project-name>/artifacts/transcript.txt"
+                ),
             },
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "model",
+            "transcript",
+            "language",
+            "output",
+            "output_path",
+        ],
+        "properties": {
+            "provider": {"type": "string"},
+            "model": {"type": "string", "enum": list(_MODELS.keys())},
+            "transcript": {"type": "string"},
+            "language": {"type": ["string", "null"]},
+            "output": {"type": ["string", "null"]},
+            "output_path": {"type": ["string", "null"]},
         },
     }
 
@@ -130,6 +153,19 @@ class QwenASR(BaseTool):
         return 0.0  # per-hour pricing; duration unknown at estimate time
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        output_path, output_error = require_optional_project_sidecar_path(
+            inputs,
+            "output_path",
+            self.name,
+            artifact_label="transcript output",
+        )
+        if output_error:
+            return output_error
+
+        validated_inputs = dict(inputs)
+        if output_path is not None:
+            validated_inputs["output_path"] = str(output_path)
+
         api_key = self._get_api_key()
         if not api_key:
             return ToolResult(
@@ -138,16 +174,16 @@ class QwenASR(BaseTool):
             )
 
         start = time.time()
-        model = inputs.get("model", "qwen3-asr-flash")
+        model = validated_inputs.get("model", "qwen3-asr-flash")
 
-        audio_ref = inputs.get("audio_url") or ""
-        if not audio_ref and inputs.get("audio_path"):
-            audio_ref = self._file_to_b64(inputs["audio_path"]) or ""
+        audio_ref = validated_inputs.get("audio_url") or ""
+        if not audio_ref and validated_inputs.get("audio_path"):
+            audio_ref = self._file_to_b64(validated_inputs["audio_path"]) or ""
         if not audio_ref:
             return ToolResult(success=False, error="audio_url or audio_path required")
 
         try:
-            result = self._transcribe(inputs, api_key, model, audio_ref)
+            result = self._transcribe(validated_inputs, api_key, model, audio_ref)
         except Exception as exc:
             return ToolResult(success=False, error=f"Qwen ASR failed: {exc}")
 
@@ -216,6 +252,7 @@ class QwenASR(BaseTool):
                 "transcript": transcript,
                 "language": lang,
                 "output": output_path_str,
+                "output_path": output_path_str,
             },
             artifacts=artifacts,
             model=model,

@@ -282,11 +282,13 @@ After the render succeeds, actually probe the output file and check:
 - **Resolution.** Should match the canvas.
 - **Audio presence.** If music was in the plan, the output must
   have an audio stream. If silence was planned, confirm.
-- **First and last frame.** Open the file, seek to 0s and to
-  duration-0.1s. The first frame should be a fade-in. The last
-  frame should be (or be fading to) black.
-- **Silence window.** Seek to the silence_window start. Audio level
-  should drop visibly in the waveform.
+- **First and last frame.** Extract frame samples at 0s and
+  duration-0.1s with terminal tooling or surface them in GenUI. The
+  first frame should be a fade-in. The last frame should be (or be
+  fading to) black.
+- **Silence window.** Probe the silence_window start with audio
+  metadata/waveform tooling or surface it in GenUI. Audio level should
+  drop visibly in the waveform.
 
 Record verifications in `render_report.verification_notes`.
 
@@ -364,7 +366,8 @@ Record verifications in `render_report.verification_notes`.
   decisions, re-emit the artifact, then re-render.
 - **Skipping verification.** A render that "succeeded" but is
   actually silent, or fades wrong, or clips the last hero frame, is
-  worse than a failure. Open the file.
+  worse than a failure. Verify with terminal probes, extracted frame
+  samples, waveform evidence, or a GenUI review surface.
 
 ## When The Render Fails
 

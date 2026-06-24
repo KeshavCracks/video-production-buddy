@@ -19,6 +19,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class PexelsImage(BaseTool):
@@ -37,7 +38,7 @@ class PexelsImage(BaseTool):
         "Set PEXELS_API_KEY to your Pexels API key.\n"
         "  Get one free at https://www.pexels.com/api/"
     )
-    agent_skills = []
+    agent_skills = ["stock-sourcing"]
 
     capabilities = ["search_image", "download_image", "stock_image"]
     supports = {
@@ -60,7 +61,7 @@ class PexelsImage(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["query"],
+        "required": ["query", "output_path"],
         "properties": {
             "query": {"type": "string", "description": "Search term"},
             "orientation": {
@@ -84,6 +85,36 @@ class PexelsImage(BaseTool):
                 "default": "large2x",
             },
             "output_path": {"type": "string"},
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "photo_id",
+            "photographer",
+            "query",
+            "output",
+            "output_path",
+            "total_results",
+            "results_returned",
+            "license",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "pexels"},
+            "photo_id": {"type": ["integer", "string"]},
+            "photographer": {"type": "string"},
+            "photographer_url": {"type": "string"},
+            "alt": {"type": "string"},
+            "width": {"type": ["integer", "null"], "minimum": 0},
+            "height": {"type": ["integer", "null"], "minimum": 0},
+            "query": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "total_results": {"type": "integer", "minimum": 0},
+            "results_returned": {"type": "integer", "minimum": 0},
+            "license": {"type": "string"},
+            "pexels_url": {"type": "string"},
         },
     }
 
@@ -113,6 +144,14 @@ class PexelsImage(BaseTool):
         return 0.0  # Pexels is free
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="stock image",
+        )
+        if output_error:
+            return output_error
+
         api_key = os.environ.get("PEXELS_API_KEY")
         if not api_key:
             return ToolResult(
@@ -163,7 +202,6 @@ class PexelsImage(BaseTool):
             image_response = requests.get(image_url, timeout=60)
             image_response.raise_for_status()
 
-            output_path = Path(inputs.get("output_path", f"pexels_{photo['id']}.jpg"))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(image_response.content)
 
@@ -182,6 +220,7 @@ class PexelsImage(BaseTool):
                 "height": photo.get("height"),
                 "query": query,
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "total_results": data.get("total_results", 0),
                 "results_returned": len(photos),
                 "license": "Pexels License (free, no attribution required)",

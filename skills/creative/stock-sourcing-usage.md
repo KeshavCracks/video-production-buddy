@@ -55,7 +55,7 @@ Need stock video?
     "per_page": 5,                        # Results per page (1-80)
     "download_size": "large2x",           # Image: original/large2x/large/medium
     "preferred_quality": "hd",            # Video: hd/sd
-    "output_path": "assets/images/s3.jpg" # Where to save
+    "output_path": "projects/<project-name>/assets/images/s3.jpg" # Where to save
 }
 ```
 
@@ -70,7 +70,7 @@ Need stock video?
     "colors": "blue,gray",              # Comma-separated color names
     "editors_choice": true,              # Curated high-quality only
     "safesearch": true,                  # Always true for production
-    "output_path": "assets/video/s5.mp4" # Where to save
+    "output_path": "projects/<project-name>/assets/video/s5.mp4" # Where to save
 }
 ```
 

@@ -70,9 +70,9 @@ Before generating anything:
 
 Before batch-generating assets, produce one sample of each expensive asset type and present them to the user for approval:
 
-1. **TTS sample**: Generate narration for the first script section only. Play it for the user. Confirm voice, pace, and tone are acceptable before generating the rest.
-2. **Image sample**: Generate one image for the most representative scene. Show it to the user. Confirm the style, quality, and prompt approach before batch-generating all images.
-3. **Music sample** (if using `music_gen`): Generate one short clip. Confirm mood and energy before committing.
+1. **TTS sample**: Generate narration for the first script section only. Provide the artifact path plus duration, transcript, and waveform/loudness summary; do not launch playback automatically. Ask the user to approve or reject voice, pace, and tone before generating the rest.
+2. **Image sample**: Generate one image for the most representative scene. Present the artifact path plus dimensions and prompt summary, using GenUI or inline review only when available and appropriate. Confirm the style, quality, and prompt approach before batch-generating all images.
+3. **Music sample** (if using `music_gen`): Generate one short clip. Provide the artifact path plus duration, loudness, and style/mood metadata; do not launch playback automatically. Confirm mood and energy before committing.
 
 If the user rejects a sample:
 - Adjust the parameters (voice, prompt style, provider) and regenerate the sample.

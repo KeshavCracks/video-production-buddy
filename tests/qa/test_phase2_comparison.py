@@ -7,9 +7,10 @@ manual comparison.
 """
 
 import json
+import os
+import shutil
 import subprocess
 import sys
-import shutil
 from pathlib import Path
 
 import pytest
@@ -51,6 +52,17 @@ def _get_file_size_mb(path: str) -> float:
     return Path(path).stat().st_size / (1024 * 1024)
 
 
+def _project_render_path(filename: str) -> str:
+    return f"projects/phase2-comparison/renders/{filename}"
+
+
+def _absolute_from_workspace(workspace: Path, path: str) -> str:
+    candidate = Path(path)
+    if candidate.is_absolute():
+        return str(candidate)
+    return str(workspace / candidate)
+
+
 @pytest.fixture(scope="module")
 def comparison_outputs(tmp_path_factory):
     """Run compose handler twice: baseline and enhanced."""
@@ -58,79 +70,84 @@ def comparison_outputs(tmp_path_factory):
         pytest.skip("FFmpeg not available")
     tmp = tmp_path_factory.mktemp("comparison")
     footage = _make_synthetic_footage(tmp / "source_footage.mp4")
+    old_cwd = Path.cwd()
+    os.chdir(tmp)
 
-    from tools.video.video_compose import VideoCompose
-    from tools.enhancement.face_enhance import FaceEnhance
-    from tools.enhancement.color_grade import ColorGrade
-    from tools.audio.audio_enhance import AudioEnhance
+    try:
+        from tools.video.video_compose import VideoCompose
+        from tools.enhancement.face_enhance import FaceEnhance
+        from tools.enhancement.color_grade import ColorGrade
+        from tools.audio.audio_enhance import AudioEnhance
 
-    results = {}
+        results = {}
 
-    # Phase 1 baseline: just encode
-    composer = VideoCompose()
-    baseline_path = str(tmp / "phase1_baseline.mp4")
-    r = composer.execute({
-        "operation": "encode",
-        "input_path": str(footage),
-        "output_path": baseline_path,
-        "codec": "libx264",
-        "crf": 20,
-    })
-    assert r.success, f"Baseline encode failed: {r.error}"
-    results["baseline"] = baseline_path
+        # Phase 1 baseline: just encode
+        composer = VideoCompose()
+        baseline_path = _project_render_path("phase1_baseline.mp4")
+        r = composer.execute({
+            "operation": "encode",
+            "input_path": str(footage),
+            "output_path": baseline_path,
+            "codec": "libx264",
+            "crf": 20,
+        })
+        assert r.success, f"Baseline encode failed: {r.error}"
+        results["baseline"] = _absolute_from_workspace(tmp, baseline_path)
 
-    # Phase 2 enhanced: face -> color -> audio
-    current = str(footage)
-    enhancements = []
+        # Phase 2 enhanced: face -> color -> audio
+        current = str(footage)
+        enhancements = []
 
-    face = FaceEnhance()
-    face_out = str(tmp / "step_face.mp4")
-    r = face.execute({
-        "input_path": current,
-        "output_path": face_out,
-        "presets": ["talking_head_standard"],
-    })
-    if r.success:
-        current = r.data["output"]
-        enhancements.append("face_enhance:talking_head_standard")
+        face = FaceEnhance()
+        face_out = _project_render_path("step_face.mp4")
+        r = face.execute({
+            "input_path": current,
+            "output_path": face_out,
+            "presets": ["talking_head_standard"],
+        })
+        if r.success:
+            current = _absolute_from_workspace(tmp, r.data["output"])
+            enhancements.append("face_enhance:talking_head_standard")
 
-    color = ColorGrade()
-    color_out = str(tmp / "step_color.mp4")
-    r = color.execute({
-        "input_path": current,
-        "output_path": color_out,
-        "profile": "cinematic_warm",
-        "intensity": 0.85,
-    })
-    if r.success:
-        current = r.data["output"]
-        enhancements.append("color_grade:cinematic_warm@0.85")
+        color = ColorGrade()
+        color_out = _project_render_path("step_color.mp4")
+        r = color.execute({
+            "input_path": current,
+            "output_path": color_out,
+            "profile": "cinematic_warm",
+            "intensity": 0.85,
+        })
+        if r.success:
+            current = _absolute_from_workspace(tmp, r.data["output"])
+            enhancements.append("color_grade:cinematic_warm@0.85")
 
-    audio = AudioEnhance()
-    audio_out = str(tmp / "step_audio.mp4")
-    r = audio.execute({
-        "input_path": current,
-        "output_path": audio_out,
-        "preset": "clean_speech",
-    })
-    if r.success:
-        current = r.data["output"]
-        enhancements.append("audio_enhance:clean_speech")
+        audio = AudioEnhance()
+        audio_out = _project_render_path("step_audio.mp4")
+        r = audio.execute({
+            "input_path": current,
+            "output_path": audio_out,
+            "preset": "clean_speech",
+        })
+        if r.success:
+            current = _absolute_from_workspace(tmp, r.data["output"])
+            enhancements.append("audio_enhance:clean_speech")
 
-    # Final encode
-    enhanced_path = str(tmp / "phase2_enhanced.mp4")
-    r = composer.execute({
-        "operation": "encode",
-        "input_path": current,
-        "output_path": enhanced_path,
-        "codec": "libx264",
-        "crf": 20,
-    })
-    assert r.success, f"Enhanced encode failed: {r.error}"
-    results["enhanced"] = enhanced_path
-    results["enhancements"] = enhancements
+        # Final encode
+        enhanced_path = _project_render_path("phase2_enhanced.mp4")
+        r = composer.execute({
+            "operation": "encode",
+            "input_path": current,
+            "output_path": enhanced_path,
+            "codec": "libx264",
+            "crf": 20,
+        })
+        assert r.success, f"Enhanced encode failed: {r.error}"
+        results["enhanced"] = _absolute_from_workspace(tmp, enhanced_path)
+        results["enhancements"] = enhancements
 
-    return results
+        return results
+    finally:
+        os.chdir(old_cwd)
 
 
 class TestPhase2Comparison:

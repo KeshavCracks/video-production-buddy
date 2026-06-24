@@ -19,6 +19,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class PixabayImage(BaseTool):
@@ -37,7 +38,7 @@ class PixabayImage(BaseTool):
         "Set PIXABAY_API_KEY to your Pixabay API key.\n"
         "  Get one free at https://pixabay.com/api/docs/"
     )
-    agent_skills = []
+    agent_skills = ["stock-sourcing"]
 
     capabilities = ["search_image", "download_image", "stock_image"]
     supports = {
@@ -61,7 +62,7 @@ class PixabayImage(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["query"],
+        "required": ["query", "output_path"],
         "properties": {
             "query": {"type": "string", "description": "Search term (max 100 chars)"},
             "image_type": {
@@ -94,6 +95,35 @@ class PixabayImage(BaseTool):
             "output_path": {"type": "string"},
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "image_id",
+            "user",
+            "query",
+            "output",
+            "output_path",
+            "total_results",
+            "results_returned",
+            "license",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "pixabay"},
+            "image_id": {"type": ["integer", "string"]},
+            "user": {"type": "string"},
+            "tags": {"type": "string"},
+            "image_width": {"type": ["integer", "null"], "minimum": 0},
+            "image_height": {"type": ["integer", "null"], "minimum": 0},
+            "query": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "total_results": {"type": "integer", "minimum": 0},
+            "results_returned": {"type": "integer", "minimum": 0},
+            "license": {"type": "string"},
+            "page_url": {"type": "string"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=256, vram_mb=0, disk_mb=50, network_required=True
@@ -123,6 +153,14 @@ class PixabayImage(BaseTool):
         return 0.0  # Pixabay is free
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="stock image",
+        )
+        if output_error:
+            return output_error
+
         api_key = os.environ.get("PIXABAY_API_KEY")
         if not api_key:
             return ToolResult(
@@ -178,7 +216,6 @@ class PixabayImage(BaseTool):
             image_response = requests.get(image_url, timeout=60)
             image_response.raise_for_status()
 
-            output_path = Path(inputs.get("output_path", f"pixabay_{hit['id']}.jpg"))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(image_response.content)
 
@@ -196,6 +233,7 @@ class PixabayImage(BaseTool):
                 "image_height": hit.get("imageHeight"),
                 "query": query,
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "total_results": data.get("total", 0),
                 "results_returned": len(hits),
                 "license": "Pixabay Content License (free, no attribution required)",

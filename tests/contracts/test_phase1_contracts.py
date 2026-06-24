@@ -140,7 +140,8 @@ class TestPhase1ToolDiscovery:
 # ---- Contract: SubtitleGen produces valid output without FFmpeg ----
 
 class TestSubtitleGenUnit:
-    def test_srt_generation(self):
+    def test_srt_generation(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
         segments = [
             {
                 "text": "Hello world",
@@ -167,7 +168,7 @@ class TestSubtitleGenUnit:
         result = tool.execute({
             "segments": segments,
             "format": "srt",
-            "output_path": "test_output.srt",
+            "output_path": "projects/demo/assets/subtitles/test_output.srt",
         })
         assert result.success
         assert len(result.artifacts) == 1
@@ -178,7 +179,8 @@ class TestSubtitleGenUnit:
         # Cleanup
         Path(result.artifacts[0]).unlink(missing_ok=True)
 
-    def test_vtt_generation(self):
+    def test_vtt_generation(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
         segments = [
             {
                 "text": "Test cue",
@@ -194,14 +196,15 @@ class TestSubtitleGenUnit:
         result = tool.execute({
             "segments": segments,
             "format": "vtt",
-            "output_path": "test_output.vtt",
+            "output_path": "projects/demo/assets/subtitles/test_output.vtt",
         })
         assert result.success
         content = Path(result.artifacts[0]).read_text()
         assert content.startswith("WEBVTT")
         Path(result.artifacts[0]).unlink(missing_ok=True)
 
-    def test_json_generation(self):
+    def test_json_generation(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
         segments = [
             {
                 "text": "JSON test",
@@ -217,7 +220,7 @@ class TestSubtitleGenUnit:
         result = tool.execute({
             "segments": segments,
             "format": "json",
-            "output_path": "test_output.caption.json",
+            "output_path": "projects/demo/assets/subtitles/test_output.caption.json",
         })
         assert result.success
         data = json.loads(Path(result.artifacts[0]).read_text())
@@ -225,7 +228,8 @@ class TestSubtitleGenUnit:
         assert len(data["cues"]) >= 1
         Path(result.artifacts[0]).unlink(missing_ok=True)
 
-    def test_word_grouping_respects_max_words(self):
+    def test_word_grouping_respects_max_words(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
         words = [{"word": f"w{i}", "start": i * 0.5, "end": i * 0.5 + 0.4} for i in range(20)]
         segments = [{"text": " ".join(w["word"] for w in words), "start": 0.0, "end": 10.0, "words": words}]
 
@@ -234,7 +238,7 @@ class TestSubtitleGenUnit:
             "segments": segments,
             "format": "json",
             "max_words_per_cue": 4,
-            "output_path": "test_grouping.caption.json",
+            "output_path": "projects/demo/assets/subtitles/test_grouping.caption.json",
         })
         assert result.success
         data = json.loads(Path(result.artifacts[0]).read_text())
@@ -242,8 +246,9 @@ class TestSubtitleGenUnit:
             assert len(cue["words"]) <= 4
         Path(result.artifacts[0]).unlink(missing_ok=True)
 
-    def test_segment_fallback_without_words(self):
+    def test_segment_fallback_without_words(self, tmp_path, monkeypatch):
         """Segments without word-level timestamps use segment-level timing."""
+        monkeypatch.chdir(tmp_path)
         segments = [
             {"text": "No word data", "start": 0.0, "end": 2.0},
         ]
@@ -251,7 +256,7 @@ class TestSubtitleGenUnit:
         result = tool.execute({
             "segments": segments,
             "format": "srt",
-            "output_path": "test_fallback.srt",
+            "output_path": "projects/demo/assets/subtitles/test_fallback.srt",
         })
         assert result.success
         content = Path(result.artifacts[0]).read_text()

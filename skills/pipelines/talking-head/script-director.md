@@ -21,6 +21,7 @@ Unlike the explainer pipeline (which writes a script from scratch), you're extra
 Use the transcriber tool to get word-level timestamps:
 - Model: `large-v3` for best quality, `base` for speed
 - Enable word-level alignment for precise timing
+- Write transcript files to `projects/<project-name>/artifacts/transcripts/`
 - Note language detection result
 
 ### Step 2: Segment into Sections

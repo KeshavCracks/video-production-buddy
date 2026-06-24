@@ -21,6 +21,7 @@ from tools.base_tool import (
     ToolStability,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class ShowcaseCard(BaseTool):
@@ -53,7 +54,10 @@ class ShowcaseCard(BaseTool):
             },
             "output_path": {
                 "type": "string",
-                "description": "Path for the output showcase card video.",
+                "description": (
+                    "Project-scoped path for the output showcase card video, e.g. "
+                    "projects/<project-name>/renders/showcase-card.mp4"
+                ),
             },
             "title": {
                 "type": "string",
@@ -106,6 +110,27 @@ class ShowcaseCard(BaseTool):
             },
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "output",
+            "output_path",
+            "source_resolution",
+            "output_resolution",
+            "title",
+            "subtitle",
+            "letterbox_y_offset",
+        ],
+        "properties": {
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "source_resolution": {"type": "string"},
+            "output_resolution": {"type": "string"},
+            "title": {"type": "string"},
+            "subtitle": {"type": "string"},
+            "letterbox_y_offset": {"type": "integer"},
+        },
+    }
 
     resource_profile = ResourceProfile(cpu_cores=2, ram_mb=1024, vram_mb=0, disk_mb=500)
     idempotency_key_fields = [
@@ -124,13 +149,20 @@ class ShowcaseCard(BaseTool):
     ]
     side_effects = ["writes showcase card video to output_path"]
     user_visible_verification = [
-        "Play output and verify title, subtitle, and video are positioned correctly",
+        "Inspect sampled frames to verify title, subtitle, and video are positioned correctly",
         "Verify the video content is fully visible (not cropped)",
     ]
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="showcase card video",
+        )
+        if output_error:
+            return output_error
+
         input_path = inputs["input_path"]
-        output_path = inputs["output_path"]
         title = inputs["title"]
         subtitle = inputs.get("subtitle", "")
         out_w = inputs.get("output_width", 1080)
@@ -145,7 +177,7 @@ class ShowcaseCard(BaseTool):
         if not Path(input_path).exists():
             return ToolResult(success=False, error=f"Input not found: {input_path}")
 
-        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         start = time.time()
 
         # Get source dimensions
@@ -215,7 +247,7 @@ class ShowcaseCard(BaseTool):
             "-c:v", "libx264", "-preset", "fast", "-crf", "18",
             "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k",
-            output_path,
+            str(output_path),
         ]
 
         try:
@@ -223,7 +255,7 @@ class ShowcaseCard(BaseTool):
         except Exception as e:
             return ToolResult(success=False, error=f"FFmpeg failed: {e}")
 
-        if not Path(output_path).exists():
+        if not output_path.exists():
             return ToolResult(success=False, error="No output produced")
 
         elapsed = round(time.time() - start, 2)
@@ -231,13 +263,14 @@ class ShowcaseCard(BaseTool):
         return ToolResult(
             success=True,
             data={
-                "output": output_path,
+                "output": str(output_path),
+                "output_path": str(output_path),
                 "source_resolution": f"{src_w}x{src_h}",
                 "output_resolution": f"{out_w}x{out_h}",
                 "title": title,
                 "subtitle": subtitle,
                 "letterbox_y_offset": pad_y,
             },
-            artifacts=[output_path],
+            artifacts=[str(output_path)],
             duration_seconds=elapsed,
         )

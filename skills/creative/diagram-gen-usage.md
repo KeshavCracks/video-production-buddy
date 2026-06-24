@@ -14,6 +14,7 @@ RENDER WIDTH:       Minimum 1200px
 RENDER VIEWPORT:    3840x2160 (4K) for high-res PNG export
 THEME (dark bg):    tokyo-night or dracula
 THEME (light bg):   github-light or catppuccin-latte
+OUTPUT_PATH:        Required; write under projects/<project-name>/assets/... or projects/<project-name>/renders/...
 ```
 
 ## Diagram Type Selection
@@ -109,3 +110,4 @@ When using the `diagram_gen` tool:
 6. **Default to flowchart TD** unless the content specifically requires another diagram type
 7. **Render at 4K viewport** (3840x2160) even for 1080p output — ensures crisp text when scaled
 8. **Test readability** — view the rendered PNG at actual video frame size before composing
+9. **Pass an explicit `output_path`** such as `projects/<project-name>/assets/images/diagram_intro.png`; do not rely on root-level defaults

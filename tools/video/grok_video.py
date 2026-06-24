@@ -25,7 +25,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
-from tools.video._shared import validate_video_operation
+from tools.video._shared import require_generated_video_output_path, validate_video_operation
 
 
 def _file_to_data_uri(path_str: str) -> str:
@@ -87,7 +87,7 @@ class GrokVideo(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {"type": "string"},
             "operation": {
@@ -133,6 +133,39 @@ class GrokVideo(BaseTool):
             "timeout_seconds": {"type": "integer", "minimum": 30, "default": 900},
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "model",
+            "prompt",
+            "operation",
+            "request_id",
+            "output",
+            "output_path",
+            "format",
+            "file_size_bytes",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "grok"},
+            "model": {"type": "string"},
+            "prompt": {"type": "string"},
+            "operation": {
+                "type": "string",
+                "enum": ["text_to_video", "image_to_video", "reference_to_video"],
+            },
+            "request_id": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "format": {"type": "string", "const": "mp4"},
+            "file_size_bytes": {"type": "integer", "minimum": 0},
+            "duration_seconds": {"type": "number", "minimum": 0},
+            "file_size_mb": {"type": "number", "minimum": 0},
+            "video_width": {"type": "integer", "minimum": 0},
+            "video_height": {"type": "integer", "minimum": 0},
+            "video_codec": {"type": "string"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=512, vram_mb=0, disk_mb=500, network_required=True
@@ -152,7 +185,7 @@ class GrokVideo(BaseTool):
         "reference_image_paths",
     ]
     side_effects = ["writes video file to output_path", "calls xAI video API"]
-    user_visible_verification = ["Watch generated clip for motion quality and prompt fidelity"]
+    user_visible_verification = ["Inspect sampled frames for motion quality and prompt fidelity"]
 
     def get_status(self) -> ToolStatus:
         if os.environ.get("XAI_API_KEY"):
@@ -226,6 +259,17 @@ class GrokVideo(BaseTool):
         return payload
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        operation = inputs.get("operation", "text_to_video")
+        operation_error = validate_video_operation(
+            operation,
+            {"text_to_video", "image_to_video", "reference_to_video"},
+        )
+        if operation_error:
+            return ToolResult(success=False, error=operation_error)
+        output_path, output_error = require_generated_video_output_path(inputs, self.name)
+        if output_error:
+            return output_error
+
         api_key = os.environ.get("XAI_API_KEY")
         if not api_key:
             return ToolResult(
@@ -237,13 +281,6 @@ class GrokVideo(BaseTool):
         from tools.video._shared import probe_output
 
         start = time.time()
-        operation = inputs.get("operation", "text_to_video")
-        operation_error = validate_video_operation(
-            operation,
-            {"text_to_video", "image_to_video", "reference_to_video"},
-        )
-        if operation_error:
-            return ToolResult(success=False, error=operation_error)
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
@@ -290,7 +327,6 @@ class GrokVideo(BaseTool):
 
             download = requests.get(video_url, timeout=300)
             download.raise_for_status()
-            output_path = Path(inputs.get("output_path", "grok_video_output.mp4"))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(download.content)
 

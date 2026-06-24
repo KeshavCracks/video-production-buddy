@@ -30,6 +30,10 @@ def _ok_result() -> ToolResult:
     return ToolResult(success=True, data={"path": "/tmp/synthetic.mp3"})
 
 
+def _inputs() -> dict[str, str]:
+    return {"text": "hi", "output_path": "projects/synthetic/assets/audio/voice.mp3"}
+
+
 class TestCosyVoiceTTSRetryWiring:
     """RetryPolicy is data; these tests pin that it actually drives behavior."""
 
@@ -40,7 +44,7 @@ class TestCosyVoiceTTSRetryWiring:
         # Act
         with patch.object(tool, "_generate_qwen", gen), \
              patch("tools.audio.cosyvoice_tts.time.sleep"):
-            result = tool.execute({"text": "hi"})
+            result = tool.execute(_inputs())
         # Assert — the retry policy declares max_retries=2, so one transient
         # failure followed by success must produce a successful ToolResult and
         # exactly two calls to the underlying generator.
@@ -60,7 +64,7 @@ class TestCosyVoiceTTSRetryWiring:
         # Act
         with patch.object(tool, "_generate_qwen", gen), \
              patch("tools.audio.cosyvoice_tts.time.sleep"):
-            result = tool.execute({"text": "hi"})
+            result = tool.execute(_inputs())
         # Assert — max_retries=2 means 1 initial + 2 retries = 3 total attempts.
         # After the third failure the tool surfaces a failed ToolResult.
         assert result.success is False
@@ -77,7 +81,7 @@ class TestCosyVoiceTTSRetryWiring:
         # Act
         with patch.object(tool, "_generate_qwen", gen), \
              patch("tools.audio.cosyvoice_tts.time.sleep"):
-            result = tool.execute({"text": "hi"})
+            result = tool.execute(_inputs())
         # Assert — non-retryable errors must fail immediately. No retries.
         assert result.success is False
         assert gen.call_count == 1, (

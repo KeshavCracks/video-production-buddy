@@ -48,6 +48,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_project_corpus_destination
 
 
 class ClipSearch(BaseTool):
@@ -157,10 +158,52 @@ class ClipSearch(BaseTool):
             "clip_id": {"type": "string"},
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": ["operation", "corpus_dir", "corpus_size"],
+        "properties": {
+            "operation": {
+                "type": "string",
+                "enum": ["rank_for_slot", "find_similar_set", "diversify", "get", "stats"],
+            },
+            "corpus_dir": {"type": "string"},
+            "corpus_size": {"type": "integer", "minimum": 0},
+            "rows": {"type": "integer", "minimum": 0},
+            "per_source": {"type": "object"},
+            "per_kind": {"type": "object"},
+            "mean_motion_score": {"type": "number"},
+            "mean_duration": {"type": "number"},
+            "query_text": {"type": "string"},
+            "seed_clip_id": {"type": "string"},
+            "results": {"type": "array", "items": {"type": "object"}},
+            "input_count": {"type": "integer", "minimum": 0},
+            "kept_count": {"type": "integer", "minimum": 0},
+            "kept_ids": {"type": "array", "items": {"type": "string"}},
+            "clip_id": {"type": "string"},
+            "found": {"type": "boolean"},
+            "record": {"type": ["object", "null"]},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=1024, vram_mb=0, disk_mb=50, network_required=False
     )
+    idempotency_key_fields = [
+        "operation",
+        "corpus_dir",
+        "query_text",
+        "k",
+        "tag_weight",
+        "motion_min",
+        "kind",
+        "exclude_ids",
+        "seed_clip_id",
+        "n",
+        "diversity",
+        "candidate_pool",
+        "candidate_ids",
+        "clip_id",
+    ]
     side_effects = []
     user_visible_verification = [
         "Inspect returned clip_ids and visit thumb_dir/frame_02.jpg "
@@ -186,10 +229,19 @@ class ClipSearch(BaseTool):
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
         start = time.time()
         try:
+            corpus_dir, corpus_error = require_explicit_project_corpus_destination(
+                inputs,
+                "corpus_dir",
+                self.name,
+                artifact_label="clip corpus",
+            )
+            if corpus_error:
+                return corpus_error
+
             from lib.corpus import Corpus
 
             operation = inputs["operation"]
-            corpus_dir = Path(inputs["corpus_dir"])
+            assert corpus_dir is not None
 
             corp = Corpus(corpus_dir)
             corp.load()

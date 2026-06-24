@@ -30,6 +30,7 @@ from tools.base_tool import (
     ToolStability,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 def _detect_audio_device_windows() -> str | None:
@@ -120,7 +121,10 @@ class ScreenRecorder(BaseTool):
         "properties": {
             "output_path": {
                 "type": "string",
-                "description": "Path for the output MP4 file",
+                "description": (
+                    "Project-scoped path for the output MP4 file, e.g. "
+                    "projects/<project-name>/renders/recording.mp4"
+                ),
             },
             "duration_seconds": {
                 "type": "integer",
@@ -157,12 +161,22 @@ class ScreenRecorder(BaseTool):
 
     output_schema = {
         "type": "object",
+        "required": [
+            "output_path",
+            "duration_seconds",
+            "has_audio",
+            "file_size_mb",
+            "platform",
+            "capture_method",
+        ],
         "properties": {
             "output_path": {"type": "string"},
             "duration_seconds": {"type": "number"},
             "resolution": {"type": "string"},
             "has_audio": {"type": "boolean"},
             "file_size_mb": {"type": "number"},
+            "platform": {"type": "string"},
+            "capture_method": {"type": "string"},
         },
     }
 
@@ -178,11 +192,18 @@ class ScreenRecorder(BaseTool):
         "region",
         "screen_index",
     ]
-    side_effects = ["creates_file"]
+    side_effects = ["writes screen recording MP4 to output_path"]
     fallback_tools = ["cap_recorder"]
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
-        output_path = Path(inputs["output_path"])
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="screen recording",
+        )
+        if output_error:
+            return output_error
+
         duration = min(inputs.get("duration_seconds", 60), 600)
         fps = inputs.get("fps", 30)
         capture_audio = inputs.get("capture_audio", True)

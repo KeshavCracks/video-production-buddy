@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from tools.base_tool import ToolResult, ToolStatus
+from tools.output_paths import require_explicit_output_path
 
 
 HEYGEN_PROVIDERS = {
@@ -160,6 +161,65 @@ def validate_video_operation(operation: str, allowed: set[str]) -> str | None:
     )
 
 
+def require_generated_video_output_path(
+    inputs: dict[str, Any],
+    tool_name: str,
+) -> tuple[Path | None, ToolResult | None]:
+    return require_explicit_output_path(
+        inputs,
+        tool_name,
+        artifact_label="generated video",
+    )
+
+
+def local_video_output_schema(provider_name: str) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "required": [
+            "provider",
+            "model_variant",
+            "provider_name",
+            "mode",
+            "prompt",
+            "model_id",
+            "width",
+            "height",
+            "num_frames",
+            "fps",
+            "duration_seconds",
+            "operation",
+            "output",
+            "output_path",
+            "format",
+            "license",
+            "file_size_bytes",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": provider_name},
+            "model_variant": {"type": "string"},
+            "provider_name": {"type": "string"},
+            "mode": {"type": "string", "const": "local"},
+            "prompt": {"type": "string"},
+            "model_id": {"type": "string"},
+            "width": {"type": "integer", "minimum": 0},
+            "height": {"type": "integer", "minimum": 0},
+            "num_frames": {"type": "integer", "minimum": 1},
+            "fps": {"type": "integer", "minimum": 1},
+            "duration_seconds": {"type": "number", "minimum": 0},
+            "operation": {"type": "string", "enum": ["text_to_video", "image_to_video"]},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "format": {"type": "string", "const": "mp4"},
+            "license": {"type": "string"},
+            "file_size_bytes": {"type": "integer", "minimum": 0},
+            "file_size_mb": {"type": "number", "minimum": 0},
+            "video_width": {"type": "integer", "minimum": 0},
+            "video_height": {"type": "integer", "minimum": 0},
+            "video_codec": {"type": "string"},
+        },
+    }
+
+
 def _diffusers_pipeline_name(pipeline_class: str) -> str:
     pipeline_map = {
         "WanPipeline": "WanPipeline",
@@ -296,6 +356,9 @@ def generate_local_video(
             success=False,
             error=f"{meta['name']} does not support image_to_video.",
         )
+    output_path, output_error = require_generated_video_output_path(inputs, tool_name)
+    if output_error:
+        return output_error
 
     import torch
     from diffusers.utils import export_to_video
@@ -327,7 +390,6 @@ def generate_local_video(
     output = pipeline(**generation_args)
     frames = output.frames[0] if hasattr(output, "frames") else output.images
 
-    output_path = Path(inputs.get("output_path", f"{tool_name}_{variant}.mp4"))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     export_to_video(frames, str(output_path), fps=fps)
 
@@ -347,6 +409,7 @@ def generate_local_video(
             "duration_seconds": round(num_frames / fps, 2),
             "operation": operation,
             "output": str(output_path),
+            "output_path": str(output_path),
             "format": "mp4",
             "license": meta["license"],
             **probe_output(output_path),
@@ -495,21 +558,25 @@ def generate_heygen_video(inputs: dict[str, Any]) -> ToolResult:
     operation_error = validate_video_operation(operation, {"text_to_video", "image_to_video"})
     if operation_error:
         return ToolResult(success=False, error=operation_error)
+    ref_url = inputs.get("reference_image_url")
+    ref_path = inputs.get("reference_image_path")
+    if operation == "image_to_video" and not (ref_url or ref_path):
+        return ToolResult(
+            success=False,
+            error="image_to_video requires reference_image_url or reference_image_path",
+        )
+    output_path, output_error = require_generated_video_output_path(inputs, "heygen_video")
+    if output_error:
+        return output_error
+
     workflow_input: dict[str, Any] = {
         "prompt": prompt,
         "provider": provider,
         "aspect_ratio": aspect_ratio,
     }
     if operation == "image_to_video":
-        ref_url = inputs.get("reference_image_url")
-        ref_path = inputs.get("reference_image_path")
         if ref_path and not ref_url:
             ref_url = upload_image_heygen(ref_path, api_key)
-        if not ref_url:
-            return ToolResult(
-                success=False,
-                error="image_to_video requires reference_image_url or reference_image_path",
-            )
         workflow_input["reference_image_url"] = ref_url
 
     response = requests.post(
@@ -525,7 +592,6 @@ def generate_heygen_video(inputs: dict[str, Any]) -> ToolResult:
         return ToolResult(success=False, error=f"No execution_id in response: {payload}")
 
     video_url = poll_heygen(execution_id, api_key, timeout=600)
-    output_path = Path(inputs.get("output_path", f"heygen_video_{execution_id}.mp4"))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     download = requests.get(video_url, timeout=120)
     download.raise_for_status()
@@ -544,6 +610,7 @@ def generate_heygen_video(inputs: dict[str, Any]) -> ToolResult:
             "operation": operation,
             "execution_id": execution_id,
             "output": str(output_path),
+            "output_path": str(output_path),
             "format": "mp4",
         },
         artifacts=[str(output_path)],
@@ -565,6 +632,17 @@ def generate_ltx_modal_video(inputs: dict[str, Any]) -> ToolResult:
     operation_error = validate_video_operation(operation, {"text_to_video", "image_to_video"})
     if operation_error:
         return ToolResult(success=False, error=operation_error)
+    ref_path = inputs.get("reference_image_path")
+    ref_url = inputs.get("reference_image_url")
+    if operation == "image_to_video" and not (ref_path or ref_url):
+        return ToolResult(
+            success=False,
+            error="image_to_video requires reference_image_url or reference_image_path",
+        )
+    output_path, output_error = require_generated_video_output_path(inputs, "ltx_video_modal")
+    if output_error:
+        return output_error
+
     aspect = inputs.get("aspect_ratio", "16:9")
     width = inputs.get("width")
     height = inputs.get("height")
@@ -593,21 +671,13 @@ def generate_ltx_modal_video(inputs: dict[str, Any]) -> ToolResult:
         payload["seed"] = inputs["seed"]
 
     if operation == "image_to_video":
-        ref_path = inputs.get("reference_image_path")
-        ref_url = inputs.get("reference_image_url")
         if ref_path:
             payload["input_image"] = base64.b64encode(Path(ref_path).read_bytes()).decode()
         elif ref_url:
             payload["input_image_url"] = ref_url
-        else:
-            return ToolResult(
-                success=False,
-                error="image_to_video requires reference_image_url or reference_image_path",
-            )
 
     response = requests.post(endpoint_url, json=payload, timeout=300)
     response.raise_for_status()
-    output_path = Path(inputs.get("output_path", "ltx_video_modal.mp4"))
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     content_type = response.headers.get("content-type", "")
@@ -636,6 +706,7 @@ def generate_ltx_modal_video(inputs: dict[str, Any]) -> ToolResult:
             "duration_seconds": round(num_frames / 24, 2),
             "operation": operation,
             "output": str(output_path),
+            "output_path": str(output_path),
             "format": "mp4",
         },
         artifacts=[str(output_path)],

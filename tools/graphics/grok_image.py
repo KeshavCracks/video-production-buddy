@@ -22,6 +22,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 def _file_to_data_uri(path_str: str) -> str:
@@ -85,7 +86,7 @@ class GrokImage(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {"type": "string"},
             "generation_mode": {
@@ -124,6 +125,29 @@ class GrokImage(BaseTool):
                 "description": "Multiple local source image paths for compositing edits",
             },
             "output_path": {"type": "string"},
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "model",
+            "prompt",
+            "generation_mode",
+            "output",
+            "output_path",
+            "outputs",
+            "images_generated",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "grok"},
+            "model": {"type": "string"},
+            "prompt": {"type": "string"},
+            "generation_mode": {"type": "string", "enum": ["generate", "edit"]},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "outputs": {"type": "array", "items": {"type": "string"}},
+            "images_generated": {"type": "integer", "minimum": 1},
         },
     }
 
@@ -223,11 +247,7 @@ class GrokImage(BaseTool):
         return ".png"
 
     @staticmethod
-    def _output_paths(output_path: str | None, count: int, extension: str) -> list[Path]:
-        if not output_path:
-            stem = "grok_image"
-            return [Path(f"{stem}_{idx + 1}{extension}") for idx in range(count)]
-
+    def _output_paths(output_path: str, count: int, extension: str) -> list[Path]:
         path = Path(output_path)
         suffix = path.suffix or extension
         if count == 1:
@@ -237,6 +257,18 @@ class GrokImage(BaseTool):
         return [base.parent / f"{base.name}_{idx + 1}{suffix}" for idx in range(count)]
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        mode = inputs.get("generation_mode", "generate")
+        if mode not in {"generate", "edit"}:
+            return ToolResult(success=False, error=f"Unsupported generation_mode '{mode}'.")
+
+        validated_output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="generated image",
+        )
+        if output_error:
+            return output_error
+
         api_key = os.environ.get("XAI_API_KEY")
         if not api_key:
             return ToolResult(
@@ -244,11 +276,12 @@ class GrokImage(BaseTool):
                 error="XAI_API_KEY not set. " + self.install_instructions,
             )
 
-        import requests
-
         start = time.time()
         try:
             endpoint, payload = self._build_payload(inputs)
+
+            import requests
+
             response = requests.post(
                 endpoint,
                 headers={
@@ -270,7 +303,7 @@ class GrokImage(BaseTool):
             if first_url:
                 extension = self._infer_extension(first_url)
 
-            output_paths = self._output_paths(inputs.get("output_path"), len(items), extension)
+            output_paths = self._output_paths(str(validated_output_path), len(items), extension)
             artifacts: list[str] = []
             outputs: list[str] = []
 
@@ -300,6 +333,7 @@ class GrokImage(BaseTool):
                 "prompt": inputs["prompt"],
                 "generation_mode": inputs.get("generation_mode", "generate"),
                 "output": primary_output,
+                "output_path": primary_output,
                 "outputs": outputs,
                 "images_generated": len(outputs),
             },

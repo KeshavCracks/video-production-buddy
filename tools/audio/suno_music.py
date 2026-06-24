@@ -24,6 +24,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class SunoMusic(BaseTool):
@@ -74,7 +75,7 @@ class SunoMusic(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {
                 "type": "string",
@@ -116,6 +117,37 @@ class SunoMusic(BaseTool):
             },
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "model",
+            "prompt",
+            "style",
+            "title",
+            "instrumental",
+            "duration_seconds",
+            "format",
+            "output",
+            "output_path",
+            "track_id",
+            "tracks_generated",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "suno"},
+            "model": {"type": "string"},
+            "prompt": {"type": "string"},
+            "style": {"type": ["string", "null"]},
+            "title": {"type": ["string", "null"]},
+            "instrumental": {"type": "boolean"},
+            "duration_seconds": {"type": ["number", "null"], "minimum": 0},
+            "format": {"type": "string", "const": "mp3"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "track_id": {"type": ["string", "number", "null"]},
+            "tracks_generated": {"type": "integer", "minimum": 0},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=256, vram_mb=0, disk_mb=100, network_required=True
@@ -133,7 +165,7 @@ class SunoMusic(BaseTool):
     ]
     side_effects = ["writes audio file to output_path", "calls Suno API via sunoapi.org"]
     user_visible_verification = [
-        "Listen to generated music for mood, genre accuracy, and quality",
+        "Inspect audio metadata, duration, tags, and waveform metrics for mood, genre accuracy, and quality fit",
     ]
 
     _BASE_URL = "https://api.sunoapi.org/api/v1"
@@ -153,19 +185,28 @@ class SunoMusic(BaseTool):
         return 0.05
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
-        api_key = self._get_api_key()
-        if not api_key:
-            return ToolResult(
-                success=False,
-                error="No Suno API key. " + self.install_instructions,
-            )
-
         if inputs.get("custom_mode", False) and (
             not inputs.get("style") or not inputs.get("title")
         ):
             return ToolResult(
                 success=False,
                 error="custom_mode requires style and title before submitting to Suno.",
+            )
+
+        output_path, output_error = require_explicit_output_path(
+            inputs, self.name, artifact_label="generated music audio"
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+        inputs = dict(inputs)
+        inputs["output_path"] = str(output_path)
+
+        api_key = self._get_api_key()
+        if not api_key:
+            return ToolResult(
+                success=False,
+                error="No Suno API key. " + self.install_instructions,
             )
 
         start = time.time()
@@ -206,6 +247,7 @@ class SunoMusic(BaseTool):
                 "instrumental": inputs.get("instrumental", True),
                 "duration_seconds": track.get("duration"),
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "format": "mp3",
                 "track_id": track.get("id"),
                 "tracks_generated": len(tracks),
@@ -295,7 +337,7 @@ class SunoMusic(BaseTool):
         """Download the audio file to the output path."""
         import requests
 
-        output_path = Path(inputs.get("output_path", "suno_output.mp3"))
+        output_path = Path(inputs["output_path"])
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         response = requests.get(audio_url, timeout=120)

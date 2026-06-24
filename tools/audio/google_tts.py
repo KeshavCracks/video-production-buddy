@@ -24,6 +24,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class GoogleTTS(BaseTool):
@@ -71,7 +72,7 @@ class GoogleTTS(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["text"],
+        "required": ["text", "output_path"],
         "properties": {
             "text": {"type": "string", "description": "Text to convert to speech"},
             "voice": {
@@ -107,6 +108,34 @@ class GoogleTTS(BaseTool):
             "output_path": {"type": "string"},
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "voice",
+            "language_code",
+            "text_length",
+            "format",
+            "speaking_rate",
+            "pitch",
+            "output",
+            "output_path",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "google_tts"},
+            "voice": {"type": "string"},
+            "language_code": {"type": "string"},
+            "text_length": {"type": "integer", "minimum": 0},
+            "format": {
+                "type": "string",
+                "enum": ["MP3", "LINEAR16", "OGG_OPUS", "MULAW", "ALAW"],
+            },
+            "speaking_rate": {"type": "number"},
+            "pitch": {"type": "number"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=256, vram_mb=0, disk_mb=50, network_required=True
@@ -122,7 +151,7 @@ class GoogleTTS(BaseTool):
         "audio_encoding",
     ]
     side_effects = ["writes audio file to output_path", "calls Google Cloud TTS API"]
-    user_visible_verification = ["Listen to generated audio for natural speech quality"]
+    user_visible_verification = ["Inspect transcript alignment, duration, and waveform metrics for natural speech quality"]
 
     # Extension mapping for audio encodings
     _EXT_MAP = {
@@ -166,6 +195,13 @@ class GoogleTTS(BaseTool):
         return round(char_count * rate_per_char, 4)
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        output_path, output_error = require_explicit_output_path(
+            inputs, self.name, artifact_label="generated speech audio"
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+
         api_key = self._get_api_key()
         if not api_key:
             return ToolResult(
@@ -175,15 +211,22 @@ class GoogleTTS(BaseTool):
 
         start = time.time()
         try:
-            result = self._generate(inputs, api_key)
+            result = self._generate(inputs, api_key, output_path)
         except Exception as exc:
             return ToolResult(success=False, error=f"Google TTS failed: {exc}")
 
         result.duration_seconds = round(time.time() - start, 2)
         result.cost_usd = self.estimate_cost(inputs)
+        if result.success:
+            result.data.setdefault("output_path", str(output_path))
         return result
 
-    def _generate(self, inputs: dict[str, Any], api_key: str) -> ToolResult:
+    def _generate(
+        self,
+        inputs: dict[str, Any],
+        api_key: str,
+        output_path: Path,
+    ) -> ToolResult:
         import requests
 
         text = inputs["text"]
@@ -221,8 +264,6 @@ class GoogleTTS(BaseTool):
 
         audio_content = base64.b64decode(response.json()["audioContent"])
 
-        ext = self._EXT_MAP.get(audio_encoding, "mp3")
-        output_path = Path(inputs.get("output_path", f"tts_output.{ext}"))
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(audio_content)
 

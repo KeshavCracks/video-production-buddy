@@ -112,6 +112,31 @@ sources:
     assert raw.endswith("\n")
 
 
+def test_load_lock_rejects_non_strict_json(tmp_path: Path) -> None:
+    from lib.agent_components import ComponentError, ComponentManager
+
+    lock_path = tmp_path / ".agents" / "components.lock.json"
+    lock_path.parent.mkdir(parents=True)
+    lock_path.write_text(
+        """
+{
+  "lockfileVersion": 1,
+  "components": {},
+  "x-non-finite-sentinel": NaN
+}
+""".lstrip(),
+        encoding="utf-8",
+    )
+    manager = ComponentManager(
+        tmp_path / ".agents" / "components.yaml",
+        lock_path,
+        repo_root=tmp_path,
+    )
+
+    with pytest.raises(ComponentError, match="strict JSON"):
+        manager.load_lock()
+
+
 def test_lock_ignores_python_bytecode_cache_files(tmp_path: Path) -> None:
     from lib.agent_components import ComponentManager
 

@@ -1,11 +1,33 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
+
+import pytest
 
 from tools.base_tool import ToolStatus
 from tools.tool_registry import ToolRegistry
 from tools.video.corpus_builder import CorpusBuilder
 from tools.video.video_compose import VideoCompose
+
+
+@pytest.fixture
+def project_renders_dir(tmp_path):
+    repo_root = Path(__file__).resolve().parents[2]
+    project_dir = repo_root / "projects" / f"pytest-documentary-compose-{tmp_path.name}"
+    shutil.rmtree(project_dir, ignore_errors=True)
+    renders_dir = project_dir / "renders"
+    yield renders_dir
+    shutil.rmtree(project_dir, ignore_errors=True)
+
+
+@pytest.fixture
+def project_corpus_dir(tmp_path):
+    repo_root = Path(__file__).resolve().parents[2]
+    project_dir = repo_root / "projects" / f"pytest-documentary-corpus-{tmp_path.name}"
+    shutil.rmtree(project_dir, ignore_errors=True)
+    yield project_dir / "corpus"
+    shutil.rmtree(project_dir, ignore_errors=True)
 
 
 class _DummySource:
@@ -67,7 +89,7 @@ def test_corpus_builder_reports_source_level_discoverability(monkeypatch):
     }
 
 
-def test_corpus_builder_rejects_unavailable_pinned_sources(monkeypatch, tmp_path):
+def test_corpus_builder_rejects_unavailable_pinned_sources(monkeypatch, project_corpus_dir):
     import tools.video.stock_sources as stock_sources
 
     sources = {
@@ -94,7 +116,7 @@ def test_corpus_builder_rejects_unavailable_pinned_sources(monkeypatch, tmp_path
     )
 
     result = CorpusBuilder().execute({
-        "corpus_dir": str(tmp_path / "corpus"),
+        "corpus_dir": str(project_corpus_dir),
         "queries": [{"query": "rain at night"}],
         "sources": ["pexels"],
     })
@@ -118,7 +140,7 @@ def test_video_compose_surfaces_all_three_runtimes():
     assert "runtime_governance" in info
 
 
-def test_video_compose_blocks_silent_hyperframes_swap(tmp_path, monkeypatch):
+def test_video_compose_blocks_silent_hyperframes_swap(monkeypatch, project_renders_dir):
     """Governance: if render_runtime='hyperframes' is locked but runtime
     is missing, the tool MUST return a structured blocker and NOT route to
     Remotion or FFmpeg."""
@@ -137,7 +159,7 @@ def test_video_compose_blocks_silent_hyperframes_swap(tmp_path, monkeypatch):
                 ],
             },
             "asset_manifest": {"assets": [{"id": "x", "path": "missing.png"}]},
-            "output_path": str(tmp_path / "out.mp4"),
+            "output_path": str(project_renders_dir / "out.mp4"),
         }
     )
     assert not result.success
@@ -147,7 +169,7 @@ def test_video_compose_blocks_silent_hyperframes_swap(tmp_path, monkeypatch):
     assert ("blocker" in err) or ("not available" in err)
 
 
-def test_video_compose_rejects_unknown_render_runtime(tmp_path):
+def test_video_compose_rejects_unknown_render_runtime(project_renders_dir):
     result = VideoCompose().execute(
         {
             "operation": "render",
@@ -160,7 +182,7 @@ def test_video_compose_rejects_unknown_render_runtime(tmp_path):
                 ],
             },
             "asset_manifest": {"assets": []},
-            "output_path": str(tmp_path / "out.mp4"),
+            "output_path": str(project_renders_dir / "out.mp4"),
         }
     )
     assert not result.success

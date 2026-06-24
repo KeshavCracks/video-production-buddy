@@ -88,6 +88,72 @@ class AudioEnergy(BaseTool):
             },
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "file",
+            "audio_duration_seconds",
+            "analysis",
+            "recommended_offset_seconds",
+            "offset_reason",
+            "needs_loop",
+            "loop_info",
+            "energy_profile",
+        ],
+        "properties": {
+            "file": {"type": "string"},
+            "audio_duration_seconds": {"type": "number", "minimum": 0},
+            "analysis": {
+                "type": "object",
+                "required": [
+                    "threshold_lufs",
+                    "total_seconds",
+                    "active_seconds",
+                    "quiet_intro_seconds",
+                    "peak_loudness_at_seconds",
+                    "peak_loudness_lufs",
+                ],
+                "properties": {
+                    "threshold_lufs": {"type": "number"},
+                    "total_seconds": {"type": "integer", "minimum": 0},
+                    "active_seconds": {"type": "integer", "minimum": 0},
+                    "quiet_intro_seconds": {"type": "number", "minimum": 0},
+                    "peak_loudness_at_seconds": {"type": "number", "minimum": 0},
+                    "peak_loudness_lufs": {"type": "number"},
+                },
+            },
+            "recommended_offset_seconds": {"type": "number", "minimum": 0},
+            "offset_reason": {"type": "string"},
+            "needs_loop": {"type": "boolean"},
+            "loop_info": {
+                "type": ["object", "null"],
+                "required": [
+                    "music_available_from_offset",
+                    "video_duration",
+                    "shortfall_seconds",
+                    "recommendation",
+                ],
+                "properties": {
+                    "music_available_from_offset": {"type": "number", "minimum": 0},
+                    "video_duration": {"type": "number", "minimum": 0},
+                    "shortfall_seconds": {"type": "number", "minimum": 0},
+                    "recommendation": {"type": "string"},
+                },
+            },
+            "energy_profile": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["time_seconds", "loudness_lufs", "active"],
+                    "properties": {
+                        "time_seconds": {"type": "integer", "minimum": 0},
+                        "loudness_lufs": {"type": "number"},
+                        "active": {"type": "boolean"},
+                    },
+                },
+            },
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=128, vram_mb=0, disk_mb=0, network_required=False

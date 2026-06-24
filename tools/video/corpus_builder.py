@@ -71,6 +71,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_project_corpus_destination
 from tools.video.stock_sources import safe_clip_file_name
 
 
@@ -100,7 +101,7 @@ class CorpusBuilder(BaseTool):
         "  UNSPLASH_ACCESS_KEY for Unsplash (see https://unsplash.com/documentation)\n"
         "  archive.org, nasa, and wikimedia work without API keys"
     )
-    agent_skills = []
+    agent_skills = ["stock-sourcing", "video-understand"]
 
     capabilities = [
         "stock_fanout_search",
@@ -188,6 +189,47 @@ class CorpusBuilder(BaseTool):
             },
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "corpus_dir",
+            "queries_run",
+            "candidates_seen",
+            "clips_added",
+            "clips_skipped_existing",
+            "clips_failed",
+            "per_source_counts",
+            "added_ids",
+            "total_corpus_size",
+            "requested_sources",
+            "resolved_sources",
+            "source_provider_summary",
+            "cache_hits",
+            "cache_misses",
+            "cache_bytes_saved",
+            "cache_stats",
+            "errors",
+        ],
+        "properties": {
+            "corpus_dir": {"type": "string"},
+            "queries_run": {"type": "integer", "minimum": 0},
+            "candidates_seen": {"type": "integer", "minimum": 0},
+            "clips_added": {"type": "integer", "minimum": 0},
+            "clips_skipped_existing": {"type": "integer", "minimum": 0},
+            "clips_failed": {"type": "integer", "minimum": 0},
+            "per_source_counts": {"type": "object"},
+            "added_ids": {"type": "array", "items": {"type": "string"}},
+            "total_corpus_size": {"type": "integer", "minimum": 0},
+            "requested_sources": {"type": "array", "items": {"type": "string"}},
+            "resolved_sources": {"type": "array", "items": {"type": "string"}},
+            "source_provider_summary": {"type": "object"},
+            "cache_hits": {"type": "integer", "minimum": 0},
+            "cache_misses": {"type": "integer", "minimum": 0},
+            "cache_bytes_saved": {"type": "integer", "minimum": 0},
+            "cache_stats": {"type": "object"},
+            "errors": {"type": "array", "items": {"type": "object"}},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=2, ram_mb=2048, vram_mb=0, disk_mb=4000, network_required=True
@@ -208,8 +250,8 @@ class CorpusBuilder(BaseTool):
         "calls external stock APIs",
     ]
     user_visible_verification = [
-        "Open <corpus_dir>/index.jsonl and inspect a few added rows",
-        "Open <corpus_dir>/thumbnails/<some_clip_id>/frame_02.jpg visually",
+        "Inspect <corpus_dir>/index.jsonl with terminal JSON tooling and confirm a few added rows",
+        "Verify <corpus_dir>/thumbnails/<some_clip_id>/frame_02.jpg exists and inspect metadata or GenUI review evidence",
     ]
 
     def get_status(self) -> ToolStatus:
@@ -251,6 +293,15 @@ class CorpusBuilder(BaseTool):
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
         start = time.time()
         try:
+            corpus_dir, corpus_error = require_explicit_project_corpus_destination(
+                inputs,
+                "corpus_dir",
+                self.name,
+                artifact_label="clip corpus",
+            )
+            if corpus_error:
+                return corpus_error
+
             from lib.corpus import Corpus
             from tools.video.clip_cache import get_default_cache
             from tools.video.stock_sources import (
@@ -261,7 +312,7 @@ class CorpusBuilder(BaseTool):
                 source_summary,
             )
 
-            corpus_dir = Path(inputs["corpus_dir"])
+            assert corpus_dir is not None
             queries: list[dict] = list(inputs["queries"])
             source_names: Optional[list[str]] = inputs.get("sources")
             filters_in: dict = inputs.get("filters") or {}

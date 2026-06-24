@@ -30,6 +30,11 @@ raw footage
   → final encode (video_compose)
 ```
 
+When calling `video_compose` for subtitle burn, overlay, encode, compose, or
+render, always pass an explicit `output_path` under
+`projects/<project-name>/renders/...` for final renders or
+`projects/<project-name>/assets/...` for intermediate post-process media.
+
 ### Face Enhancement Presets
 
 | Preset | When to Use |
@@ -67,6 +72,10 @@ raw footage
 | **Text overlay** | Key terms, statistics, quotes | video_compose overlay | Upper or lower third |
 | **Code snippet** | Technical content, API examples | code_snippet → overlay | Side of frame or full-screen |
 | **Diagram** | Explaining a concept visually | diagram_gen → overlay | Side of frame or full-screen |
+
+Overlay image tools require explicit project-scoped outputs, for example
+`projects/<project-name>/assets/images/code_intro.png` or
+`projects/<project-name>/assets/images/diagram_flow.png`.
 | **Lower third** | Speaker name, topic label | video_compose overlay | Bottom 20% of frame |
 
 ## Overlay Density Guidelines

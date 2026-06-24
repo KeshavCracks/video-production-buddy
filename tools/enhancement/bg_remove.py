@@ -22,6 +22,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 MODELS = ["u2net", "u2net_human_seg", "isnet-general-use"]
@@ -58,7 +59,7 @@ class BgRemove(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["input_path"],
+        "required": ["input_path", "output_path"],
         "properties": {
             "input_path": {
                 "type": "string",
@@ -66,7 +67,7 @@ class BgRemove(BaseTool):
             },
             "output_path": {
                 "type": "string",
-                "description": "Output path; defaults to {stem}_nobg.png",
+                "description": "Project-scoped output path under projects/<project-name>/assets/... or projects/<project-name>/renders/...",
             },
             "model": {
                 "type": "string",
@@ -82,6 +83,25 @@ class BgRemove(BaseTool):
                 "default": False,
                 "description": "Use alpha matting for finer edges",
             },
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "input",
+            "output",
+            "output_path",
+            "model",
+            "alpha_matting",
+            "bg_color",
+        ],
+        "properties": {
+            "input": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "model": {"type": "string", "enum": MODELS},
+            "alpha_matting": {"type": "boolean"},
+            "bg_color": {"type": ["string", "null"]},
         },
     }
 
@@ -104,9 +124,14 @@ class BgRemove(BaseTool):
         if not input_path.exists():
             return ToolResult(success=False, error=f"Input not found: {input_path}")
 
-        output_path = Path(
-            inputs.get("output_path", str(input_path.with_stem(f"{input_path.stem}_nobg").with_suffix(".png")))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="background-removed image",
         )
+        if output_error:
+            return output_error
+        assert output_path is not None
         model_name = inputs.get("model", "u2net")
         bg_color = inputs.get("bg_color")
         alpha_matting = inputs.get("alpha_matting", False)
@@ -157,6 +182,7 @@ class BgRemove(BaseTool):
             data={
                 "input": str(input_path),
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "model": model_name,
                 "alpha_matting": alpha_matting,
                 "bg_color": bg_color,

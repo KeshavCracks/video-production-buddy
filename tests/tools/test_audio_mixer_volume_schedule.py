@@ -18,6 +18,10 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from tools.audio.audio_mixer import AudioMixer
 
 
+def _project_audio_output(filename: str) -> str:
+    return f"projects/test-audio/assets/audio/{filename}"
+
+
 def _capture_ffmpeg_cmd(tool: AudioMixer, inputs: dict) -> list[str]:
     """Invoke the tool with run_command mocked; return the cmd list it would have run."""
     captured: list[list[str]] = []
@@ -59,16 +63,20 @@ def _capture_full_mix_ffmpeg_cmd(tool: AudioMixer, inputs: dict) -> list[str]:
     return captured[-1]
 
 
-def test_duck_without_schedule_uses_legacy_sidechaincompress():
+def test_duck_without_schedule_uses_legacy_sidechaincompress(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
     """Sanity: when no music_volume_schedule is provided, the existing
     sidechaincompress path is unchanged."""
+    monkeypatch.chdir(tmp_path)
     tool = AudioMixer()
     cmd = _capture_ffmpeg_cmd(tool, {
         "operation": "duck",
         "primary_audio": "speech.wav",
         "secondary_audio": "music.wav",
         "duck_level": -18,
-        "output_path": "out.wav",
+        "output_path": _project_audio_output("out.wav"),
     })
     fc = " ".join(cmd)
     assert "sidechaincompress" in fc, f"legacy path must use sidechaincompress, got: {fc}"
@@ -84,9 +92,13 @@ def _make_placeholder_inputs(tmp_path):
     return str(speech), str(music)
 
 
-def test_duck_with_schedule_emits_time_varying_volume_filter(tmp_path):
+def test_duck_with_schedule_emits_time_varying_volume_filter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
     """Path B: a music_volume_schedule input replaces sidechaincompress with a
     deterministic time-varying volume envelope."""
+    monkeypatch.chdir(tmp_path)
     tool = AudioMixer()
     speech, music = _make_placeholder_inputs(tmp_path)
     schedule = [
@@ -101,7 +113,7 @@ def test_duck_with_schedule_emits_time_varying_volume_filter(tmp_path):
         "primary_audio": speech,
         "secondary_audio": music,
         "music_volume_schedule": schedule,
-        "output_path": str(tmp_path / "out.wav"),
+        "output_path": _project_audio_output("out.wav"),
     })
     fc = " ".join(cmd)
     assert "eval=frame" in fc, f"schedule path requires eval=frame for per-frame volume, got: {fc}"
@@ -111,8 +123,12 @@ def test_duck_with_schedule_emits_time_varying_volume_filter(tmp_path):
     )
 
 
-def test_full_mix_with_schedule_emits_time_varying_music_volume_filter(tmp_path):
+def test_full_mix_with_schedule_emits_time_varying_music_volume_filter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
     """Path B schedule must be honored by the compose-facing full_mix operation."""
+    monkeypatch.chdir(tmp_path)
     tool = AudioMixer()
     speech, music = _make_placeholder_inputs(tmp_path)
     schedule = [
@@ -127,7 +143,7 @@ def test_full_mix_with_schedule_emits_time_varying_music_volume_filter(tmp_path)
             {"path": music, "role": "music", "volume": 0.2},
         ],
         "music_volume_schedule": schedule,
-        "output_path": str(tmp_path / "full-mix.wav"),
+        "output_path": _project_audio_output("full-mix.wav"),
     })
     fc = " ".join(cmd)
     assert "eval=frame" in fc, f"full_mix schedule path requires eval=frame, got: {fc}"
@@ -137,26 +153,34 @@ def test_full_mix_with_schedule_emits_time_varying_music_volume_filter(tmp_path)
     )
 
 
-def test_duck_with_empty_schedule_falls_through_to_legacy():
+def test_duck_with_empty_schedule_falls_through_to_legacy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
     """An explicitly empty schedule is the same as not providing one — legacy path."""
+    monkeypatch.chdir(tmp_path)
     tool = AudioMixer()
     cmd = _capture_ffmpeg_cmd(tool, {
         "operation": "duck",
         "primary_audio": "speech.wav",
         "secondary_audio": "music.wav",
         "music_volume_schedule": [],
-        "output_path": "out.wav",
+        "output_path": _project_audio_output("out.wav"),
     })
     fc = " ".join(cmd)
     assert "sidechaincompress" in fc, "empty schedule must fall through to legacy path"
 
 
-def test_duck_schedule_filter_includes_input_paths_and_output(tmp_path):
+def test_duck_schedule_filter_includes_input_paths_and_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
     """The constructed command must reference both input files and the output path."""
+    monkeypatch.chdir(tmp_path)
     tool = AudioMixer()
     speech = tmp_path / "speech-fixture.wav"
     music = tmp_path / "music-fixture.wav"
-    out = tmp_path / "duck-out.wav"
+    out = _project_audio_output("duck-out.wav")
     speech.write_bytes(b"")
     music.write_bytes(b"")
     cmd = _capture_ffmpeg_cmd(tool, {
@@ -167,15 +191,19 @@ def test_duck_schedule_filter_includes_input_paths_and_output(tmp_path):
             {"t_seconds": 0.0, "gain_db": 0.0},
             {"t_seconds": 5.0, "gain_db": -18.0},
         ],
-        "output_path": str(out),
+        "output_path": out,
     })
     assert str(speech) in cmd
     assert str(music) in cmd
-    assert str(out) in cmd
+    assert out in cmd
 
 
-def test_duck_schedule_emits_amix_to_combine_speech_and_ducked_music(tmp_path):
+def test_duck_schedule_emits_amix_to_combine_speech_and_ducked_music(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
     """Schedule path must still mix speech with the (now schedule-ducked) music."""
+    monkeypatch.chdir(tmp_path)
     tool = AudioMixer()
     speech, music = _make_placeholder_inputs(tmp_path)
     cmd = _capture_ffmpeg_cmd(tool, {
@@ -183,25 +211,28 @@ def test_duck_schedule_emits_amix_to_combine_speech_and_ducked_music(tmp_path):
         "primary_audio": speech,
         "secondary_audio": music,
         "music_volume_schedule": [{"t_seconds": 0.0, "gain_db": -10.0}],
-        "output_path": str(tmp_path / "out.wav"),
+        "output_path": _project_audio_output("out.wav"),
     })
     fc = " ".join(cmd)
     assert "amix" in fc, f"schedule path must still mix speech+music, got: {fc}"
 
 
-def test_duck_schedule_returns_clean_error_on_missing_input_file(tmp_path):
+def test_duck_schedule_returns_clean_error_on_missing_input_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
     """When the speech or music input doesn't exist, audio_mixer must fail with
     a structured ToolResult error — not let subprocess raise an opaque exception."""
+    monkeypatch.chdir(tmp_path)
     tool = AudioMixer()
     missing_speech = tmp_path / "does-not-exist.wav"
-    out = tmp_path / "out.wav"
 
     result = tool.execute({
         "operation": "duck",
         "primary_audio": str(missing_speech),
         "secondary_audio": str(missing_speech),  # both missing
         "music_volume_schedule": [{"t_seconds": 0.0, "gain_db": -10.0}],
-        "output_path": str(out),
+        "output_path": _project_audio_output("out.wav"),
     })
     assert result.success is False
     err = (result.error or "").lower()

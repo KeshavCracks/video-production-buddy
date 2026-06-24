@@ -26,6 +26,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 # Quality presets mapping to Manim CLI flags
@@ -73,7 +74,7 @@ class MathAnimate(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["scene_code"],
+        "required": ["scene_code", "output_path"],
         "properties": {
             "scene_code": {
                 "type": "string",
@@ -98,7 +99,13 @@ class MathAnimate(BaseTool):
                 "enum": ["mp4", "gif", "png", "webm"],
                 "default": "mp4",
             },
-            "output_path": {"type": "string"},
+            "output_path": {
+                "type": "string",
+                "description": (
+                    "Project-scoped output path under projects/<project-name>/assets/... "
+                    "or projects/<project-name>/renders/..."
+                ),
+            },
             "transparent": {
                 "type": "boolean",
                 "default": False,
@@ -113,6 +120,36 @@ class MathAnimate(BaseTool):
                 "items": {"type": "string"},
                 "description": "Additional Manim CLI arguments",
             },
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "scene_name",
+            "quality",
+            "format",
+            "output",
+            "output_path",
+            "resolution",
+            "fps",
+            "file_size_bytes",
+        ],
+        "properties": {
+            "scene_name": {"type": "string"},
+            "quality": {"type": "string", "enum": list(QUALITY_PRESETS.keys())},
+            "format": {"type": "string", "enum": ["mp4", "gif", "png", "webm"]},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "resolution": {"type": "string"},
+            "fps": {"type": "integer", "minimum": 1},
+            "file_size_bytes": {"type": "integer", "minimum": 0},
+            "duration_seconds": {"type": "number", "minimum": 0},
+            "file_size_mb": {"type": "number", "minimum": 0},
+            "video_width": {"type": "integer", "minimum": 0},
+            "video_height": {"type": "integer", "minimum": 0},
+            "video_codec": {"type": "string"},
+            "full_stderr": {"type": "string"},
+            "full_stdout": {"type": "string"},
         },
     }
 
@@ -132,7 +169,7 @@ class MathAnimate(BaseTool):
     ]
     side_effects = ["writes video/image file to output_path", "creates temp files"]
     user_visible_verification = [
-        "Watch the animation for correctness and visual quality",
+        "Inspect sampled frames for animation correctness and visual quality",
         "Verify math formulas render correctly (requires LaTeX)",
     ]
 
@@ -157,6 +194,14 @@ class MathAnimate(BaseTool):
         return estimates.get(quality, 15.0)
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="Manim animation",
+        )
+        if output_error:
+            return output_error
+
         if not shutil.which("manim"):
             return ToolResult(
                 success=False,
@@ -166,7 +211,7 @@ class MathAnimate(BaseTool):
         start = time.time()
 
         try:
-            result = self._render(inputs)
+            result = self._render({**inputs, "output_path": str(output_path)})
         except Exception as e:
             return ToolResult(success=False, error=f"Manim render failed: {e}")
 
@@ -180,7 +225,7 @@ class MathAnimate(BaseTool):
         output_format = inputs.get("format")
         if not output_format:
             output_format = "gif" if quality == "preview" else "mp4"
-        output_path = inputs.get("output_path")
+        output_path = inputs["output_path"]
         transparent = inputs.get("transparent", False)
         bg_color = inputs.get("background_color")
         extra_args = inputs.get("extra_args", [])
@@ -279,13 +324,8 @@ class MathAnimate(BaseTool):
                 error=f"Render succeeded but output file not found. Manim output:\n{proc.stdout}",
             )
 
-        # Move to desired output path
-        if output_path:
-            final_path = Path(output_path)
-        else:
-            ext = rendered_file.suffix
-            final_path = Path(f"manim_{scene_name}{ext}")
-
+        # Move to desired output path.
+        final_path = Path(output_path)
         final_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(str(rendered_file), str(final_path))
 
@@ -302,6 +342,7 @@ class MathAnimate(BaseTool):
                 "quality": quality,
                 "format": output_format,
                 "output": str(final_path),
+                "output_path": str(final_path),
                 "resolution": preset["resolution"],
                 "fps": preset["fps"],
                 **video_info,

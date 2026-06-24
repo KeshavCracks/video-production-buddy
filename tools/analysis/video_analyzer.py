@@ -27,9 +27,60 @@ from tools.base_tool import (
     ToolTier,
     ToolRuntime,
 )
+from tools.output_paths import require_explicit_project_artifact_destination
 
 
 ANALYSIS_DEPTHS = ["transcript_only", "standard", "deep"]
+
+
+def _video_analysis_brief_output_schema() -> dict[str, Any]:
+    schema_path = (
+        Path(__file__).resolve().parents[2]
+        / "schemas"
+        / "artifacts"
+        / "video_analysis_brief.schema.json"
+    )
+    with schema_path.open("r", encoding="utf-8") as f:
+        schema = json.load(f)
+
+    schema["description"] = "ToolResult.data payload for VideoAnalyzer."
+    required = list(schema.get("required", []))
+    if "_analysis_meta" not in required:
+        required.append("_analysis_meta")
+    if "output_dir" not in required:
+        required.append("output_dir")
+    schema["required"] = required
+    schema.setdefault("properties", {})["output_dir"] = {
+        "type": "string",
+        "description": (
+            "Project-scoped artifact directory containing video_analysis_brief.json."
+        ),
+    }
+    schema["properties"]["_analysis_meta"] = {
+        "type": "object",
+        "required": [
+            "depth",
+            "steps_completed",
+            "steps_failed",
+            "duration_seconds",
+        ],
+        "properties": {
+            "depth": {"type": "string", "enum": ANALYSIS_DEPTHS},
+            "steps_completed": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "steps_failed": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "keyframe_count": {"type": "integer"},
+            "scene_count": {"type": "integer"},
+            "has_transcript": {"type": "boolean"},
+            "duration_seconds": {"type": "number"},
+        },
+    }
+    return schema
 
 
 class VideoAnalyzer(BaseTool):
@@ -75,7 +126,7 @@ class VideoAnalyzer(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["source"],
+        "required": ["source", "output_dir"],
         "properties": {
             "source": {
                 "type": "string",
@@ -100,15 +151,16 @@ class VideoAnalyzer(BaseTool):
             },
             "output_dir": {
                 "type": "string",
-                "description": "Directory for analysis outputs (default: auto-generated)",
+                "description": (
+                    "Project-scoped artifacts directory for the video analysis brief "
+                    "Downloaded media, transcripts, and keyframes are routed to "
+                    "matching project subdirectories."
+                ),
             },
         },
     }
 
-    output_schema = {
-        "type": "object",
-        "description": "VideoAnalysisBrief artifact — see schemas/artifacts/video_analysis_brief.schema.json",
-    }
+    output_schema = _video_analysis_brief_output_schema()
 
     resource_profile = ResourceProfile(
         cpu_cores=2, ram_mb=2048, vram_mb=0, disk_mb=3000,
@@ -116,9 +168,9 @@ class VideoAnalyzer(BaseTool):
     )
     idempotency_key_fields = ["source", "output_dir", "analysis_depth", "max_keyframes"]
     side_effects = [
-        "downloads video to output_dir (if URL)",
-        "writes keyframe images to output_dir/keyframes/",
-        "writes analysis JSON to output_dir/video_analysis_brief.json",
+        "writes video_analysis_brief.json to the project artifacts output_dir",
+        "downloads URL reference media to the matching project reference_assets directory",
+        "writes keyframe images to the matching project assets/keyframes directory",
     ]
     fallback_tools = []
     user_visible_verification = [
@@ -163,10 +215,28 @@ class VideoAnalyzer(BaseTool):
             return ToolResult(success=False, error=f"Unknown analysis_depth: {depth}")
 
         # Setup output directory
-        if inputs.get("output_dir"):
-            output_dir = Path(inputs["output_dir"])
-        else:
-            output_dir = Path("projects/_analysis") / f"analysis_{int(time.time())}"
+        output_dir, output_error = require_explicit_project_artifact_destination(
+            inputs,
+            "output_dir",
+            self.name,
+            artifact_label="video analysis brief",
+        )
+        if output_error:
+            return output_error
+        assert output_dir is not None
+        if output_dir.suffix:
+            return ToolResult(
+                success=False,
+                error=(
+                    f"{self.name}: output_dir for video analysis brief must be a "
+                    "directory path under projects/<project-name>/artifacts/..."
+                ),
+            )
+        project_root = self._project_root_for_output_dir(output_dir)
+        run_id = output_dir.name
+        reference_dir = project_root / "reference_assets" / run_id
+        transcript_dir = output_dir / "transcripts"
+        keyframe_dir = project_root / "assets" / "keyframes" / run_id
         output_dir.mkdir(parents=True, exist_ok=True)
 
         platform = self._detect_platform(source)
@@ -176,6 +246,7 @@ class VideoAnalyzer(BaseTool):
         # Initialize brief structure
         brief = {
             "version": "1.0",
+            "output_dir": str(output_dir),
             "source": {
                 "type": platform,
                 "duration_seconds": 0,
@@ -215,13 +286,13 @@ class VideoAnalyzer(BaseTool):
                     # Only get metadata, skip video download
                     dl_result = downloader.execute({
                         "url": source,
-                        "output_dir": str(output_dir),
+                        "output_dir": str(reference_dir),
                         "format": "metadata_only",
                     })
                 else:
                     dl_result = downloader.execute({
                         "url": source,
-                        "output_dir": str(output_dir),
+                        "output_dir": str(reference_dir),
                         "format": "video",
                         "max_resolution": "720p",
                     })
@@ -317,7 +388,7 @@ class VideoAnalyzer(BaseTool):
                 downloader = VideoDownloader()
                 dl_result = downloader.execute({
                     "url": source,
-                    "output_dir": str(output_dir),
+                    "output_dir": str(reference_dir),
                     "format": "video",
                     "max_resolution": "720p",
                 })
@@ -345,7 +416,7 @@ class VideoAnalyzer(BaseTool):
                 tr_inputs = {
                     "input_path": transcription_source,
                     "model_size": "base",
-                    "output_dir": str(output_dir),
+                    "output_dir": str(transcript_dir),
                 }
                 # Only set language if we know it from transcript attempt
                 detected_lang = brief.get("narration_transcript", {}).get("language")
@@ -452,7 +523,6 @@ class VideoAnalyzer(BaseTool):
 
         # ─── STEP 4: Keyframe extraction (scene-guided) ───
         keyframes = []
-        keyframe_dir = output_dir / "keyframes"
         if video_path and scenes:
             try:
                 # Extract keyframes at scene boundaries + midpoints
@@ -599,6 +669,17 @@ class VideoAnalyzer(BaseTool):
         )
 
     # ─── Helpers ───
+
+    def _project_root_for_output_dir(self, output_dir: Path) -> Path:
+        workspace = Path.cwd().resolve()
+        resolved = (
+            output_dir.resolve(strict=False)
+            if output_dir.is_absolute()
+            else (workspace / output_dir).resolve(strict=False)
+        )
+        relative = resolved.relative_to(workspace)
+        parts = relative.parts
+        return Path(parts[0]) / parts[1]
 
     def _get_duration(self, video_path: Path) -> float:
         """Get video duration via ffprobe."""
@@ -805,7 +886,11 @@ class VideoAnalyzer(BaseTool):
     def _save_brief(self, brief: dict, output_dir: Path) -> None:
         """Save the VideoAnalysisBrief to disk."""
         out_path = output_dir / "video_analysis_brief.json"
-        # Remove non-serializable items
-        clean_brief = {k: v for k, v in brief.items()}
+        try:
+            serialized = json.dumps(brief, indent=2, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"VideoAnalysisBrief must be strict JSON serializable: {exc}"
+            ) from exc
         with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(clean_brief, f, indent=2, default=str)
+            f.write(serialized)

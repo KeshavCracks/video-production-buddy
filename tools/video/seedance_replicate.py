@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import os
 import time
-from pathlib import Path
 from typing import Any
 
 from tools.base_tool import (
@@ -28,7 +27,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
-from tools.video._shared import validate_video_operation
+from tools.video._shared import require_generated_video_output_path, validate_video_operation
 
 
 class SeedanceReplicate(BaseTool):
@@ -75,7 +74,7 @@ class SeedanceReplicate(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {"type": "string"},
             "operation": {
@@ -116,6 +115,46 @@ class SeedanceReplicate(BaseTool):
             "output_path": {"type": "string"},
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "gateway",
+            "model",
+            "prompt",
+            "operation",
+            "variant",
+            "aspect_ratio",
+            "resolution",
+            "generate_audio",
+            "seed",
+            "output",
+            "output_path",
+            "format",
+            "file_size_bytes",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "seedance"},
+            "gateway": {"type": "string", "const": "replicate"},
+            "model": {"type": "string"},
+            "prompt": {"type": "string"},
+            "operation": {"type": "string", "enum": ["text_to_video", "image_to_video"]},
+            "variant": {"type": "string"},
+            "aspect_ratio": {"type": "string"},
+            "resolution": {"type": "string"},
+            "generate_audio": {"type": "boolean"},
+            "seed": {"type": ["integer", "null"]},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "format": {"type": "string", "const": "mp4"},
+            "file_size_bytes": {"type": "integer", "minimum": 0},
+            "duration_seconds": {"type": "number", "minimum": 0},
+            "file_size_mb": {"type": "number", "minimum": 0},
+            "video_width": {"type": "integer", "minimum": 0},
+            "video_height": {"type": "integer", "minimum": 0},
+            "video_codec": {"type": "string"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=512, vram_mb=0, disk_mb=500, network_required=True
@@ -135,7 +174,7 @@ class SeedanceReplicate(BaseTool):
     ]
     side_effects = ["writes video file to output_path", "calls Replicate API"]
     user_visible_verification = [
-        "Watch generated clip for motion coherence, audio sync, and visual quality"
+        "Inspect sampled frames and timing metadata for motion coherence, audio sync, and visual quality"
     ]
 
     def _get_api_token(self) -> str | None:
@@ -156,13 +195,6 @@ class SeedanceReplicate(BaseTool):
         return 60.0 if inputs.get("model_variant") == "fast" else 120.0
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
-        token = self._get_api_token()
-        if not token:
-            return ToolResult(
-                success=False,
-                error="REPLICATE_API_TOKEN not set. " + self.install_instructions,
-            )
-
         variant = inputs.get("model_variant", "standard")
         operation = inputs.get("operation", "text_to_video")
         operation_error = validate_video_operation(operation, {"text_to_video", "image_to_video"})
@@ -170,6 +202,16 @@ class SeedanceReplicate(BaseTool):
             return ToolResult(success=False, error=operation_error)
         if operation == "image_to_video" and not inputs.get("image_url"):
             return ToolResult(success=False, error="image_to_video requires image_url")
+        output_path, output_error = require_generated_video_output_path(inputs, self.name)
+        if output_error:
+            return output_error
+
+        token = self._get_api_token()
+        if not token:
+            return ToolResult(
+                success=False,
+                error="REPLICATE_API_TOKEN not set. " + self.install_instructions,
+            )
 
         import requests
 
@@ -235,7 +277,6 @@ class SeedanceReplicate(BaseTool):
             video_response = requests.get(video_url, timeout=180)
             video_response.raise_for_status()
 
-            output_path = Path(inputs.get("output_path", "seedance_replicate_output.mp4"))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(video_response.content)
 

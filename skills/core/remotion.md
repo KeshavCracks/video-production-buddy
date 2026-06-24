@@ -151,7 +151,7 @@ for terminal/code-oriented scenes.
 ```python
 from tools.analysis.composition_validator import CompositionValidator
 result = CompositionValidator().execute({
-    "composition_path": "path/to/composition.json",
+    "composition_path": "projects/<project-name>/artifacts/composition.json",
     "assets_root": "remotion-composer/public",
 })
 # result.data["valid"] must be True before rendering

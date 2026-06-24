@@ -20,6 +20,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 # Aspect ratio to approximate pixel dimensions (for cost/reporting only)
 ASPECT_RATIOS = {
@@ -60,7 +61,7 @@ class GoogleImagen(BaseTool):
         "Set GOOGLE_API_KEY (or GEMINI_API_KEY) to your Google AI API key.\n"
         "  Get one at https://aistudio.google.com/apikey"
     )
-    agent_skills = []
+    agent_skills = ["flux-best-practices"]
 
     capabilities = ["generate_image", "generate_illustration", "text_to_image"]
     supports = {
@@ -82,7 +83,7 @@ class GoogleImagen(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {"type": "string", "description": "Image description (max 480 tokens)"},
             "aspect_ratio": {
@@ -116,6 +117,27 @@ class GoogleImagen(BaseTool):
                 "maximum": 4,
             },
             "output_path": {"type": "string"},
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "model",
+            "prompt",
+            "aspect_ratio",
+            "output",
+            "output_path",
+            "images_generated",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "google_imagen"},
+            "model": {"type": "string"},
+            "prompt": {"type": "string"},
+            "aspect_ratio": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "images_generated": {"type": "integer", "minimum": 1},
         },
     }
 
@@ -153,6 +175,12 @@ class GoogleImagen(BaseTool):
         return 0.04 * n
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        _, output_error = require_explicit_output_path(
+            inputs, self.name, artifact_label="generated image"
+        )
+        if output_error:
+            return output_error
+
         api_key = self._get_api_key()
         if not api_key:
             return ToolResult(
@@ -213,7 +241,7 @@ class GoogleImagen(BaseTool):
                 predictions[0]["bytesBase64Encoded"]
             )
 
-            output_path = Path(inputs.get("output_path", "generated_image.png"))
+            output_path = Path(inputs["output_path"])
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(image_bytes)
 
@@ -228,6 +256,7 @@ class GoogleImagen(BaseTool):
                 "prompt": prompt,
                 "aspect_ratio": aspect_ratio,
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "images_generated": len(predictions),
             },
             artifacts=[str(output_path)],

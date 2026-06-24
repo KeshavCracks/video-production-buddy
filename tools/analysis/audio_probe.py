@@ -92,6 +92,44 @@ class AudioProbe(BaseTool):
             },
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "file",
+            "duration_seconds",
+            "format_name",
+            "format_long_name",
+            "size_bytes",
+            "bit_rate",
+            "stream_count",
+        ],
+        "properties": {
+            "file": {"type": "string"},
+            "duration_seconds": {"type": "number", "minimum": 0},
+            "format_name": {"type": ["string", "null"]},
+            "format_long_name": {"type": ["string", "null"]},
+            "size_bytes": {"type": "integer", "minimum": 0},
+            "bit_rate": {"type": "integer", "minimum": 0},
+            "stream_count": {"type": "integer", "minimum": 0},
+            "audio": {
+                "type": "object",
+                "required": [
+                    "codec",
+                    "sample_rate",
+                    "channels",
+                    "channel_layout",
+                    "bit_rate",
+                ],
+                "properties": {
+                    "codec": {"type": ["string", "null"]},
+                    "sample_rate": {"type": "integer", "minimum": 0},
+                    "channels": {"type": ["integer", "null"], "minimum": 0},
+                    "channel_layout": {"type": ["string", "null"]},
+                    "bit_rate": {"type": ["integer", "null"], "minimum": 0},
+                },
+            },
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=64, vram_mb=0, disk_mb=0, network_required=False

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import shutil
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,15 @@ from tools.character.character_animation import (
     SvgRigBuilder,
 )
 from tools.video.video_compose import VideoCompose
+
+
+@pytest.fixture
+def project_renders_dir(tmp_path):
+    project_dir = PROJECT_ROOT / "projects" / f"pytest-runtime-checkpoint-{tmp_path.name}"
+    shutil.rmtree(project_dir, ignore_errors=True)
+    renders_dir = project_dir / "renders"
+    yield renders_dir
+    shutil.rmtree(project_dir, ignore_errors=True)
 
 
 def _minimal_proposal_packet() -> dict:
@@ -126,7 +136,6 @@ def test_character_animation_custom_stages_checkpoint_with_manifest_artifacts(tm
                     "required_actions": ["idle", "gesture"],
                 }
             ],
-            "output_path": str(tmp_path / "character_design.json"),
         }
     )
     assert character_result.success
@@ -143,17 +152,12 @@ def test_character_animation_custom_stages_checkpoint_with_manifest_artifacts(tm
     assert design_path.exists()
 
     rig_result = SvgRigBuilder().execute(
-        {
-            "character_design": character_design,
-            "output_path": str(tmp_path / "rig_plan.json"),
-        }
+        {"character_design": character_design}
     )
     assert rig_result.success
     rig_plan = rig_result.data["rig_plan"]
 
-    pose_result = PoseLibraryBuilder().execute(
-        {"rig_plan": rig_plan, "output_path": str(tmp_path / "pose_library.json")}
-    )
+    pose_result = PoseLibraryBuilder().execute({"rig_plan": rig_plan})
     assert pose_result.success
     pose_library = pose_result.data["pose_library"]
 
@@ -288,7 +292,11 @@ def test_compose_checkpoint_rejects_non_passing_final_review_for_any_pipeline(tm
         )
 
 
-def test_video_compose_blocks_locked_remotion_when_runtime_unavailable(monkeypatch, tmp_path):
+def test_video_compose_blocks_locked_remotion_when_runtime_unavailable(
+    monkeypatch,
+    tmp_path,
+    project_renders_dir,
+):
     composer = VideoCompose()
     monkeypatch.setattr(composer, "_remotion_available", lambda: False)
     monkeypatch.setattr(composer, "_pre_compose_validation", lambda *args, **kwargs: None)
@@ -326,7 +334,7 @@ def test_video_compose_blocks_locked_remotion_when_runtime_unavailable(monkeypat
                     }
                 ],
             },
-            "output_path": str(tmp_path / "out.mp4"),
+            "output_path": str(project_renders_dir / "out.mp4"),
         }
     )
 

@@ -13,11 +13,11 @@ produce broken or truncated output.
 
 from __future__ import annotations
 
-import json
 import time
 from pathlib import Path
 from typing import Any
 
+from schemas.artifacts import load_strict_json_object
 from tools.analysis.audio_probe import probe_duration
 from tools.base_tool import (
     BaseTool,
@@ -79,10 +79,34 @@ class CompositionValidator(BaseTool):
             },
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "valid",
+            "errors",
+            "warnings",
+            "info",
+            "error_count",
+            "warning_count",
+        ],
+        "properties": {
+            "valid": {"type": "boolean"},
+            "errors": {"type": "array", "items": {"type": "string"}},
+            "warnings": {"type": "array", "items": {"type": "string"}},
+            "info": {"type": "array", "items": {"type": "string"}},
+            "error_count": {"type": "integer", "minimum": 0},
+            "warning_count": {"type": "integer", "minimum": 0},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=64, vram_mb=0, disk_mb=0, network_required=False
     )
+    idempotency_key_fields = [
+        "composition_path",
+        "assets_root",
+        "render_runtime",
+    ]
     side_effects = []
 
     def estimate_cost(self, inputs: dict[str, Any]) -> float:
@@ -100,8 +124,11 @@ class CompositionValidator(BaseTool):
         start = time.time()
 
         try:
-            comp = json.loads(comp_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, UnicodeDecodeError) as e:
+            comp = load_strict_json_object(
+                comp_path,
+                context=f"composition JSON {comp_path}",
+            )
+        except (ValueError, UnicodeDecodeError) as e:
             return ToolResult(success=False, error=f"Invalid JSON: {e}")
 
         # Determine assets root. Explicit wins; otherwise dispatch by runtime.

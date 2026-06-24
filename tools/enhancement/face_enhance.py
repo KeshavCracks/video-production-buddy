@@ -20,6 +20,7 @@ from tools.base_tool import (
     ToolStability,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 # Named presets mapping to FFmpeg filter chains
@@ -96,10 +97,13 @@ class FaceEnhance(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["input_path"],
+        "required": ["input_path", "output_path"],
         "properties": {
             "input_path": {"type": "string"},
-            "output_path": {"type": "string"},
+            "output_path": {
+                "type": "string",
+                "description": "Project-scoped output path under projects/<project-name>/assets/... or projects/<project-name>/renders/...",
+            },
             "preset": {
                 "type": "string",
                 "enum": list(PRESETS.keys()),
@@ -116,6 +120,17 @@ class FaceEnhance(BaseTool):
             },
             "codec": {"type": "string", "default": "libx264"},
             "crf": {"type": "integer", "default": 20},
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["input", "output", "output_path", "filter", "preset"],
+        "properties": {
+            "input": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "filter": {"type": "string"},
+            "preset": {"type": ["string", "null"]},
         },
     }
 
@@ -140,10 +155,14 @@ class FaceEnhance(BaseTool):
         if not input_path.exists():
             return ToolResult(success=False, error=f"Input not found: {input_path}")
 
-        output_path = Path(
-            inputs.get("output_path", str(input_path.with_stem(f"{input_path.stem}_enhanced")))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="enhanced video",
         )
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        if output_error:
+            return output_error
+        assert output_path is not None
         codec = inputs.get("codec", "libx264")
         crf = inputs.get("crf", 20)
 
@@ -156,6 +175,7 @@ class FaceEnhance(BaseTool):
             return ToolResult(success=False, error="No preset, presets, or custom_vf specified")
 
         start = time.time()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
         cmd = [
             "ffmpeg", "-y",
@@ -184,6 +204,7 @@ class FaceEnhance(BaseTool):
             data={
                 "input": str(input_path),
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "filter": vf,
                 "preset": inputs.get("preset"),
             },

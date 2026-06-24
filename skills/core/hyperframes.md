@@ -362,14 +362,16 @@ b-roll reel, then overlay HyperFrames typography via chromakey). That's
 the pattern `projects/quantum-willow-multiverse/` settled on after six
 HyperFrames renders with 640×360 Pexels sources.
 
-### Always preview-scrub footage-forward scenes before render
+### Preview-scrub footage-forward scenes before render without unsolicited launch
 
 60-minute renders are expensive. Before committing to a full render,
-open the Launch preview panel (or `npx hyperframes preview`) and scrub
-to at least one scene per chapter where b-roll should dominate. The
-tiny-video bug — and similar layout issues like "lower-third text sits
-off-screen at 1080p" — are 2-second visual checks at preview time and
-60-minute regression costs at render time.
+use non-launching checks first: `hyperframes lint`, `hyperframes validate`,
+workspace artifact inspection, and sampled rendered frames. Do not launch the
+Launch preview panel or run `npx hyperframes preview` unless the user
+explicitly requests an interactive preview; if requested, warn that it may open
+a local browser window. The tiny-video bug — and similar layout issues like
+"lower-third text sits off-screen at 1080p" — are cheap visual checks before a
+full render and 60-minute regression costs after render time.
 
 ### Bump stock-footage legibility, not opacity
 
@@ -392,14 +394,28 @@ Render fails with `video_heavy_parallel_timeout` or produces frame
 freezes when stock clips have keyframe intervals > 5s. Always re-encode
 downloaded stock via `ffmpeg ... -c:v libx264 -r 30 -g 30 -keyint_min 30
 -sc_threshold 0 -movflags +faststart` before staging into the
-workspace. See `hyperframes_compose`'s existing workspace prep — it
-doesn't do this automatically yet.
+workspace. `hyperframes_compose` checks staged video assets with `ffprobe` and
+creates a `.dense.mp4` workspace copy automatically when keyframe spacing is
+too sparse.
+
+### Package CJK fonts for Chinese text
+
+Do not rely on browser/system fallback for Chinese typography. If a
+HyperFrames workspace contains Chinese/CJK text, the workspace must ship
+Noto Sans SC locally and declare it with `@font-face`. `hyperframes_compose`
+detects CJK text in `edit_decisions`, copies `NotoSansSC.ttf` from
+`projects/<project-id>/fonts/`, workspace-local font assets, or `~/.fonts/`
+into `workspace/assets/`, and injects the `@font-face` rule during scaffold.
+If hand-authoring or patching a workspace outside `hyperframes_compose`, do
+the same before lint/validate/render.
 
 ### Render with `--workers 1` for video-heavy compositions
 
 Default parallel capture overwhelms headless Chrome when many videos
 load simultaneously. For any composition with >5 background video
 elements, always pass `--workers 1` to `hyperframes render`.
+`hyperframes_compose` applies this automatically when more than five video
+cuts are present and the caller has not provided an explicit worker count.
 
 ### Use Outfit / Inter / JetBrains Mono, not Space Grotesk
 

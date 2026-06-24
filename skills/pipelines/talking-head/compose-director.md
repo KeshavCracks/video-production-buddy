@@ -32,6 +32,7 @@ Before rendering anything, validate the inputs and catch issues that are expensi
    silence_cutter.execute({
        "input_path": "<raw_footage>",
        "mode": "mark",
+       "output_path": "projects/<project-name>/artifacts/silence_segments.json",
        "silence_threshold_db": -35,
        "min_silence_duration": 0.5
    })
@@ -75,7 +76,7 @@ Apply video enhancements in this exact order. **Attempt every step** if the tool
 ```
 eye_enhance.execute({
     "input_path": "<face_enhanced_video>",
-    "output_path": "<project>/assets/video/eye_enhanced.mp4",
+    "output_path": "projects/<project-name>/assets/video/eye_enhanced.mp4",
     "operations": ["dark_circles", "brighten_eyes"],
     "dark_circle_intensity": 0.4,       # 0-1, subtle is better
     "eye_brighten_intensity": 0.3,
@@ -90,7 +91,7 @@ If the user wants the video sped up or slowed down, use `video_trimmer`:
 video_trimmer.execute({
     "operation": "speed",
     "input_path": "<enhanced_video>",
-    "output_path": "<project>/assets/video/speed_adjusted.mp4",
+    "output_path": "projects/<project-name>/assets/video/speed_adjusted.mp4",
     "speed_factor": 1.25    # 0.5x (slow), 1.25x, 1.5x, 2x (fast)
 })
 ```
@@ -113,7 +114,7 @@ If the target platform requires a different aspect ratio (e.g. Instagram Reels =
 ```
 auto_reframe.execute({
     "input_path": "<enhanced_video>",
-    "output_path": "<project>/renders/reframed.mp4",
+    "output_path": "projects/<project-name>/renders/reframed.mp4",
     "target_aspect": "portrait",       # 9:16 for Reels/TikTok/Shorts
     "smoothing_window": 15,            # smooth camera pan
     "face_padding": 0.4,              # 40% padding around face
@@ -164,7 +165,7 @@ Pass this dict to both `subtitle_gen` (if generating SRT) and `remotion_caption_
 ```
 remotion_caption_burn.execute({
     "input_path": "<reframed_or_enhanced_video>",
-    "output_path": "<project>/assets/video/captioned.mp4",
+    "output_path": "projects/<project-name>/assets/video/captioned.mp4",
     "segments": <transcript_segments_from_asset_manifest>,
     "corrections": {"cloud": "Claude", "co-pilot": "Copilot"},
     "words_per_page": 4,
@@ -173,7 +174,7 @@ remotion_caption_burn.execute({
 })
 ```
 
-**Fallback ONLY if Remotion is completely unavailable:** Use `video_compose` with `burn_subtitles` operation. This is a degraded experience -- warn the user that word-by-word highlighting won't be available.
+**Fallback ONLY if Remotion is completely unavailable:** Use `video_compose` with `burn_subtitles` operation and an explicit `output_path` such as `projects/<project-name>/assets/video/captioned.mp4`. This is a degraded experience -- warn the user that word-by-word highlighting won't be available.
 
 **CRITICAL: Caption positioning for 9:16 vertical video (FFmpeg fallback only).**
 Captions MUST be in the lower 20% of the frame. On a 1920-high frame, that means `MarginV=160` or higher. The default FFmpeg subtitle position is center -- this WILL occlude the face. You MUST override it.
@@ -198,7 +199,7 @@ If the scene plan includes overlay scenes (text_cards, stat_cards, charts, compa
 ```
 remotion_caption_burn.execute({
     "input_path": "<reframed_or_enhanced_video>",
-    "output_path": "<project>/assets/video/captioned.mp4",
+    "output_path": "projects/<project-name>/assets/video/captioned.mp4",
     "segments": <transcript_segments>,
     "corrections": {"cloud": "Claude"},
     "words_per_page": 4,
@@ -280,7 +281,7 @@ If the footage has a green/blue screen (detected in scene-director Step 0), foll
    ```
    green_screen_processor.execute({
        "input_path": "<enhanced_video>",
-       "output_path": "<project>/assets/video/greenscreen_removed.mp4",
+       "output_path": "projects/<project-name>/assets/video/greenscreen_removed.mp4",
        "method": "auto"
    })
    ```
@@ -290,7 +291,7 @@ If the footage has a green/blue screen (detected in scene-director Step 0), foll
    ```
    # Render an AnimatedBackground clip (gradient mesh, floating orbs, subtle grid)
    # Use the Explainer composition — NOT a flat #0F172A solid color
-   npx remotion render src/index.ts Explainer --props='{"duration":VIDEO_DURATION}' --output=<project>/assets/video/animated_bg.mp4
+   npx remotion render src/index.ts Explainer --props='{"duration":VIDEO_DURATION}' --output=projects/<project-name>/assets/video/animated_bg.mp4
    ```
    The AnimatedBackground provides a professional gradient mesh with floating orbs and a subtle grid pattern. This is far superior to a flat solid color.
 
@@ -299,7 +300,7 @@ If the footage has a green/blue screen (detected in scene-director Step 0), foll
    green_screen_composite.execute({
        "foreground_path": "<greenscreen_removed_video>",
        "background_path": "<animated_bg>",
-       "output_path": "<project>/assets/video/composited.mp4",
+       "output_path": "projects/<project-name>/assets/video/composited.mp4",
        "layout": "news_anchor"
    })
    ```
@@ -309,7 +310,7 @@ If the footage has a green/blue screen (detected in scene-director Step 0), foll
    ```
    remotion_caption_burn.execute({
        "input_path": "<composited_video>",
-       "output_path": "<project>/assets/video/captioned.mp4",
+       "output_path": "projects/<project-name>/assets/video/captioned.mp4",
        "segments": <transcript_segments>,
        "corrections": <corrections_dict>,
        "words_per_page": 4,
@@ -326,7 +327,7 @@ If the footage has a green/blue screen (detected in scene-director Step 0), foll
        "video_path": "<captioned_video>",
        "music_path": "<bg_music>",
        "music_volume": 0.15,
-       "output_path": "<project>/assets/video/with_music.mp4"
+       "output_path": "projects/<project-name>/assets/video/with_music.mp4"
    })
    ```
 
@@ -338,7 +339,7 @@ If the output is a reel with showcase clips, use `showcase_card` for each:
 ```
 showcase_card.execute({
     "input_path": "<showcase_video>",
-    "output_path": "<project>/assets/video/sc_<name>.mp4",
+    "output_path": "projects/<project-name>/assets/video/sc_<name>.mp4",
     "title": "VIDEO TITLE",
     "subtitle": "Description | Style | Cost: $0.15",
     "background_color": "0x0A0F1A",
@@ -353,7 +354,7 @@ If the output has multiple segments (e.g. talking head + showcase clips), use `v
 video_stitch.execute({
     "operation": "stitch",
     "clips": ["intro.mp4", "showcase1.mp4", ..., "outro.mp4"],
-    "output_path": "<project>/renders/assembled.mp4",
+    "output_path": "projects/<project-name>/renders/assembled.mp4",
     "transition": "crossfade",         # or "fade" for fade-through-black
     "transition_duration": 0.5,
 })
@@ -379,7 +380,7 @@ audio_mixer.execute({
         {"start": 167.0, "end": 175.0}    # outro speech
     ],
     "fade_duration": 0.5,
-    "output_path": "<project>/renders/final.mp4",
+    "output_path": "projects/<project-name>/renders/final.mp4",
 })
 ```
 
@@ -410,7 +411,7 @@ If the output exceeds the target, re-encode with a lower bitrate. A 66-second In
 video_compose.execute({
     "operation": "encode",
     "input_path": "<mixed_video>",
-    "output_path": "<project>/renders/final.mp4",
+    "output_path": "projects/<project-name>/renders/final.mp4",
     "profile": "instagram_reels",
     "video_bitrate": "4M",
     "audio_bitrate": "192k",
@@ -425,6 +426,7 @@ visual_qa.execute({
     "operation": "review",
     "input_path": "<final_video>",
     "timestamps": [3.0, 10.0, 25.0, 50.0, 100.0, 170.0],
+    "output_dir": "projects/<project-name>/assets/review_frames/final",
 })
 ```
 Then **read each extracted frame** to verify:

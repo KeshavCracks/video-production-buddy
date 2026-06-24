@@ -8,6 +8,7 @@ scoped to pytest's ``tmp_path`` so nothing escapes the test session.
 from __future__ import annotations
 
 import json
+import math
 import os
 from pathlib import Path
 
@@ -100,6 +101,16 @@ def test_default_max_total_bytes_ignores_upstream_env_override(monkeypatch):
 def test_default_max_total_bytes_ignores_garbage_override(monkeypatch):
     monkeypatch.delenv("VIDEO_PRODUCTION_BUDDY_CACHE_MAX_GB", raising=False)
     monkeypatch.setenv("VIDEO_PRODUCTION_BUDDY_CACHE_MAX_GB", "not-a-number")
+    assert default_max_total_bytes() == 20 * 1024 * 1024 * 1024
+
+
+@pytest.mark.parametrize("override", ["0", "-1", "nan", "inf"])
+def test_default_max_total_bytes_ignores_invalid_numeric_overrides(
+    monkeypatch,
+    override: str,
+):
+    monkeypatch.delenv("VIDEO_PRODUCTION_BUDDY_CACHE_MAX_GB", raising=False)
+    monkeypatch.setenv("VIDEO_PRODUCTION_BUDDY_CACHE_MAX_GB", override)
     assert default_max_total_bytes() == 20 * 1024 * 1024 * 1024
 
 
@@ -399,6 +410,91 @@ def test_manifest_tolerates_corrupt_lines(tmp_path):
 
     entries = cache._read_manifest()
     assert list(entries.keys()) == ["good_1"]
+
+
+def test_manifest_read_skips_non_finite_json_rows(tmp_path):
+    cache_dir = tmp_path / "cache"
+    cache = ClipCache(cache_dir=cache_dir)
+    good = CacheEntry(
+        clip_id="good_1",
+        file_name="good_1.mp4",
+        size_bytes=1234,
+        added_at=1000.0,
+        last_access_at=1000.0,
+    )
+    _fake_clip(cache_dir / "good_1.mp4", 1234)
+    manifest_path = cache_dir / ClipCache.MANIFEST_NAME
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        f.write(
+            '{"clip_id": "bad_1", "file_name": "bad_1.mp4", '
+            '"size_bytes": 1234, "added_at": NaN, '
+            '"last_access_at": 1000.0}\n'
+        )
+        f.write(
+            '{"clip_id": "bad_2", "file_name": "bad_2.mp4", '
+            '"size_bytes": 1234, "added_at": 1000.0, '
+            '"last_access_at": Infinity}\n'
+        )
+        f.write(
+            '{"clip_id": "bad_3", "file_name": "bad_3.mp4", '
+            '"size_bytes": Infinity, "added_at": 1000.0, '
+            '"last_access_at": 1000.0}\n'
+        )
+        f.write(json.dumps(good.to_dict()) + "\n")
+
+    entries = cache._read_manifest()
+
+    assert list(entries.keys()) == ["good_1"]
+
+
+def test_manifest_read_skips_non_strict_json_constants_in_metadata_fields(tmp_path):
+    cache_dir = tmp_path / "cache"
+    cache = ClipCache(cache_dir=cache_dir)
+    good = CacheEntry(
+        clip_id="good_1",
+        file_name="good_1.mp4",
+        size_bytes=1234,
+        added_at=1000.0,
+        last_access_at=1000.0,
+    )
+    manifest_path = cache_dir / ClipCache.MANIFEST_NAME
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        f.write(
+            '{"clip_id": "bad_1", "file_name": "bad_1.mp4", '
+            '"size_bytes": 1234, "added_at": 1000.0, '
+            '"last_access_at": 1000.0, "source_tags": NaN}\n'
+        )
+        f.write(json.dumps(good.to_dict()) + "\n")
+
+    entries = cache._read_manifest()
+
+    assert list(entries.keys()) == ["good_1"]
+
+
+def test_manifest_write_rejects_non_finite_entries_before_replace(tmp_path):
+    cache = ClipCache(cache_dir=tmp_path / "cache")
+    good = CacheEntry(
+        clip_id="good_1",
+        file_name="good_1.mp4",
+        size_bytes=1234,
+        added_at=1000.0,
+        last_access_at=1000.0,
+    )
+    cache._write_manifest({"good_1": good})
+    original = cache.manifest_path.read_text(encoding="utf-8")
+    bad = CacheEntry(
+        clip_id="bad_1",
+        file_name="bad_1.mp4",
+        size_bytes=1234,
+        added_at=math.nan,
+        last_access_at=1000.0,
+    )
+
+    with pytest.raises(ValueError, match="strict JSON"):
+        cache._write_manifest({"bad_1": bad})
+
+    assert cache.manifest_path.read_text(encoding="utf-8") == original
+    assert not list(cache.cache_dir.glob("cache_manifest.*.tmp"))
 
 
 # ----------------------------------------------------------------------

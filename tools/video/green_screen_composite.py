@@ -16,9 +16,6 @@ import time
 from pathlib import Path
 from typing import Any
 
-import numpy as np
-from PIL import Image
-
 from tools.base_tool import (
     BaseTool,
     Determinism,
@@ -30,6 +27,20 @@ from tools.base_tool import (
     ToolStability,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
+
+
+def _load_pixel_dependencies() -> tuple[Any, Any]:
+    """Load optional frame-compositing dependencies on demand."""
+    try:
+        import numpy as np
+        from PIL import Image
+    except ImportError as exc:
+        raise RuntimeError(
+            "green_screen_composite requires numpy and Pillow. "
+            "Install with: pip install numpy Pillow"
+        ) from exc
+    return np, Image
 
 
 class GreenScreenComposite(BaseTool):
@@ -74,7 +85,10 @@ class GreenScreenComposite(BaseTool):
             },
             "output_path": {
                 "type": "string",
-                "description": "Output composite video path",
+                "description": (
+                    "Project-scoped output composite video path, e.g. "
+                    "projects/<project-name>/renders/composite.mp4"
+                ),
             },
             "original_audio_path": {
                 "type": "string",
@@ -108,6 +122,31 @@ class GreenScreenComposite(BaseTool):
             },
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "output",
+            "output_path",
+            "layout",
+            "fps",
+            "frame_count",
+            "duration",
+            "dimensions",
+            "speaker_scale",
+            "has_audio",
+        ],
+        "properties": {
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "layout": {"type": "string", "enum": ["news_anchor", "full_behind", "pip", "split"]},
+            "fps": {"type": "number"},
+            "frame_count": {"type": "integer"},
+            "duration": {"type": "number"},
+            "dimensions": {"type": "string"},
+            "speaker_scale": {"type": "number"},
+            "has_audio": {"type": "boolean"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=4, ram_mb=4096, vram_mb=0, disk_mb=8000, network_required=False
@@ -126,15 +165,22 @@ class GreenScreenComposite(BaseTool):
     ]
     side_effects = ["writes composite video to output_path"]
     user_visible_verification = [
-        "Watch output — speaker should be cleanly composited without color fringing",
+        "Inspect sampled frames to verify the speaker is cleanly composited without color fringing",
         "Check layout positioning matches the chosen preset",
         "Verify audio is synced if original_audio_path was provided",
     ]
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="composite video",
+        )
+        if output_error:
+            return output_error
+
         speaker_path = Path(inputs["speaker_path"])
         background_path = Path(inputs["background_path"])
-        output_path = Path(inputs["output_path"])
         original_audio_path = inputs.get("original_audio_path")
         layout = inputs.get("layout", "news_anchor")
         if layout not in {"news_anchor", "full_behind", "pip", "split"}:
@@ -149,6 +195,10 @@ class GreenScreenComposite(BaseTool):
             return ToolResult(success=False, error=f"Background video not found: {background_path}")
         if original_audio_path and not Path(original_audio_path).exists():
             return ToolResult(success=False, error=f"Audio source not found: {original_audio_path}")
+        try:
+            _, Image = _load_pixel_dependencies()
+        except RuntimeError as exc:
+            return ToolResult(success=False, error=str(exc))
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         start = time.time()
@@ -241,6 +291,7 @@ class GreenScreenComposite(BaseTool):
                 success=True,
                 data={
                     "output": str(output_path),
+                    "output_path": str(output_path),
                     "layout": layout,
                     "fps": target_fps,
                     "frame_count": frame_count,
@@ -258,8 +309,9 @@ class GreenScreenComposite(BaseTool):
             # Step 7: Clean up temp directories
             self._cleanup_temp(temp_dir)
 
-    def _parse_hex_color(self, hex_str: str) -> np.ndarray:
+    def _parse_hex_color(self, hex_str: str):
         """Parse a hex color string like '#0E172A' to an RGB numpy array."""
+        np, _ = _load_pixel_dependencies()
         hex_str = hex_str.lstrip("#")
         r = int(hex_str[0:2], 16)
         g = int(hex_str[2:4], 16)
@@ -321,7 +373,7 @@ class GreenScreenComposite(BaseTool):
         self,
         speaker_img: Image.Image,
         bg_img: Image.Image,
-        bg_color: np.ndarray,
+        bg_color,
         *,
         layout: str,
         speaker_scale: float,
@@ -330,6 +382,7 @@ class GreenScreenComposite(BaseTool):
         out_h: int,
     ) -> Image.Image:
         """Composite a single speaker frame over a background frame using the given layout."""
+        np, Image = _load_pixel_dependencies()
         # Create alpha mask from speaker frame
         speaker_arr = np.array(speaker_img).astype(float)
         dist = np.sqrt(np.sum((speaker_arr - bg_color.astype(float)) ** 2, axis=2))

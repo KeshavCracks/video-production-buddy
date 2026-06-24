@@ -22,8 +22,10 @@ from tools.base_tool import (
     ResumeSupport,
     ToolResult,
     ToolStability,
+    ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 def _ffconcat_quote(path: str) -> str:
@@ -79,7 +81,10 @@ class VideoStitch(BaseTool):
                 "minItems": 1,
                 "description": "List of input video file paths",
             },
-            "output_path": {"type": "string"},
+            "output_path": {
+                "type": "string",
+                "description": "Project-scoped output path under projects/<project-name>/assets/... or projects/<project-name>/renders/...",
+            },
             "transition": {
                 "type": "string",
                 "enum": ["cut", "crossfade", "fade"],
@@ -164,7 +169,7 @@ class VideoStitch(BaseTool):
             {
                 "if": {"properties": {"operation": {"const": "stitch"}}},
                 "then": {
-                    "required": ["clips"],
+                    "required": ["clips", "output_path"],
                     "properties": {"clips": {"minItems": 2}},
                 },
             },
@@ -175,18 +180,81 @@ class VideoStitch(BaseTool):
             {
                 "if": {"properties": {"operation": {"const": "preview_stitch"}}},
                 "then": {
-                    "required": ["clips"],
+                    "required": ["clips", "output_path"],
                     "properties": {"clips": {"minItems": 2}},
                 },
             },
             {
                 "if": {"properties": {"operation": {"const": "spatial"}}},
                 "then": {
-                    "required": ["clips", "layout"],
+                    "required": ["clips", "layout", "output_path"],
                     "properties": {"clips": {"minItems": 2}},
                 },
             },
         ],
+    }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "operation",
+            "clip_count",
+        ],
+        "allOf": [
+            {
+                "if": {
+                    "properties": {
+                        "operation": {
+                            "enum": ["stitch", "preview_stitch", "spatial"],
+                        }
+                    },
+                    "required": ["operation"],
+                },
+                "then": {
+                    "required": [
+                        "output",
+                        "output_path",
+                        "duration",
+                        "file_size_bytes",
+                    ]
+                },
+            },
+            {
+                "if": {
+                    "properties": {"operation": {"const": "validate"}},
+                    "required": ["operation"],
+                },
+                "then": {
+                    "required": [
+                        "compatible",
+                        "total_duration",
+                        "reference_clip",
+                        "mismatches",
+                        "clips",
+                    ]
+                },
+            },
+        ],
+        "properties": {
+            "operation": {
+                "type": "string",
+                "enum": ["stitch", "preview_stitch", "spatial", "validate"],
+            },
+            "clip_count": {"type": "integer"},
+            "transition": {"type": "string", "enum": ["cut", "crossfade", "fade"]},
+            "transition_duration": {"type": "number"},
+            "auto_normalized": {"type": "boolean"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "duration": {"type": "number"},
+            "file_size_bytes": {"type": "integer"},
+            "method": {"type": "string"},
+            "layout": {"type": "string"},
+            "compatible": {"type": "boolean"},
+            "total_duration": {"type": "number"},
+            "reference_clip": {"type": "object"},
+            "mismatches": {"type": "array", "items": {"type": "object"}},
+            "clips": {"type": "array", "items": {"type": "object"}},
+        },
     }
 
     resource_profile = ResourceProfile(
@@ -214,7 +282,7 @@ class VideoStitch(BaseTool):
     ]
     side_effects = ["writes video file to output_path"]
     user_visible_verification = [
-        "Play the stitched output and verify clip ordering, transitions, and A/V sync",
+        "Inspect stitched output metadata, audio streams, and sampled frames to verify clip ordering, transitions, and A/V sync",
     ]
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
@@ -248,6 +316,7 @@ class VideoStitch(BaseTool):
         """Preflight check: validate clips and report what would happen."""
         clips = inputs.get("clips", [])
         operation = inputs.get("operation", "stitch")
+        status = self.get_status()
         info = {
             "tool": self.name,
             "operation": operation,
@@ -256,8 +325,8 @@ class VideoStitch(BaseTool):
             "auto_normalize": inputs.get("auto_normalize", False),
             "estimated_cost_usd": self.estimate_cost(inputs),
             "estimated_runtime_seconds": self.estimate_runtime(inputs),
-            "status": self.get_status().value,
-            "would_execute": True,
+            "status": status.value,
+            "would_execute": status == ToolStatus.AVAILABLE,
         }
         if clips:
             probe_results = []
@@ -561,7 +630,14 @@ class VideoStitch(BaseTool):
         if len(clips) < 2:
             return ToolResult(success=False, error="At least 2 clips required for stitch")
 
-        output_path = Path(inputs.get("output_path", "stitched_output.mp4"))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="stitched video",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
         output_path.parent.mkdir(parents=True, exist_ok=True)
         transition = inputs.get("transition", "cut")
         transition_dur = inputs.get("transition_duration", 0.5)
@@ -644,6 +720,7 @@ class VideoStitch(BaseTool):
                     "transition_duration": transition_dur if transition != "cut" else 0,
                     "auto_normalized": needs_norm or auto_normalize,
                     "output": str(output_path),
+                    "output_path": str(output_path),
                     "duration": round(out_duration, 2),
                     "file_size_bytes": file_size,
                     **result_data,
@@ -818,7 +895,14 @@ class VideoStitch(BaseTool):
         if len(clips) < 2:
             return ToolResult(success=False, error="At least 2 clips required for preview")
 
-        output_path = Path(inputs.get("output_path", "stitch_preview.mp4"))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="preview stitch video",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Verify all clips exist
@@ -865,7 +949,14 @@ class VideoStitch(BaseTool):
         if not layout:
             return ToolResult(success=False, error="layout is required for spatial operation")
 
-        output_path = Path(inputs.get("output_path", "spatial_output.mp4"))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="spatial video",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
         output_path.parent.mkdir(parents=True, exist_ok=True)
         codec = inputs.get("codec", "libx264")
         crf = inputs.get("crf", 23)
@@ -912,6 +1003,7 @@ class VideoStitch(BaseTool):
                 "layout": layout,
                 "clip_count": len(clips),
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "duration": round(out_duration, 2),
                 "file_size_bytes": file_size,
             },

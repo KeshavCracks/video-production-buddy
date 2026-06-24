@@ -24,6 +24,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_project_sidecar_destination
 
 
 MODEL_SIZES = ["tiny", "base", "small", "medium", "large-v2", "large-v3"]
@@ -60,7 +61,7 @@ class Transcriber(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["input_path"],
+        "required": ["input_path", "output_dir"],
         "properties": {
             "input_path": {"type": "string", "description": "Path to audio or video file"},
             "model_size": {
@@ -70,17 +71,76 @@ class Transcriber(BaseTool):
             },
             "language": {"type": "string", "description": "ISO 639-1 language code, or null for auto-detect"},
             "diarize": {"type": "boolean", "default": False},
-            "output_dir": {"type": "string", "description": "Directory for output files"},
+            "output_dir": {
+                "type": "string",
+                "description": (
+                    "Project-scoped directory for transcript files under "
+                    "projects/<project-name>/artifacts/..., "
+                    "projects/<project-name>/assets/..., or "
+                    "projects/<project-name>/renders/..."
+                ),
+            },
         },
     }
 
     output_schema = {
         "type": "object",
+        "required": [
+            "output_dir",
+            "transcript_path",
+            "segments",
+            "word_timestamps",
+            "language",
+            "duration_seconds",
+            "model_size",
+            "device",
+        ],
         "properties": {
-            "segments": {"type": "array"},
-            "word_timestamps": {"type": "array"},
+            "output_dir": {"type": "string"},
+            "transcript_path": {"type": "string"},
+            "segments": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["id", "start", "end", "text"],
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "start": {"type": "number"},
+                        "end": {"type": "number"},
+                        "text": {"type": "string"},
+                        "words": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": ["word", "start", "end", "probability"],
+                                "properties": {
+                                    "word": {"type": "string"},
+                                    "start": {"type": "number"},
+                                    "end": {"type": "number"},
+                                    "probability": {"type": "number"},
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            "word_timestamps": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["word", "start", "end", "probability"],
+                    "properties": {
+                        "word": {"type": "string"},
+                        "start": {"type": "number"},
+                        "end": {"type": "number"},
+                        "probability": {"type": "number"},
+                    },
+                },
+            },
             "language": {"type": "string"},
             "duration_seconds": {"type": "number"},
+            "model_size": {"type": "string"},
+            "device": {"type": "string"},
         },
     }
 
@@ -125,12 +185,21 @@ class Transcriber(BaseTool):
         model_size = inputs.get("model_size", "base")
         language = inputs.get("language")
         diarize = inputs.get("diarize", False)
-        output_dir = Path(inputs.get("output_dir", input_path.parent))
         if model_size not in MODEL_SIZES:
             return ToolResult(success=False, error=f"Unknown model_size: {model_size}")
 
         if not input_path.exists():
             return ToolResult(success=False, error=f"Input file not found: {input_path}")
+
+        output_dir, output_error = require_explicit_project_sidecar_destination(
+            inputs,
+            "output_dir",
+            self.name,
+            artifact_label="transcript files",
+        )
+        if output_error:
+            return output_error
+        assert output_dir is not None
 
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -199,8 +268,11 @@ class Transcriber(BaseTool):
             )
 
         elapsed = time.time() - start
+        output_path = output_dir / f"{input_path.stem}_transcript.json"
 
         result_data = {
+            "output_dir": str(output_dir),
+            "transcript_path": str(output_path),
             "segments": segments,
             "word_timestamps": word_timestamps,
             "language": detected_language,
@@ -210,8 +282,14 @@ class Transcriber(BaseTool):
         }
 
         # Write transcript JSON
-        output_path = output_dir / f"{input_path.stem}_transcript.json"
-        output_path.write_text(json.dumps(result_data, indent=2), encoding="utf-8")
+        try:
+            serialized = json.dumps(result_data, indent=2, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            return ToolResult(
+                success=False,
+                error=f"Transcript result must be strict JSON serializable: {exc}",
+            )
+        output_path.write_text(serialized, encoding="utf-8")
 
         return ToolResult(
             success=True,

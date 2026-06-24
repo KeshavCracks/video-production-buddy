@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
+
+import jsonschema
+import pytest
 
 from tools.video.direct_clip_search import DirectClipSearch
 from tools.video.stock_sources.base import Candidate
@@ -114,12 +118,85 @@ def _install_source(monkeypatch, source) -> None:
     )
 
 
-def test_direct_clip_search_keeps_download_paths_inside_clips_dir(monkeypatch, tmp_path):
+@pytest.fixture
+def project_output_dir(tmp_path):
+    repo_root = Path(__file__).resolve().parents[2]
+    project_dir = repo_root / "projects" / f"pytest-direct-clip-{tmp_path.name}"
+    shutil.rmtree(project_dir, ignore_errors=True)
+    yield project_dir / "assets" / "video" / "raw"
+    shutil.rmtree(project_dir, ignore_errors=True)
+
+
+def test_direct_clip_search_requires_project_output_dir_before_source_lookup(
+    monkeypatch, tmp_path
+):
+    import tools.video.stock_sources as stock_sources
+
+    output_dir = tmp_path / "raw"
+    lookup_calls: list[str] = []
+
+    def fail_available_sources():
+        lookup_calls.append("available_sources")
+        raise AssertionError("stock sources should not be resolved for invalid output_dir")
+
+    monkeypatch.setattr(stock_sources, "available_sources", fail_available_sources)
+
+    result = DirectClipSearch().execute(
+        {
+            "output_dir": str(output_dir),
+            "queries": [{"query": "test"}],
+        }
+    )
+
+    assert not result.success
+    assert "output_dir" in (result.error or "")
+    assert "projects/<project-name>/" in (result.error or "")
+    assert lookup_calls == []
+    assert not output_dir.exists()
+
+
+def test_direct_clip_search_rejects_unknown_source_before_creating_output_dirs(
+    monkeypatch, project_output_dir
+):
+    import tools.video.stock_sources as stock_sources
+
+    monkeypatch.setattr(stock_sources, "all_sources", lambda: [])
+
+    result = DirectClipSearch().execute(
+        {
+            "output_dir": str(project_output_dir),
+            "queries": [{"query": "test"}],
+            "sources": ["missing-source"],
+        }
+    )
+
+    assert not result.success
+    assert "Unknown stock source" in (result.error or "")
+    assert not project_output_dir.exists()
+
+
+def test_direct_clip_search_keeps_download_paths_inside_clips_dir(
+    monkeypatch, project_output_dir
+):
     source = _UnsafeIdSource()
     _install_source(monkeypatch, source)
 
-    output_dir = tmp_path / "raw"
-    result = DirectClipSearch().execute(
+    output_dir = project_output_dir
+    tool = DirectClipSearch()
+    output_properties = tool.output_schema["properties"]
+    assert {
+        "output_dir",
+        "clips_downloaded",
+        "clips_reused",
+        "total_clips",
+        "per_source_counts",
+        "queries_run",
+        "resolved_sources",
+        "clips",
+        "errors",
+    } <= set(output_properties)
+
+    result = tool.execute(
         {
             "output_dir": str(output_dir),
             "queries": [{"query": "test"}],
@@ -133,16 +210,17 @@ def test_direct_clip_search_keeps_download_paths_inside_clips_dir(monkeypatch, t
     clip_path = Path(result.data["clips"][0]["path"]).resolve()
     clip_path.relative_to((output_dir / "clips").resolve())
     assert clip_path.exists()
-    assert not (tmp_path / "escape.mp4").exists()
+    assert not (output_dir.parent / "escape.mp4").exists()
+    jsonschema.validate(instance=result.data, schema=tool.output_schema)
 
 
 def test_direct_clip_search_removes_partial_file_when_download_fails(
-    monkeypatch, tmp_path
+    monkeypatch, project_output_dir
 ):
     source = _PartialFailureSource()
     _install_source(monkeypatch, source)
 
-    output_dir = tmp_path / "raw"
+    output_dir = project_output_dir
     result = DirectClipSearch().execute(
         {
             "output_dir": str(output_dir),
@@ -160,12 +238,12 @@ def test_direct_clip_search_removes_partial_file_when_download_fails(
 
 
 def test_direct_clip_search_extracts_missing_thumbnail_for_reused_video(
-    monkeypatch, tmp_path
+    monkeypatch, project_output_dir
 ):
     source = _ExistingVideoSource()
     _install_source(monkeypatch, source)
 
-    output_dir = tmp_path / "raw"
+    output_dir = project_output_dir
     clip_path = output_dir / "clips" / "existing_clip_1.mp4"
     clip_path.parent.mkdir(parents=True)
     clip_path.write_bytes(b"x" * 2048)
@@ -200,11 +278,11 @@ def test_direct_clip_search_extracts_missing_thumbnail_for_reused_video(
     assert thumbnail_path.read_bytes() == b"thumbnail"
 
 
-def test_direct_clip_search_materializes_image_thumbnails(monkeypatch, tmp_path):
+def test_direct_clip_search_materializes_image_thumbnails(monkeypatch, project_output_dir):
     source = _ImageSource()
     _install_source(monkeypatch, source)
 
-    output_dir = tmp_path / "raw"
+    output_dir = project_output_dir
     result = DirectClipSearch().execute(
         {
             "output_dir": str(output_dir),

@@ -22,6 +22,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class ScreenCaptureSelector(BaseTool):
@@ -39,7 +40,7 @@ class ScreenCaptureSelector(BaseTool):
         "Cap capture needs the local Cap recorder setup when available."
     )
 
-    agent_skills: list[str] = []
+    agent_skills = ["synthetic-screen-recording", "playwright-recording"]
 
     capabilities = [
         "screen_recording",
@@ -60,6 +61,17 @@ class ScreenCaptureSelector(BaseTool):
     input_schema = {
         "type": "object",
         "required": ["operation"],
+        "allOf": [
+            {
+                "if": {
+                    "properties": {
+                        "operation": {"enum": ["record", "pick_latest"]},
+                    },
+                    "required": ["operation"],
+                },
+                "then": {"required": ["output_path"]},
+            }
+        ],
         "properties": {
             "operation": {
                 "type": "string",
@@ -78,7 +90,11 @@ class ScreenCaptureSelector(BaseTool):
             },
             "output_path": {
                 "type": "string",
-                "description": "Path for the output MP4 file (required for 'record' operation)",
+                "description": (
+                    "Project-scoped output MP4 path under "
+                    "projects/<project-name>/assets/... or projects/<project-name>/renders/... "
+                    "(required for 'record' and 'pick_latest' operations)"
+                ),
             },
             "duration_seconds": {
                 "type": "integer",
@@ -120,14 +136,30 @@ class ScreenCaptureSelector(BaseTool):
             "options": {"type": "array"},
             "output_path": {"type": "string"},
             "capture_method": {"type": "string"},
+            "message": {"type": "string"},
         },
+        "anyOf": [
+            {"required": ["recommended_provider", "options", "message"]},
+            {"required": ["output_path", "capture_method"]},
+        ],
     }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=64, vram_mb=0, disk_mb=0, network_required=False,
     )
 
-    side_effects = []
+    idempotency_key_fields = [
+        "operation",
+        "preferred_provider",
+        "output_path",
+        "duration_seconds",
+        "fps",
+        "capture_audio",
+        "region",
+        "since_minutes",
+    ]
+
+    side_effects = ["delegates screen capture artifact write to output_path"]
 
     def _providers(self) -> dict[str, BaseTool]:
         """Auto-discover screen_capture providers from the registry."""
@@ -292,6 +324,14 @@ class ScreenCaptureSelector(BaseTool):
 
     def _record(self, inputs: dict[str, Any]) -> ToolResult:
         """Route a record request to the appropriate provider."""
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="screen recording",
+        )
+        if output_error:
+            return output_error
+
         preferred = inputs.get("preferred_provider", "auto")
         providers = self._providers()
 
@@ -300,14 +340,14 @@ class ScreenCaptureSelector(BaseTool):
             tool = providers.get("cap")
             if tool:
                 # Cap doesn't do the actual recording — it picks up what Cap recorded
-                return tool.execute({"operation": "pick_latest", "output_dir": inputs.get("output_path")})
+                return tool.execute({"operation": "pick_latest", "output_dir": str(output_path)})
             return ToolResult(success=False, error="Cap provider not found in registry.")
 
         if preferred == "ffmpeg" or preferred == "auto":
             tool = providers.get("ffmpeg")
             if tool and tool.get_status() == ToolStatus.AVAILABLE:
                 return tool.execute({
-                    "output_path": inputs.get("output_path", "recording.mp4"),
+                    "output_path": str(output_path),
                     "duration_seconds": inputs.get("duration_seconds", 60),
                     "fps": inputs.get("fps", 30),
                     "capture_audio": inputs.get("capture_audio", True),
@@ -321,7 +361,7 @@ class ScreenCaptureSelector(BaseTool):
                 if cap_detect.success and cap_detect.data.get("running"):
                     return cap_tool.execute({
                         "operation": "pick_latest",
-                        "output_dir": inputs.get("output_path"),
+                        "output_dir": str(output_path),
                     })
 
             return ToolResult(
@@ -333,6 +373,14 @@ class ScreenCaptureSelector(BaseTool):
 
     def _pick_latest(self, inputs: dict[str, Any]) -> ToolResult:
         """Try to pick the latest recording from any available provider."""
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="latest screen recording",
+        )
+        if output_error:
+            return output_error
+
         providers = self._providers()
         since = inputs.get("since_minutes", 5)
 
@@ -340,21 +388,12 @@ class ScreenCaptureSelector(BaseTool):
         cap_tool = providers.get("cap")
         if cap_tool:
             result = cap_tool.execute({
-                "operation": "find_recordings",
+                "operation": "pick_latest",
+                "output_dir": str(output_path),
                 "since_minutes": since,
             })
-            if result.success and result.data.get("recordings"):
-                latest = result.data["recordings"][0]
-                return ToolResult(
-                    success=True,
-                    data={
-                        "output_path": latest["path"],
-                        "size_mb": latest["size_mb"],
-                        "capture_method": "cap",
-                        "source": "cap_recordings_dir",
-                    },
-                    artifacts=[latest["path"]],
-                )
+            if result.success:
+                return result
 
         return ToolResult(
             success=False,

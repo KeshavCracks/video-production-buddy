@@ -19,7 +19,7 @@
     },
     "output_path": {
       "type": "string",
-      "description": "Path for the output video file"
+      "description": "Project-scoped output path under projects/<project-name>/assets/... or projects/<project-name>/renders/..."
     },
     "transition": {
       "type": "string",
@@ -106,7 +106,7 @@
     {
       "if": { "properties": { "operation": { "const": "stitch" } } },
       "then": {
-        "required": ["clips"],
+        "required": ["clips", "output_path"],
         "properties": {
           "clips": { "minItems": 2 }
         }
@@ -119,7 +119,7 @@
     {
       "if": { "properties": { "operation": { "const": "preview_stitch" } } },
       "then": {
-        "required": ["clips"],
+        "required": ["clips", "output_path"],
         "properties": {
           "clips": { "minItems": 2 }
         }
@@ -128,7 +128,7 @@
     {
       "if": { "properties": { "operation": { "const": "spatial" } } },
       "then": {
-        "required": ["clips", "layout"],
+        "required": ["clips", "layout", "output_path"],
         "properties": {
           "clips": { "minItems": 2 }
         }

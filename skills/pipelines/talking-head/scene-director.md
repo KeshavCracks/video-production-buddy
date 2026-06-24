@@ -138,7 +138,7 @@ Format your proposal clearly:
 **Estimated final duration:** ~Xs (from Xs raw)
 ```
 
-**IMPORTANT: When outputting the overlay plan, ALSO generate the actual Remotion JSON props file (`greenscreen-bg.json`) -- do not just describe scenes in prose.** The JSON props file should be a complete, valid input for the Remotion TalkingHead composition, including all overlay definitions, timing, colors, and content. Save it to `<project>/public/demo-props/` or the project's props directory.
+**IMPORTANT: When outputting the overlay plan, ALSO generate the actual Remotion JSON props file (`greenscreen-bg.json`) -- do not just describe scenes in prose.** The JSON props file should be a complete, valid input for the Remotion TalkingHead composition, including all overlay definitions, timing, colors, and content. Save it under `projects/<project-name>/artifacts/demo-props/` or the project's props directory.
 
 Wait for user approval before proceeding. The user may:
 - Approve as-is
@@ -152,6 +152,7 @@ Wait for user approval before proceeding. The user may:
 ```
 face_tracker.execute({
     "input_path": "<raw_footage>",
+    "output_path": "projects/<project-name>/artifacts/face_tracks.json",
     "sample_fps": 5
 })
 ```
@@ -166,6 +167,7 @@ This outputs per-frame face bounding boxes. Use this data to:
 silence_cutter.execute({
     "input_path": "<raw_footage>",
     "mode": "mark",
+    "output_path": "projects/<project-name>/artifacts/silence_segments.json",
     "silence_threshold_db": -35,
     "min_silence_duration": 0.5
 })

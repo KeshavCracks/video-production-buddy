@@ -43,6 +43,24 @@ def test_composition_validator_allows_remotion_virtual_component_sources(
     assert result.success, result.error
 
 
+def test_composition_validator_rejects_non_strict_composition_json(
+    tmp_path: Path,
+) -> None:
+    comp_path = tmp_path / "composition.json"
+    comp_path.write_text(
+        '{"render_runtime":"remotion","cuts":[{"id":"title","source":"remotion:text_card","in_seconds":0,"out_seconds":NaN}]}\n',
+        encoding="utf-8",
+    )
+
+    result = CompositionValidator().execute(
+        {"composition_path": str(comp_path), "assets_root": str(tmp_path)}
+    )
+
+    assert not result.success
+    assert "Invalid JSON" in (result.error or "")
+    assert "strict JSON" in (result.error or "")
+
+
 def test_composition_validator_rejects_overlapping_cuts(tmp_path: Path) -> None:
     source = tmp_path / "clip.mp4"
     source.write_bytes(b"stub")

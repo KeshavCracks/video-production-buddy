@@ -16,7 +16,15 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
-from tools.video._shared import HUNYUAN_VARIANTS, estimate_local_runtime, generate_local_video, local_generation_status, local_install_instructions
+from tools.video._shared import (
+    HUNYUAN_VARIANTS,
+    estimate_local_runtime,
+    generate_local_video,
+    local_generation_status,
+    local_install_instructions,
+    local_video_output_schema,
+    require_generated_video_output_path,
+)
 
 
 class HunyuanVideo(BaseTool):
@@ -51,7 +59,7 @@ class HunyuanVideo(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {"type": "string"},
             "operation": {"type": "string", "enum": ["text_to_video", "image_to_video"], "default": "text_to_video"},
@@ -67,6 +75,7 @@ class HunyuanVideo(BaseTool):
             "output_path": {"type": "string"},
         },
     }
+    output_schema = local_video_output_schema("hunyuan_video")
 
     resource_profile = ResourceProfile(cpu_cores=2, ram_mb=16000, vram_mb=14000, disk_mb=4000, network_required=False)
     retry_policy = RetryPolicy(max_retries=1)
@@ -84,7 +93,7 @@ class HunyuanVideo(BaseTool):
         "seed",
     ]
     side_effects = ["writes video file to output_path", "may download model weights"]
-    user_visible_verification = ["Watch generated clip for motion coherence and artifacts"]
+    user_visible_verification = ["Inspect sampled frames for motion coherence and artifacts"]
 
     def get_status(self) -> ToolStatus:
         return local_generation_status("HunyuanVideoPipeline")
@@ -96,6 +105,9 @@ class HunyuanVideo(BaseTool):
         return estimate_local_runtime(HUNYUAN_VARIANTS["hunyuan-1.5"]["speed"])
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        _, output_error = require_generated_video_output_path(inputs, self.name)
+        if output_error:
+            return output_error
         if self.get_status() != ToolStatus.AVAILABLE:
             return ToolResult(success=False, error="Hunyuan local video generation is unavailable. " + self.install_instructions)
         start = time.time()

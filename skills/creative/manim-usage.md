@@ -100,3 +100,4 @@ When using the `math_animate` tool:
 7. **Default to 2D** — only use `ThreeDScene` when 3D is essential to understanding
 8. **Stagger complex reveals** — `LaggedStart` with `lag_ratio=0.15` for lists/grids
 9. **Sync to narration** — the scene's total duration should match the narration segment timing from the script
+10. **Pass an explicit `output_path`** such as `projects/<project-name>/assets/video/math_scene_01.mp4`; do not rely on root-level Manim defaults

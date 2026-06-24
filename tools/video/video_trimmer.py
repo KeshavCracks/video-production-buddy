@@ -23,6 +23,7 @@ from tools.base_tool import (
     ToolStability,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 def _ffconcat_quote(path: str) -> str:
@@ -64,7 +65,10 @@ class VideoTrimmer(BaseTool):
                 "enum": ["cut", "speed", "concat"],
             },
             "input_path": {"type": "string"},
-            "output_path": {"type": "string"},
+            "output_path": {
+                "type": "string",
+                "description": "Project-scoped output path under projects/<project-name>/assets/... or projects/<project-name>/renders/...",
+            },
             "start_seconds": {"type": "number", "minimum": 0},
             "end_seconds": {"type": "number", "minimum": 0},
             "speed_factor": {"type": "number", "minimum": 0.1, "maximum": 100.0},
@@ -80,6 +84,37 @@ class VideoTrimmer(BaseTool):
                 },
             },
             "codec": {"type": "string", "default": "copy"},
+        },
+        "allOf": [
+            {
+                "if": {"properties": {"operation": {"const": "cut"}}},
+                "then": {"required": ["input_path", "output_path"]},
+            },
+            {
+                "if": {"properties": {"operation": {"const": "speed"}}},
+                "then": {"required": ["input_path", "output_path"]},
+            },
+            {
+                "if": {"properties": {"operation": {"const": "concat"}}},
+                "then": {
+                    "required": ["segments", "output_path"],
+                    "properties": {"segments": {"minItems": 1}},
+                },
+            },
+        ],
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["operation", "output", "output_path"],
+        "properties": {
+            "operation": {"type": "string", "enum": ["cut", "speed", "concat"]},
+            "input": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "start_seconds": {"type": "number"},
+            "end_seconds": {"type": ["number", "null"]},
+            "speed_factor": {"type": "number"},
+            "segment_count": {"type": "integer"},
         },
     }
 
@@ -99,7 +134,7 @@ class VideoTrimmer(BaseTool):
         "codec",
     ]
     side_effects = ["writes video file to output_path"]
-    user_visible_verification = ["Play trimmed output and verify cut points"]
+    user_visible_verification = ["Inspect trimmed output metadata and sampled frames to verify cut points"]
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
         operation = inputs["operation"]
@@ -128,9 +163,15 @@ class VideoTrimmer(BaseTool):
         start_s = inputs.get("start_seconds", 0)
         end_s = inputs.get("end_seconds")
         codec = inputs.get("codec", "copy")
-        output_path = Path(
-            inputs.get("output_path", str(input_path.with_stem(f"{input_path.stem}_cut")))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="trimmed video",
         )
+        if output_error:
+            return output_error
+        assert output_path is not None
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
         cmd = [
             "ffmpeg", "-y",
@@ -153,6 +194,7 @@ class VideoTrimmer(BaseTool):
                 "operation": "cut",
                 "input": str(input_path),
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "start_seconds": start_s,
                 "end_seconds": end_s,
             },
@@ -165,9 +207,15 @@ class VideoTrimmer(BaseTool):
             return ToolResult(success=False, error=f"Input not found: {input_path}")
 
         factor = inputs.get("speed_factor", 1.0)
-        output_path = Path(
-            inputs.get("output_path", str(input_path.with_stem(f"{input_path.stem}_speed")))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="speed-adjusted video",
         )
+        if output_error:
+            return output_error
+        assert output_path is not None
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Video: setpts adjusts presentation timestamps (inverse of speed)
         # Audio: atempo adjusts audio speed (must chain for >2x)
@@ -192,6 +240,7 @@ class VideoTrimmer(BaseTool):
                 "operation": "speed",
                 "input": str(input_path),
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "speed_factor": factor,
             },
             artifacts=[str(output_path)],
@@ -202,7 +251,14 @@ class VideoTrimmer(BaseTool):
         if not segments:
             return ToolResult(success=False, error="No segments provided for concat")
 
-        output_path = Path(inputs.get("output_path", "concat_output.mp4"))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="concatenated video",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
 
         # First, cut each segment to a temp file if start/end are specified
         temp_files: list[Path] = []
@@ -255,6 +311,7 @@ class VideoTrimmer(BaseTool):
                     "operation": "concat",
                     "segment_count": len(segments),
                     "output": str(output_path),
+                    "output_path": str(output_path),
                 },
                 artifacts=[str(output_path)],
             )

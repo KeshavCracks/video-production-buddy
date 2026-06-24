@@ -98,6 +98,15 @@ def test_safe_clip_file_name_caps_overlong_directory_names_without_extension():
     assert directory_name.endswith(hashlib.sha256(clip_id.encode("utf-8")).hexdigest()[:12])
 
 
+def test_safe_clip_file_name_rejects_path_separators_from_extension():
+    file_name = safe_clip_file_name("pexels_123", "../../escape.mp4")
+
+    assert "/" not in file_name
+    assert "\\" not in file_name
+    assert file_name != "pexels_123../../escape.mp4"
+    assert file_name.endswith(".mp4")
+
+
 def test_nasa_sanitized_source_ids_keep_long_ids_unique():
     shared_prefix = "Mission " + ("A" * 140)
 

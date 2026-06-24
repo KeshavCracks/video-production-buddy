@@ -24,6 +24,7 @@ from tools.base_tool import (
     ToolTier,
     ToolRuntime,
 )
+from tools.output_paths import require_explicit_project_source_media_destination
 
 
 FORMATS = ["video", "audio_only", "subtitles_only", "metadata_only"]
@@ -74,7 +75,14 @@ class VideoDownloader(BaseTool):
         "required": ["url", "output_dir"],
         "properties": {
             "url": {"type": "string", "description": "Video URL to download"},
-            "output_dir": {"type": "string", "description": "Directory for downloaded files"},
+            "output_dir": {
+                "type": "string",
+                "description": (
+                    "Project-scoped directory for downloaded reference media under "
+                    "projects/<project-name>/reference_assets/... or "
+                    "projects/<project-name>/assets/..."
+                ),
+            },
             "format": {
                 "type": "string",
                 "enum": FORMATS,
@@ -97,10 +105,19 @@ class VideoDownloader(BaseTool):
 
     output_schema = {
         "type": "object",
+        "required": [
+            "video_path",
+            "audio_path",
+            "subtitle_path",
+            "metadata",
+            "platform",
+            "output_dir",
+        ],
         "properties": {
             "video_path": {"type": ["string", "null"]},
             "audio_path": {"type": ["string", "null"]},
             "subtitle_path": {"type": ["string", "null"]},
+            "output_dir": {"type": "string"},
             "metadata": {
                 "type": "object",
                 "properties": {
@@ -111,6 +128,8 @@ class VideoDownloader(BaseTool):
                     "description": {"type": "string"},
                     "view_count": {"type": "integer"},
                     "like_count": {"type": "integer"},
+                    "resolution": {"type": "string"},
+                    "fps": {"type": "number"},
                 },
             },
             "platform": {"type": "string"},
@@ -196,7 +215,6 @@ class VideoDownloader(BaseTool):
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
         url = inputs["url"]
-        output_dir = Path(inputs["output_dir"])
         dl_format = inputs.get("format", "video")
         max_res = inputs.get("max_resolution", "720p")
         max_duration = inputs.get("max_duration_seconds", 600)
@@ -204,6 +222,16 @@ class VideoDownloader(BaseTool):
             return ToolResult(success=False, error=f"Unknown format: {dl_format}")
         if max_res not in MAX_RESOLUTIONS:
             return ToolResult(success=False, error=f"Unknown max_resolution: {max_res}")
+
+        output_dir, output_error = require_explicit_project_source_media_destination(
+            inputs,
+            "output_dir",
+            self.name,
+            artifact_label="downloaded reference media",
+        )
+        if output_error:
+            return output_error
+        assert output_dir is not None
 
         output_dir.mkdir(parents=True, exist_ok=True)
         platform = self._detect_platform(url)
@@ -233,6 +261,7 @@ class VideoDownloader(BaseTool):
                     "subtitle_path": None,
                     "metadata": metadata,
                     "platform": platform,
+                    "output_dir": str(output_dir),
                 },
                 duration_seconds=round(time.time() - start, 2),
             )
@@ -270,6 +299,7 @@ class VideoDownloader(BaseTool):
                 "subtitle_path": subtitle_path,
                 "metadata": metadata,
                 "platform": platform,
+                "output_dir": str(output_dir),
             },
             artifacts=artifacts,
             duration_seconds=round(elapsed, 2),

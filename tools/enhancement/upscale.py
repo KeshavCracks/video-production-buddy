@@ -24,6 +24,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi"}
@@ -72,10 +73,13 @@ class Upscale(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["input_path"],
+        "required": ["input_path", "output_path"],
         "properties": {
             "input_path": {"type": "string"},
-            "output_path": {"type": "string"},
+            "output_path": {
+                "type": "string",
+                "description": "Project-scoped output path under projects/<project-name>/assets/... or projects/<project-name>/renders/...",
+            },
             "scale": {
                 "type": "integer",
                 "enum": [2, 4],
@@ -98,6 +102,31 @@ class Upscale(BaseTool):
                 "default": 0.5,
                 "description": "Denoising strength (0 = no denoise, 1 = full)",
             },
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "input",
+            "output",
+            "output_path",
+            "scale",
+            "model",
+            "face_enhance",
+            "type",
+        ],
+        "properties": {
+            "input": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "scale": {"type": "integer", "enum": [2, 4]},
+            "model": {"type": "string", "enum": list(MODELS.keys())},
+            "face_enhance": {"type": "boolean"},
+            "type": {"type": "string", "enum": ["image", "video"]},
+            "output_width": {"type": "integer"},
+            "output_height": {"type": "integer"},
+            "total_frames": {"type": "integer"},
+            "fps": {"type": "number"},
         },
     }
 
@@ -134,9 +163,14 @@ class Upscale(BaseTool):
 
         is_video = input_path.suffix.lower() in VIDEO_EXTENSIONS
 
-        default_output = str(input_path.with_stem(f"{input_path.stem}_upscaled"))
-        output_path = Path(inputs.get("output_path", default_output))
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="upscaled file",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
 
         scale = inputs.get("scale", 4)
         model_name = inputs.get("model", "RealESRGAN_x4plus")
@@ -148,6 +182,7 @@ class Upscale(BaseTool):
             return ToolResult(success=False, error=f"Unknown model: {model_name}")
 
         start = time.time()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
         try:
             if is_video:
@@ -170,6 +205,7 @@ class Upscale(BaseTool):
             data={
                 "input": str(input_path),
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "scale": scale,
                 "model": model_name,
                 "face_enhance": face_enhance,

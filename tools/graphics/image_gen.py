@@ -32,6 +32,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class ImageGen(BaseTool):
@@ -73,7 +74,7 @@ class ImageGen(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {"type": "string"},
             "negative_prompt": {"type": "string", "default": ""},
@@ -86,7 +87,25 @@ class ImageGen(BaseTool):
             },
             "model": {"type": "string"},
             "seed": {"type": "integer"},
+            "output_path": {
+                "type": "string",
+                "description": (
+                    "Explicit project-scoped output image path under "
+                    "projects/<project-name>/assets/... or projects/<project-name>/renders/..."
+                ),
+            },
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["provider", "prompt", "output", "output_path"],
+        "properties": {
+            "provider": {"type": "string", "enum": ["openai", "flux", "local"]},
+            "model": {"type": "string"},
+            "prompt": {"type": "string"},
+            "output": {"type": "string"},
             "output_path": {"type": "string"},
+            "seed": {"type": ["integer", "string", "null"]},
         },
     }
 
@@ -136,6 +155,17 @@ class ImageGen(BaseTool):
         return 0.0  # local
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="generated image",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+        inputs = dict(inputs)
+        inputs["output_path"] = str(output_path)
+
         provider = inputs.get("provider") or self._detect_provider()
         if not provider:
             return ToolResult(
@@ -157,6 +187,8 @@ class ImageGen(BaseTool):
         except Exception as e:
             return ToolResult(success=False, error=f"Generation failed: {e}")
 
+        if result.success:
+            result.data.setdefault("output_path", str(output_path))
         result.duration_seconds = round(time.time() - start, 2)
         result.cost_usd = self.estimate_cost(inputs)
         return result
@@ -179,7 +211,7 @@ class ImageGen(BaseTool):
         )
 
         image_data = base64.b64decode(response.data[0].b64_json)
-        output_path = Path(inputs.get("output_path", "generated_image.png"))
+        output_path = Path(inputs["output_path"])
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(image_data)
 
@@ -224,7 +256,7 @@ class ImageGen(BaseTool):
         image_response = requests.get(image_url, timeout=60)
         image_response.raise_for_status()
 
-        output_path = Path(inputs.get("output_path", "generated_image.png"))
+        output_path = Path(inputs["output_path"])
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(image_response.content)
 
@@ -270,7 +302,7 @@ class ImageGen(BaseTool):
             generator=generator,
         ).images[0]
 
-        output_path = Path(inputs.get("output_path", "generated_image.png"))
+        output_path = Path(inputs["output_path"])
         output_path.parent.mkdir(parents=True, exist_ok=True)
         image.save(str(output_path))
 

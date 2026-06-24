@@ -156,6 +156,30 @@ def require_optional_project_artifact_destination(
     return path, None
 
 
+def require_explicit_project_artifact_destination(
+    inputs: dict[str, Any],
+    field_name: str,
+    tool_name: str,
+    *,
+    artifact_label: str = "canonical artifact",
+) -> tuple[Path | None, ToolResult | None]:
+    raw_path = inputs.get(field_name)
+    if _is_missing_path_input(raw_path):
+        return None, ToolResult(
+            success=False,
+            error=(
+                f"{tool_name}: {field_name} is required for {artifact_label}; "
+                "write canonical artifacts under projects/<project-name>/artifacts/..."
+            ),
+        )
+    return require_optional_project_artifact_destination(
+        inputs,
+        field_name,
+        tool_name,
+        artifact_label=artifact_label,
+    )
+
+
 def require_optional_project_media_destination(
     inputs: dict[str, Any],
     field_name: str,

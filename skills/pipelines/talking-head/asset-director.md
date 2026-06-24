@@ -38,7 +38,7 @@ subtitle_gen.execute({
     "segments": <transcript_segments>,
     "corrections": {"cloud": "Claude"},
     "max_words_per_line": 5,
-    "output_path": "<project>/assets/subtitles/subtitles.srt"
+    "output_path": "projects/<project-name>/assets/subtitles/subtitles.srt"
 })
 ```
 
@@ -131,7 +131,7 @@ Key rules:
 
 **For simple text overlays** (if Remotion is overkill):
 
-Generate PNG images using FFmpeg or PIL, stored at `<project>/assets/overlays/overlay_<id>.png`.
+Generate PNG images using FFmpeg or PIL, stored at `projects/<project-name>/assets/overlays/overlay_<id>.png`.
 
 ### Step 5: Build Asset Manifest
 

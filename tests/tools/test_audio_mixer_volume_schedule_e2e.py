@@ -29,6 +29,10 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def _project_audio_output(filename: str) -> Path:
+    return Path("projects/test-audio/assets/audio") / filename
+
+
 def _synthesize_tone(path: Path, freq: int, duration: float, amplitude: float = 0.5) -> None:
     """Generate a constant-amplitude sine tone WAV at ``path``."""
     cmd = [
@@ -62,11 +66,15 @@ def _measure_rms_in_window(path: Path, start: float, end: float) -> float:
     raise RuntimeError(f"volumedetect did not report mean_volume:\n{proc.stderr}")
 
 
-def test_schedule_envelope_renders_to_real_audio(tmp_path: Path):
+def test_schedule_envelope_renders_to_real_audio(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
     """A 3-step duck schedule on a constant tone produces a measurable envelope."""
+    monkeypatch.chdir(tmp_path)
     speech = tmp_path / "speech.wav"
     music = tmp_path / "music.wav"
-    out = tmp_path / "ducked.wav"
+    out = _project_audio_output("ducked.wav")
 
     # Near-silent "speech" so it doesn't contaminate the music gain measurement
     # via amix mixing.

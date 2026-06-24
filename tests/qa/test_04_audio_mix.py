@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """QA Test 04: Audio mixing — full_mix, ducking, TTS format detection.
 
-Run:  python -m pytest tests/qa/test_04_audio_mix.py -v
+Run:  VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider tests/qa/test_04_audio_mix.py -v
 """
 
 import json
@@ -17,16 +17,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from lib.env_loader import load_env
 
-load_env()
-
 from tools.audio.audio_mixer import AudioMixer
 from tools.audio.cosyvoice_tts import CosyVoiceTTS
 
 OUT = Path(__file__).parent / "output"
-OUT.mkdir(exist_ok=True)
+
+
+def _project_audio_output(filename: str) -> Path:
+    return Path("projects/qa-audio/assets/audio") / filename
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
+@pytest.fixture(scope="module", autouse=True)
+def _qa_env_and_output_dir() -> Path:
+    load_env()
+    OUT.mkdir(exist_ok=True)
+    return OUT
+
 
 def _gen_sine(path: Path, duration: int = 5, frequency: int = 440) -> Path:
     """Generate a sine-wave MP3 fixture if it doesn't already exist."""
@@ -94,9 +102,16 @@ def mixer() -> AudioMixer:
 
 # ── Pattern B2: full_mix result must include duration_seconds ─────────────────
 
-def test_full_mix_result_includes_duration_seconds(mixer, speech_file, music_file):
+def test_full_mix_result_includes_duration_seconds(
+    mixer,
+    speech_file,
+    music_file,
+    tmp_path,
+    monkeypatch,
+):
     """full_mix ToolResult.data must contain a positive duration_seconds float."""
-    out = OUT / "test_full_mix_duration.aac"
+    monkeypatch.chdir(tmp_path)
+    out = _project_audio_output("test_full_mix_duration.aac")
     result = mixer.execute({
         "operation": "full_mix",
         "tracks": [
@@ -114,9 +129,16 @@ def test_full_mix_result_includes_duration_seconds(mixer, speech_file, music_fil
     assert dur > 0, f"duration_seconds is non-positive: {dur}"
 
 
-def test_full_mix_produces_valid_audio(mixer, speech_file, music_file):
+def test_full_mix_produces_valid_audio(
+    mixer,
+    speech_file,
+    music_file,
+    tmp_path,
+    monkeypatch,
+):
     """full_mix output must be a valid audio file with a known codec."""
-    out = OUT / "test_full_mix_codec.aac"
+    monkeypatch.chdir(tmp_path)
+    out = _project_audio_output("test_full_mix_codec.aac")
     result = mixer.execute({
         "operation": "full_mix",
         "tracks": [
@@ -131,14 +153,21 @@ def test_full_mix_produces_valid_audio(mixer, speech_file, music_file):
     assert codec != "", f"ffprobe returned empty codec for {out}"
 
 
-def test_full_mix_duration_within_tolerance(mixer, speech_file, music_file):
+def test_full_mix_duration_within_tolerance(
+    mixer,
+    speech_file,
+    music_file,
+    tmp_path,
+    monkeypatch,
+):
     """Mix duration must cover at least the full speech track.
 
     With sidechaincompress, the effective output ends when the sidechain (speech)
     ends. The invariant is: duration >= speech_duration (8s) - 1s tolerance.
     In production, narration spans the full video so the mix covers the full target.
     """
-    out = OUT / "test_full_mix_tolerance.aac"
+    monkeypatch.chdir(tmp_path)
+    out = _project_audio_output("test_full_mix_tolerance.aac")
     result = mixer.execute({
         "operation": "full_mix",
         "tracks": [
@@ -158,9 +187,16 @@ def test_full_mix_duration_within_tolerance(mixer, speech_file, music_file):
 
 # ── Pattern B: _duck() sidechaincompress (label split fix) ────────────────────
 
-def test_duck_operation_succeeds(mixer, speech_file, music_file):
+def test_duck_operation_succeeds(
+    mixer,
+    speech_file,
+    music_file,
+    tmp_path,
+    monkeypatch,
+):
     """duck operation must succeed without filter-graph label errors."""
-    out = OUT / "test_duck.aac"
+    monkeypatch.chdir(tmp_path)
+    out = _project_audio_output("test_duck.aac")
     result = mixer.execute({
         "operation": "duck",
         "primary_audio": str(speech_file),
@@ -174,9 +210,16 @@ def test_duck_operation_succeeds(mixer, speech_file, music_file):
 
 # ── Pattern B2: sidechaincompress fallback still produces output ───────────────
 
-def test_sidechaincompress_fallback(mixer, speech_file, music_file):
+def test_sidechaincompress_fallback(
+    mixer,
+    speech_file,
+    music_file,
+    tmp_path,
+    monkeypatch,
+):
     """When sidechaincompress fails, full_mix must fall back to fixed-volume mix."""
-    out = OUT / "test_full_mix_fallback.aac"
+    monkeypatch.chdir(tmp_path)
+    out = _project_audio_output("test_full_mix_fallback.aac")
 
     original_run = mixer.run_command
 
@@ -255,9 +298,10 @@ def test_tts_format_detection_passthrough_when_format_matches():
 
 # ── Legacy functional tests (kept as smoke tests) ─────────────────────────────
 
-def test_basic_mix_succeeds(mixer, speech_file, music_file):
+def test_basic_mix_succeeds(mixer, speech_file, music_file, tmp_path, monkeypatch):
     """mix operation with two tracks must succeed."""
-    out = OUT / "mix_basic.wav"
+    monkeypatch.chdir(tmp_path)
+    out = _project_audio_output("mix_basic.wav")
     result = mixer.execute({
         "operation": "mix",
         "tracks": [
@@ -271,9 +315,10 @@ def test_basic_mix_succeeds(mixer, speech_file, music_file):
     assert out.exists()
 
 
-def test_mix_with_fades_succeeds(mixer, speech_file, music_file):
+def test_mix_with_fades_succeeds(mixer, speech_file, music_file, tmp_path, monkeypatch):
     """mix with fade_in/fade_out parameters must succeed."""
-    out = OUT / "mix_fades.wav"
+    monkeypatch.chdir(tmp_path)
+    out = _project_audio_output("mix_fades.wav")
     result = mixer.execute({
         "operation": "mix",
         "tracks": [
@@ -285,9 +330,3 @@ def test_mix_with_fades_succeeds(mixer, speech_file, music_file):
         "output_path": str(out),
     })
     assert result.success, f"mix with fades failed: {result.error}"
-
-
-# ── Standalone runner ──────────────────────────────────────────────────────────
-
-if __name__ == "__main__":
-    sys.exit(pytest.main([__file__, "-v"]))

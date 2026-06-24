@@ -8,7 +8,6 @@ and accessibility validation (D3.5.5, D3.5.6, D3.5.7).
 from __future__ import annotations
 
 import colorsys
-import json
 import math
 import re
 from pathlib import Path
@@ -16,6 +15,8 @@ from typing import Any, Optional
 
 import yaml
 import jsonschema
+
+from schemas.artifacts import load_strict_json_object
 
 STYLES_DIR = Path(__file__).resolve().parent
 SCHEMA_PATH = (
@@ -27,8 +28,7 @@ SCHEMA_PATH = (
 
 
 def _load_playbook_schema() -> dict:
-    with open(SCHEMA_PATH) as f:
-        return json.load(f)
+    return load_strict_json_object(SCHEMA_PATH, context="style playbook schema")
 
 
 def load_playbook(name: str, styles_dir: Optional[Path] = None) -> dict[str, Any]:

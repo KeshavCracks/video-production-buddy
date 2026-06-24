@@ -6,6 +6,7 @@ Rejects semantic checkpoints — those require LLM judgment.
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Any
 
 from tools.base_tool import (
@@ -79,6 +80,40 @@ class ComplianceCheck(BaseTool):
     provider = "video_production_buddy"
     best_for = ["structural compliance checking", "bible checkpoint evaluation"]
     not_good_for = ["semantic compliance — use LLM judgment instead"]
+    input_schema = {
+        "type": "object",
+        "required": ["stage_output", "checkpoint"],
+        "properties": {
+            "stage_output": {
+                "type": "object",
+                "description": "Stage artifact content to evaluate against the checkpoint.",
+            },
+            "checkpoint": {
+                "type": "object",
+                "description": "One structural compliance_manifest checkpoint definition.",
+            },
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "checkpoint_id",
+            "pass",
+            "actual_value",
+            "deviation",
+            "failure_action",
+        ],
+        "properties": {
+            "checkpoint_id": {"type": ["string", "null"]},
+            "pass": {"type": "boolean"},
+            "actual_value": {
+                "type": ["string", "number", "integer", "boolean", "object", "array", "null"],
+            },
+            "deviation": {"type": ["string", "null"]},
+            "failure_action": {"type": "string"},
+        },
+    }
+    idempotency_key_fields = ["stage_output", "checkpoint"]
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
         stage_output = inputs.get("stage_output")
@@ -178,6 +213,8 @@ class ComplianceCheck(BaseTool):
             ) from exc
 
         total_words = 0
+        total_slot = 0.0
+        slot_seen = False
         for section in stage_output.get("sections", []):
             if (
                 section.get("beat_id") != beat_id
@@ -186,9 +223,17 @@ class ComplianceCheck(BaseTool):
             ):
                 continue
             text = section.get("narration", section.get("text", ""))
-            total_words += len(text.split())
+            total_words += _count_words(text)
+            slot = _section_duration_seconds(section)
+            if slot is not None:
+                total_slot += slot
+                slot_seen = True
 
-        estimated = (total_words / _WORDS_PER_MINUTE) * 60
+        # Prefer the section's explicit time slot (authoritative for timestamped
+        # scripts/edits); fall back to a CJK-aware spoken-duration estimate for
+        # untimestamped stage output. This is correct for cinematic ads (sparse
+        # narration + music/silence, where spoken time != beat slot) and for CJK.
+        estimated = total_slot if slot_seen else (total_words / _WORDS_PER_MINUTE) * 60
         tol_seconds = target_seconds * tolerance
         passed = abs(estimated - target_seconds) <= tol_seconds
         return {
@@ -200,7 +245,7 @@ class ComplianceCheck(BaseTool):
         }
 
     def _check_structured_presence(self, stage_output: dict, structured: dict) -> dict:
-        """Substring search across the stage_output JSON. Negated form rejects on hit."""
+        """Term search across stage text. Negated form rejects on hit."""
         terms = structured.get("terms")
         if not terms or not isinstance(terms, list):
             raise _StructuredCriterionError(
@@ -219,7 +264,7 @@ class ComplianceCheck(BaseTool):
         negated = bool(structured.get("negated", False))
 
         haystack = _presence_haystack(stage_output)
-        found = {t: haystack.count(str(t).lower()) for t in terms}
+        found = {t: _presence_term_count(str(t), haystack) for t in terms}
 
         if negated:
             violations = {t: c for t, c in found.items() if c > 0}
@@ -387,13 +432,19 @@ class ComplianceCheck(BaseTool):
         beat_id = beat_match.group(1)
 
         total_words = 0
+        total_slot = 0.0
+        slot_seen = False
         for section in stage_output.get("sections", []):
             if section.get("beat_id") != beat_id and section.get("maps_to_beat") != beat_id:
                 continue
             text = section.get("narration", section.get("text", ""))
-            total_words += len(text.split())
+            total_words += _count_words(text)
+            slot = _section_duration_seconds(section)
+            if slot is not None:
+                total_slot += slot
+                slot_seen = True
 
-        estimated = (total_words / _WORDS_PER_MINUTE) * 60
+        estimated = total_slot if slot_seen else (total_words / _WORDS_PER_MINUTE) * 60
         tolerance = target_seconds * _TIMING_TOLERANCE
         passed = abs(estimated - target_seconds) <= tolerance
         return {
@@ -419,7 +470,7 @@ class ComplianceCheck(BaseTool):
             criterion.lower(),
         ))
 
-        found_map = {t: output_str.count(t.lower()) for t in quoted_terms}
+        found_map = {t: _presence_term_count(t, output_str) for t in quoted_terms}
 
         if is_negated:
             violations = {t: c for t, c in found_map.items() if c > 0}
@@ -490,6 +541,14 @@ def _presence_haystack(stage_output: Any) -> str:
     return "\n".join(values).lower()
 
 
+def _presence_term_count(term: str, haystack: str) -> int:
+    normalized = term.strip().lower()
+    if not normalized:
+        return 0
+    pattern = rf"(?<![A-Za-z0-9_-]){re.escape(normalized)}(?![A-Za-z0-9_-])"
+    return len(re.findall(pattern, haystack.lower()))
+
+
 def _collect_presence_text(value: Any, values: list[str], key: str | None = None) -> None:
     if key in _PRESENCE_METADATA_SUBTREE_KEYS:
         return
@@ -538,3 +597,40 @@ def _normalize_transition_style(style: str) -> str:
         "match_cut": "match_cut",
     }
     return aliases.get(normalized, normalized)
+
+
+def _count_words(text: Any) -> int:
+    """Word count where each CJK ideograph (Unicode category 'Lo') counts as one
+    word and Latin/number runs count as words; all punctuation is ignored. Fixes
+    len(text.split()), which collapses space-less CJK text (e.g. Mandarin
+    narration) to a single token.
+    """
+    if not isinstance(text, str) or not text:
+        return 0
+    cjk = sum(1 for ch in text if unicodedata.category(ch).startswith("Lo"))
+    latin_runs = len(re.findall(r"[A-Za-z0-9]+", text))
+    return cjk + latin_runs
+
+
+def _section_duration_seconds(section: dict[str, Any]) -> float | None:
+    """Authoritative time slot for a timestamped section/cut, else None.
+
+    Used so timing checkpoints measure the section's allocated slot (start_seconds
+    → end_seconds, or in_seconds → out_seconds, or duration_estimate_seconds)
+    instead of estimating spoken duration — correct for cinematic ads whose
+    narration is intentionally sparser than the beat slot.
+    """
+    start = section.get("start_seconds")
+    end = section.get("end_seconds")
+    if isinstance(start, (int, float)) and isinstance(end, (int, float)) and end >= start:
+        return float(end) - float(start)
+    if isinstance(section.get("in_seconds"), (int, float)) and isinstance(
+        section.get("out_seconds"), (int, float)
+    ):
+        lo, hi = float(section["in_seconds"]), float(section["out_seconds"])
+        if hi >= lo:
+            return hi - lo
+    dur = section.get("duration_estimate_seconds")
+    if isinstance(dur, (int, float)) and dur > 0:
+        return float(dur)
+    return None

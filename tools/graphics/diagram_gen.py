@@ -23,6 +23,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class DiagramGen(BaseTool):
@@ -56,7 +57,7 @@ class DiagramGen(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["diagram_type"],
+        "required": ["diagram_type", "output_path"],
         "properties": {
             "diagram_type": {
                 "type": "string",
@@ -96,7 +97,27 @@ class DiagramGen(BaseTool):
             },
             "width": {"type": "integer", "default": 1200},
             "height": {"type": "integer", "default": 800},
+            "output_path": {
+                "type": "string",
+                "description": (
+                    "Explicit project-scoped output image path under "
+                    "projects/<project-name>/assets/... or projects/<project-name>/renders/..."
+                ),
+            },
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["method", "output", "output_path"],
+        "properties": {
+            "method": {
+                "type": "string",
+                "enum": ["mermaid-cli", "pillow", "text_card"],
+            },
+            "output": {"type": "string"},
             "output_path": {"type": "string"},
+            "box_count": {"type": "integer", "minimum": 0},
+            "connection_count": {"type": "integer", "minimum": 0},
         },
     }
 
@@ -134,6 +155,15 @@ class DiagramGen(BaseTool):
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
         diagram_type = inputs["diagram_type"]
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="diagram image",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+        inputs = {**inputs, "output_path": str(output_path)}
         start = time.time()
 
         try:
@@ -146,6 +176,8 @@ class DiagramGen(BaseTool):
         except Exception as e:
             return ToolResult(success=False, error=f"Diagram generation failed: {e}")
 
+        if result.success:
+            result.data.setdefault("output_path", str(output_path))
         result.duration_seconds = round(time.time() - start, 2)
         return result
 
@@ -154,18 +186,26 @@ class DiagramGen(BaseTool):
         if not definition:
             return ToolResult(success=False, error="Mermaid definition required")
 
-        output_path = Path(inputs.get("output_path", "diagram.png"))
+        output_path = Path(inputs["output_path"])
         output_path.parent.mkdir(parents=True, exist_ok=True)
         theme = inputs.get("theme", "dark")
 
         if self._has_mermaid():
+            mermaid_config = {"theme": theme}
+            try:
+                serialized_config = json.dumps(mermaid_config, allow_nan=False)
+            except (TypeError, ValueError) as exc:
+                return ToolResult(
+                    success=False,
+                    error=f"Mermaid config must be strict JSON serializable: {exc}",
+                )
+
             # Write temp mermaid file
             temp_mmd = output_path.with_suffix(".mmd")
             temp_mmd.write_text(definition, encoding="utf-8")
 
-            mermaid_config = {"theme": theme}
             config_path = output_path.with_suffix(".mermaid.json")
-            config_path.write_text(json.dumps(mermaid_config), encoding="utf-8")
+            config_path.write_text(serialized_config, encoding="utf-8")
 
             cmd = [
                 "mmdc",
@@ -216,7 +256,7 @@ class DiagramGen(BaseTool):
         theme = inputs.get("theme", "dark")
         width = inputs.get("width", 1200)
         height = inputs.get("height", 800)
-        output_path = Path(inputs.get("output_path", "diagram.png"))
+        output_path = Path(inputs["output_path"])
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Theme colors
@@ -337,7 +377,7 @@ class DiagramGen(BaseTool):
 
         from PIL import Image, ImageDraw, ImageFont
 
-        output_path = Path(inputs.get("output_path", "diagram.png"))
+        output_path = Path(inputs["output_path"])
         output_path.parent.mkdir(parents=True, exist_ok=True)
         width = inputs.get("width", 800)
 

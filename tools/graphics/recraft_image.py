@@ -22,6 +22,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class RecraftImage(BaseTool):
@@ -40,7 +41,7 @@ class RecraftImage(BaseTool):
         "Set FAL_KEY to your fal.ai API key.\n"
         "  Get one at https://fal.ai/dashboard/keys"
     )
-    agent_skills = []
+    agent_skills = ["flux-best-practices"]
 
     capabilities = [
         "generate_image",
@@ -64,7 +65,7 @@ class RecraftImage(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {"type": "string"},
             "model": {
@@ -94,6 +95,17 @@ class RecraftImage(BaseTool):
                 "items": {"type": "string"},
                 "description": "Color palette as hex strings, e.g. ['#FF5733', '#2E86C1']",
             },
+            "output_path": {"type": "string"},
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["provider", "model", "prompt", "output", "output_path"],
+        "properties": {
+            "provider": {"type": "string", "const": "recraft"},
+            "model": {"type": "string"},
+            "prompt": {"type": "string"},
+            "output": {"type": "string"},
             "output_path": {"type": "string"},
         },
     }
@@ -128,6 +140,12 @@ class RecraftImage(BaseTool):
         return 0.04
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        _, output_error = require_explicit_output_path(
+            inputs, self.name, artifact_label="generated image"
+        )
+        if output_error:
+            return output_error
+
         api_key = self._get_api_key()
         if not api_key:
             return ToolResult(
@@ -180,8 +198,7 @@ class RecraftImage(BaseTool):
             image_response = requests.get(image_url, timeout=60)
             image_response.raise_for_status()
 
-            ext = "svg" if inputs.get("style") == "vector_illustration" else "png"
-            output_path = Path(inputs.get("output_path", f"generated_image.{ext}"))
+            output_path = Path(inputs["output_path"])
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(image_response.content)
 
@@ -195,6 +212,7 @@ class RecraftImage(BaseTool):
                 "model": model,
                 "prompt": prompt,
                 "output": str(output_path),
+                "output_path": str(output_path),
             },
             artifacts=[str(output_path)],
             cost_usd=self.estimate_cost(inputs),

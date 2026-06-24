@@ -9,16 +9,29 @@ in tests/qa/test_09_hyperframes_compose.py and are opt-in.
 from __future__ import annotations
 
 import json
+import shutil
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+import jsonschema
 import pytest
 
 from tools.base_tool import ToolStatus
+from lib.hyperframes_gsap_shim import gsap_shim_script
 from tools.video.hyperframes_compose import HyperFramesCompose
 from tools.video.video_compose import VideoCompose
+
+
+@pytest.fixture
+def project_renders_dir(tmp_path):
+    repo_root = Path(__file__).resolve().parents[2]
+    project_dir = repo_root / "projects" / f"pytest-hyperframes-compose-{tmp_path.name}"
+    shutil.rmtree(project_dir, ignore_errors=True)
+    renders_dir = project_dir / "renders"
+    yield renders_dir
+    shutil.rmtree(project_dir, ignore_errors=True)
 
 
 # ------------------------------------------------------------------
@@ -80,11 +93,39 @@ def test_hyperframes_layer2_skill_names_correct_package():
     )
 
 
+def test_hyperframes_preview_guidance_does_not_launch_browser_by_default():
+    """HyperFrames previews are useful, but project guidance must not pop a
+    local browser unless the user explicitly asks for an interactive preview."""
+    from pathlib import Path
+
+    skill_body = (
+        Path(__file__).resolve().parent.parent.parent
+        / "skills"
+        / "core"
+        / "hyperframes.md"
+    ).read_text(encoding="utf-8").lower()
+    verification_text = " ".join(HyperFramesCompose.user_visible_verification).lower()
+
+    assert "open the launch preview panel" not in skill_body
+    assert "npx hyperframes preview" not in verification_text
+    assert "do not launch" in skill_body
+    assert "explicitly requests" in skill_body
+    assert "explicitly requests" in verification_text
+
+
+def test_local_gsap_shim_exposes_hyperframes_timeline_introspection():
+    script = gsap_shim_script()
+
+    assert "getChildren: function" in script
+
+
 def test_hyperframes_scaffold_rejects_unknown_media_profile(tmp_path):
+    workspace_path = tmp_path / "hyperframes"
+
     result = HyperFramesCompose().execute(
         {
             "operation": "scaffold_workspace",
-            "workspace_path": str(tmp_path / "hyperframes"),
+            "workspace_path": str(workspace_path),
             "profile": "not-a-real-profile",
             "edit_decisions": {
                 "cuts": [
@@ -102,6 +143,23 @@ def test_hyperframes_scaffold_rejects_unknown_media_profile(tmp_path):
 
     assert not result.success
     assert "Unknown profile" in (result.error or "")
+    assert "ValueError" not in (result.error or "")
+    assert not workspace_path.exists()
+
+
+@pytest.mark.parametrize(
+    "inputs",
+    [
+        {"edit_decisions": "not-an-object"},
+        {"edit_decisions": {"cuts": "not-a-list"}},
+        {"edit_decisions": {"cuts": ["not-an-object"]}},
+        {"edit_decisions": {"cuts": [{"out_seconds": "not-a-number"}]}},
+    ],
+)
+def test_hyperframes_estimate_runtime_tolerates_malformed_edit_decisions(
+    inputs: dict[str, Any],
+) -> None:
+    assert HyperFramesCompose().estimate_runtime(inputs) == pytest.approx(30.0)
 
 
 def test_hyperframes_idempotency_key_includes_workspace_render_inputs():
@@ -301,6 +359,75 @@ def test_runtime_check_fails_when_npm_package_unresolvable(monkeypatch):
     assert rc["npm_package"] == "hyperframes"
 
 
+def test_hyperframes_doctor_runtime_check_payload_matches_output_schema(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tool = HyperFramesCompose()
+    runtime_check = {
+        "runtime_available": False,
+        "node_major": None,
+        "ffmpeg_available": True,
+        "npx_available": False,
+        "npm_package": "hyperframes",
+        "npm_package_version": None,
+        "npm_resolve_error": None,
+        "reasons": ["node not found on PATH", "npx not found on PATH"],
+    }
+    monkeypatch.setattr(tool, "_runtime_check", lambda: runtime_check)
+
+    result = tool.execute({"operation": "doctor"})
+
+    assert result.success is False
+    assert result.data == {"runtime_check": runtime_check}
+    jsonschema.validate(instance=result.data, schema=tool.output_schema)
+
+    malformed_payload = {"runtime_check": {"runtime_available": False}}
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance=malformed_payload, schema=tool.output_schema)
+
+
+def test_hyperframes_doctor_cli_payload_matches_output_schema(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tool = HyperFramesCompose()
+    runtime_check = {
+        "runtime_available": True,
+        "node_major": 24,
+        "ffmpeg_available": True,
+        "npx_available": True,
+        "npm_package": "hyperframes",
+        "npm_package_version": "0.4.5",
+        "npm_resolve_error": None,
+        "reasons": [],
+    }
+    monkeypatch.setattr(tool, "_runtime_check", lambda: runtime_check)
+    monkeypatch.setattr(
+        tool,
+        "_run_hf",
+        lambda args, cwd=None, timeout=None, check=False: SimpleNamespace(
+            returncode=0,
+            stdout="doctor ok",
+            stderr="",
+        ),
+    )
+
+    result = tool.execute({"operation": "doctor"})
+
+    assert result.success is True
+    assert result.data is not None
+    assert result.data["cli_doctor"] == {
+        "exit_code": 0,
+        "stdout_tail": "doctor ok",
+        "stderr_tail": "",
+    }
+    jsonschema.validate(instance=result.data, schema=tool.output_schema)
+
+    malformed_payload = dict(result.data)
+    malformed_payload["cli_doctor"] = {"stdout_tail": "doctor ok"}
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance=malformed_payload, schema=tool.output_schema)
+
+
 def test_runtime_check_succeeds_when_npm_resolves(monkeypatch):
     monkeypatch.setattr(
         HyperFramesCompose, "_npm_resolve_cache", None, raising=False
@@ -398,11 +525,60 @@ def test_hyperframes_unknown_operation_returns_error():
     assert "Unknown operation" in (result.error or "")
 
 
+def test_hyperframes_missing_operation_returns_error():
+    result = HyperFramesCompose().execute({})
+    assert not result.success
+    assert "operation" in (result.error or "")
+
+
 def test_hyperframes_lint_requires_workspace():
     # No workspace_path → ValueError surfaced through execute as a ToolResult.
     result = HyperFramesCompose().execute({"operation": "lint"})
     assert not result.success
     assert "workspace_path" in (result.error or "")
+
+
+def test_hyperframes_lint_cli_payload_matches_output_schema(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    tool = HyperFramesCompose()
+    workspace_path = tmp_path / "hyperframes"
+    workspace_path.mkdir()
+    (workspace_path / "index.html").write_text("<div></div>", encoding="utf-8")
+
+    monkeypatch.setattr(
+        tool,
+        "_run_hf",
+        lambda args, cwd=None, timeout=None, check=False: SimpleNamespace(
+            returncode=0,
+            stdout='{"ok": true}',
+            stderr="",
+        ),
+    )
+
+    result = tool.execute({"operation": "lint", "workspace_path": str(workspace_path)})
+
+    assert result.success is True
+    assert result.data == {
+        "workspace_path": str(workspace_path),
+        "exit_code": 0,
+        "report": {"ok": True},
+        "stderr_tail": "",
+    }
+    jsonschema.validate(instance=result.data, schema=tool.output_schema)
+
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance={"exit_code": 0}, schema=tool.output_schema)
+
+    malformed_add_block = {
+        "operation": "add_block",
+        "exit_code": 0,
+        "stdout_tail": "",
+        "stderr_tail": "",
+    }
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance=malformed_add_block, schema=tool.output_schema)
 
 
 def test_hyperframes_render_requires_workspace():
@@ -411,6 +587,1930 @@ def test_hyperframes_render_requires_workspace():
     # Depending on runtime availability, error mentions either workspace or runtime.
     err = (result.error or "").lower()
     assert ("workspace" in err) or ("runtime" in err) or ("hyperframes" in err)
+
+
+def test_hyperframes_add_block_rejects_non_string_block_name_before_cli(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    tool = HyperFramesCompose()
+    workspace_path = tmp_path / "hyperframes"
+    workspace_path.mkdir()
+    run_calls: list[list[str]] = []
+
+    def fake_run_hf(args, cwd=None, timeout=None, check=False):
+        run_calls.append(args)
+        return SimpleNamespace(returncode=0, stdout='{"ok": true}', stderr="")
+
+    monkeypatch.setattr(tool, "_run_hf", fake_run_hf)
+
+    result = tool.execute(
+        {
+            "operation": "add_block",
+            "workspace_path": str(workspace_path),
+            "block_name": 123,
+        }
+    )
+
+    assert result.success is False
+    assert "block_name" in (result.error or "").lower()
+    assert "string" in (result.error or "").lower()
+    assert "attributeerror" not in (result.error or "").lower()
+    assert run_calls == []
+
+
+def test_hyperframes_scaffold_rejects_non_object_edit_decisions(tmp_path: Path) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": "not-an-object",
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions" in (result.error or "").lower()
+    assert "object" in (result.error or "").lower()
+    assert "attributeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_list_edit_decisions_cuts(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {"cuts": "not-a-list"},
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.cuts" in (result.error or "").lower()
+    assert "array" in (result.error or "").lower()
+    assert "attributeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_object_edit_decisions_cut_entry(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {"cuts": ["not-an-object"]},
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.cuts[0]" in (result.error or "").lower()
+    assert "object" in (result.error or "").lower()
+    assert "attributeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_string_edit_decisions_cut_source(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "source": ["not", "a", "string"]}],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.cuts[0].source" in (result.error or "").lower()
+    assert "string" in (result.error or "").lower()
+    assert "typeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_string_edit_decisions_cut_type(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "type": ["not", "a", "string"]}],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.cuts[0].type" in (result.error or "").lower()
+    assert "string" in (result.error or "").lower()
+    assert "attributeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_numeric_edit_decisions_cut_out_seconds(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": "not-a-number"}],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.cuts[0].out_seconds" in (result.error or "").lower()
+    assert "number" in (result.error or "").lower()
+    assert "valueerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_numeric_edit_decisions_cut_in_seconds(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [
+                    {
+                        "id": "cut-1",
+                        "in_seconds": "not-a-number",
+                        "out_seconds": 1,
+                    }
+                ],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.cuts[0].in_seconds" in (result.error or "").lower()
+    assert "number" in (result.error or "").lower()
+    assert "valueerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_string_edit_decisions_cut_text(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "text": ["not", "a", "string"]}],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.cuts[0].text" in (result.error or "").lower()
+    assert "string" in (result.error or "").lower()
+    assert "attributeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_object_edit_decisions_audio(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+                "audio": "not-an-object",
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.audio" in (result.error or "").lower()
+    assert "object" in (result.error or "").lower()
+    assert "attributeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_object_audio_narration(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+                "audio": {"narration": "not-an-object"},
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.audio.narration" in (result.error or "").lower()
+    assert "object" in (result.error or "").lower()
+    assert "attributeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_list_audio_narration_segments(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+                "audio": {"narration": {"segments": "not-a-list"}},
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.audio.narration.segments" in (result.error or "").lower()
+    assert "array" in (result.error or "").lower()
+    assert "attributeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_object_audio_narration_segment_entry(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+                "audio": {"narration": {"segments": ["not-an-object"]}},
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.audio.narration.segments[0]" in (
+        result.error or ""
+    ).lower()
+    assert "object" in (result.error or "").lower()
+    assert "attributeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_string_audio_narration_segment_asset_id(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+                "audio": {
+                    "narration": {
+                        "segments": [{"asset_id": ["not", "a", "string"]}],
+                    },
+                },
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.audio.narration.segments[0].asset_id" in (
+        result.error or ""
+    ).lower()
+    assert "string" in (result.error or "").lower()
+    assert "typeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_numeric_audio_narration_segment_start_seconds(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+    narration_asset = tmp_path / "narration.wav"
+    narration_asset.write_bytes(b"not-a-real-wave-but-present")
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+                "audio": {
+                    "narration": {
+                        "segments": [
+                            {
+                                "asset_id": "narration-1",
+                                "start_seconds": "not-a-number",
+                            },
+                        ],
+                    },
+                },
+            },
+            "asset_manifest": {
+                "assets": [{"id": "narration-1", "path": str(narration_asset)}],
+            },
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.audio.narration.segments[0].start_seconds" in (
+        result.error or ""
+    ).lower()
+    assert "number" in (result.error or "").lower()
+    assert "valueerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_object_audio_music(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+                "audio": {"music": "not-an-object"},
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.audio.music" in (result.error or "").lower()
+    assert "object" in (result.error or "").lower()
+    assert "attributeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_string_audio_music_asset_id(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+                "audio": {"music": {"asset_id": ["not", "a", "string"]}},
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.audio.music.asset_id" in (result.error or "").lower()
+    assert "string" in (result.error or "").lower()
+    assert "typeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_string_audio_music_src(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+                "audio": {"music": {"src": ["not", "a", "string"]}},
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.audio.music.src" in (result.error or "").lower()
+    assert "string" in (result.error or "").lower()
+    assert "typeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_numeric_audio_music_volume(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+    music_asset = tmp_path / "music.mp3"
+    music_asset.write_bytes(b"not-a-real-mp3-but-present")
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+                "audio": {
+                    "music": {
+                        "src": str(music_asset),
+                        "volume": "not-a-number",
+                    },
+                },
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.audio.music.volume" in (result.error or "").lower()
+    assert "number" in (result.error or "").lower()
+    assert "valueerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_object_edit_decisions_metadata(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+                "metadata": "not-an-object",
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.metadata" in (result.error or "").lower()
+    assert "object" in (result.error or "").lower()
+    assert "attributeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_string_edit_decisions_metadata_title(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+                "metadata": {"title": ["not", "a", "string"]},
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "edit_decisions.metadata.title" in (result.error or "").lower()
+    assert "string" in (result.error or "").lower()
+    assert "attributeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_object_asset_manifest(tmp_path: Path) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+            },
+            "asset_manifest": "not-an-object",
+        }
+    )
+
+    assert result.success is False
+    assert "asset_manifest" in (result.error or "").lower()
+    assert "object" in (result.error or "").lower()
+    assert "attributeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_list_asset_manifest_assets(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {"assets": "not-a-list"},
+        }
+    )
+
+    assert result.success is False
+    assert "asset_manifest.assets" in (result.error or "").lower()
+    assert "array" in (result.error or "").lower()
+    assert "attributeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_object_asset_manifest_asset_entry(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {"assets": ["not-an-object"]},
+        }
+    )
+
+    assert result.success is False
+    assert "asset_manifest.assets[0]" in (result.error or "").lower()
+    assert "object" in (result.error or "").lower()
+    assert "attributeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_string_asset_manifest_asset_id(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {"assets": [{"id": ["not", "a", "string"]}]},
+        }
+    )
+
+    assert result.success is False
+    assert "asset_manifest.assets[0].id" in (result.error or "").lower()
+    assert "string" in (result.error or "").lower()
+    assert "typeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_string_asset_manifest_asset_path(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "source": "asset-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {
+                "assets": [{"id": "asset-1", "path": ["not", "a", "string"]}],
+            },
+        }
+    )
+
+    assert result.success is False
+    assert "asset_manifest.assets[0].path" in (result.error or "").lower()
+    assert "string" in (result.error or "").lower()
+    assert "typeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_directory_asset_manifest_asset_path(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+    asset_dir = tmp_path / "asset-dir"
+    asset_dir.mkdir()
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "source": "asset-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {
+                "assets": [{"id": "asset-1", "path": str(asset_dir)}],
+            },
+        }
+    )
+
+    assert result.success is False
+    assert "asset_manifest.assets[0].path" in (result.error or "").lower()
+    assert "file" in (result.error or "").lower()
+    assert "isadirectoryerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_non_object_playbook(tmp_path: Path) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {"assets": []},
+            "playbook": "not-an-object",
+        }
+    )
+
+    assert result.success is False
+    assert "playbook" in (result.error or "").lower()
+    assert "object" in (result.error or "").lower()
+    assert "attributeerror" not in (result.error or "").lower()
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_rejects_invalid_fps_before_workspace_creation(
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "fps": 25,
+            "edit_decisions": {
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "fps" in (result.error or "").lower()
+    assert "24" in (result.error or "")
+    assert not workspace_path.exists()
+
+
+@pytest.mark.parametrize(
+    "inputs",
+    [
+        {"operation": "render", "workspace_path": "projects/demo/hyperframes"},
+        {
+            "operation": "render",
+            "workspace_path": "projects/demo/hyperframes",
+            "output_path": "renders/final.mp4",
+        },
+    ],
+)
+def test_hyperframes_render_requires_project_output_path_before_runtime_check(
+    inputs, monkeypatch, tmp_path
+):
+    monkeypatch.chdir(tmp_path)
+    runtime_calls = []
+
+    def fake_runtime_check(self):
+        runtime_calls.append("runtime")
+        return {"runtime_available": False, "reasons": ["should not be checked first"]}
+
+    monkeypatch.setattr(HyperFramesCompose, "_runtime_check", fake_runtime_check)
+
+    result = HyperFramesCompose().execute(inputs)
+
+    assert not result.success
+    assert "output_path" in (result.error or "")
+    assert "projects/<project-name>/" in (result.error or "")
+    assert runtime_calls == []
+    assert not (tmp_path / "renders").exists()
+
+
+def test_hyperframes_render_rejects_unknown_media_profile_before_output_dir_creation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    tool = HyperFramesCompose()
+    output_path = Path("projects/demo/renders/final.mp4")
+    workspace_path = Path("projects/demo/hyperframes")
+    run_calls: list[list[str]] = []
+
+    monkeypatch.setattr(
+        tool,
+        "_runtime_check",
+        lambda: {"runtime_available": True, "reasons": []},
+    )
+
+    def fake_run_hf(args, cwd=None, timeout=None, check=False):
+        run_calls.append(args)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(tool, "_run_hf", fake_run_hf)
+
+    result = tool.execute(
+        {
+            "operation": "render",
+            "workspace_path": str(workspace_path),
+            "output_path": str(output_path),
+            "profile": "not-a-real-profile",
+            "edit_decisions": {
+                "render_runtime": "hyperframes",
+                "renderer_family": "animation-first",
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "Unknown profile" in (result.error or "")
+    assert "ValueError" not in (result.error or "")
+    assert not output_path.parent.exists()
+    assert not workspace_path.exists()
+    assert run_calls == []
+
+
+def test_hyperframes_render_success_payload_includes_output_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    tool = HyperFramesCompose()
+    output_path = Path("projects/demo/renders/final.mp4")
+    workspace_path = Path("projects/demo/hyperframes")
+
+    monkeypatch.setattr(
+        tool,
+        "_runtime_check",
+        lambda: {"runtime_available": True, "reasons": []},
+    )
+    monkeypatch.setattr(
+        tool,
+        "_scaffold",
+        lambda inputs: SimpleNamespace(success=True, error=None, data={"ok": True}),
+    )
+    monkeypatch.setattr(
+        tool,
+        "_lint",
+        lambda inputs: SimpleNamespace(success=True, error=None, data={"ok": True}),
+    )
+    monkeypatch.setattr(
+        tool,
+        "_validate",
+        lambda inputs: SimpleNamespace(success=True, error=None, data={"ok": True}),
+    )
+
+    def fake_run_hf(args, cwd=None, timeout=None, check=False):
+        rendered = Path(args[args.index("--output") + 1])
+        rendered.parent.mkdir(parents=True, exist_ok=True)
+        rendered.write_bytes(b"rendered")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(tool, "_run_hf", fake_run_hf)
+
+    result = tool.execute(
+        {
+            "operation": "render",
+            "workspace_path": str(workspace_path),
+            "output_path": str(output_path),
+            "edit_decisions": {
+                "render_runtime": "hyperframes",
+                "renderer_family": "animation-first",
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is True
+    assert result.data is not None
+    assert result.data["output"] == str(output_path)
+    assert result.data["output_path"] == str(output_path)
+    assert result.data["workspace"] == str(workspace_path.resolve())
+    assert result.data["workspace_path"] == str(workspace_path.resolve())
+    assert result.artifacts == [str(output_path)]
+    assert {
+        "operation",
+        "output",
+        "output_path",
+        "workspace",
+        "workspace_path",
+        "width",
+        "height",
+        "fps",
+        "quality",
+        "workers",
+        "steps",
+    } <= set(tool.output_schema["properties"])
+    jsonschema.validate(instance=result.data, schema=tool.output_schema)
+
+    malformed_payload = dict(result.data)
+    malformed_steps = dict(result.data["steps"])
+    malformed_steps.pop("render")
+    malformed_payload["steps"] = malformed_steps
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance=malformed_payload, schema=tool.output_schema)
+
+    malformed_payload = dict(result.data)
+    malformed_steps = {
+        step_name: dict(step_data)
+        for step_name, step_data in result.data["steps"].items()
+    }
+    malformed_steps["render"]["exit_code"] = 1
+    malformed_payload["steps"] = malformed_steps
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance=malformed_payload, schema=tool.output_schema)
+
+    malformed_payload = dict(result.data)
+    malformed_payload["operation"] = "scaffold_workspace"
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance=malformed_payload, schema=tool.output_schema)
+
+
+def test_hyperframes_render_passes_absolute_output_path_to_cli(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    tool = HyperFramesCompose()
+    output_path = Path("projects/demo/renders/final.mp4")
+    workspace_path = Path("projects/demo/hyperframes")
+
+    monkeypatch.setattr(
+        tool,
+        "_runtime_check",
+        lambda: {"runtime_available": True, "reasons": []},
+    )
+    monkeypatch.setattr(
+        tool,
+        "_scaffold",
+        lambda inputs: SimpleNamespace(success=True, error=None, data={"ok": True}),
+    )
+    monkeypatch.setattr(
+        tool,
+        "_lint",
+        lambda inputs: SimpleNamespace(success=True, error=None, data={"ok": True}),
+    )
+    monkeypatch.setattr(
+        tool,
+        "_validate",
+        lambda inputs: SimpleNamespace(success=True, error=None, data={"ok": True}),
+    )
+
+    def fake_run_hf(args, cwd=None, timeout=None, check=False):
+        cli_output = Path(args[args.index("--output") + 1])
+        assert cli_output.is_absolute()
+        assert cwd == workspace_path.resolve(strict=False)
+        cli_output.parent.mkdir(parents=True, exist_ok=True)
+        cli_output.write_bytes(b"rendered")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(tool, "_run_hf", fake_run_hf)
+
+    result = tool.execute(
+        {
+            "operation": "render",
+            "workspace_path": str(workspace_path),
+            "output_path": str(output_path),
+            "edit_decisions": {
+                "render_runtime": "hyperframes",
+                "renderer_family": "animation-first",
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is True
+    assert result.data is not None
+    assert result.data["output_path"] == str(output_path)
+    render_step = result.data["steps"]["render"]
+    assert Path(render_step["cli_output_path"]).is_absolute()
+    assert render_step["cli_output_path"] == str(output_path.resolve(strict=False))
+    assert output_path.read_bytes() == b"rendered"
+
+
+def test_hyperframes_render_missing_output_error_names_cli_output_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    tool = HyperFramesCompose()
+    output_path = Path("projects/demo/renders/final.mp4")
+    workspace_path = Path("projects/demo/hyperframes")
+
+    monkeypatch.setattr(
+        tool,
+        "_runtime_check",
+        lambda: {"runtime_available": True, "reasons": []},
+    )
+    monkeypatch.setattr(
+        tool,
+        "_scaffold",
+        lambda inputs: SimpleNamespace(success=True, error=None, data={"ok": True}),
+    )
+    monkeypatch.setattr(
+        tool,
+        "_lint",
+        lambda inputs: SimpleNamespace(success=True, error=None, data={"ok": True}),
+    )
+    monkeypatch.setattr(
+        tool,
+        "_validate",
+        lambda inputs: SimpleNamespace(success=True, error=None, data={"ok": True}),
+    )
+    monkeypatch.setattr(
+        tool,
+        "_run_hf",
+        lambda args, cwd=None, timeout=None, check=False: SimpleNamespace(
+            returncode=0,
+            stdout="render claimed success",
+            stderr="",
+        ),
+    )
+
+    result = tool.execute(
+        {
+            "operation": "render",
+            "workspace_path": str(workspace_path),
+            "output_path": str(output_path),
+            "edit_decisions": {
+                "render_runtime": "hyperframes",
+                "renderer_family": "animation-first",
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    expected_cli_path = str(output_path.resolve(strict=False))
+    assert expected_cli_path in (result.error or "")
+    assert "stdout_tail" not in (result.error or "")
+    assert result.data is not None
+    assert result.data["steps"]["render"]["cli_output_path"] == expected_cli_path
+
+
+def test_hyperframes_scaffold_packages_cjk_font_for_chinese_text(tmp_path: Path) -> None:
+    project_dir = tmp_path / "projects" / "demo"
+    workspace_path = project_dir / "hyperframes"
+    font_path = project_dir / "fonts" / "NotoSansSC.ttf"
+    font_path.parent.mkdir(parents=True)
+    font_path.write_bytes(b"fake-font")
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "renderer_family": "animation-first",
+                "cuts": [
+                    {
+                        "id": "cut-1",
+                        "type": "text_card",
+                        "in_seconds": 0,
+                        "out_seconds": 1,
+                        "text": "一言成片",
+                    }
+                ],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is True
+    staged_font = workspace_path / "assets" / "NotoSansSC.ttf"
+    assert staged_font.read_bytes() == b"fake-font"
+    html = (workspace_path / "index.html").read_text(encoding="utf-8")
+    assert "@font-face" in html
+    assert "Noto Sans SC" in html
+    assert "assets/NotoSansSC.ttf" in html
+    assert result.data is not None
+    assert result.data["workspace"] == str(workspace_path)
+    assert result.data["workspace_path"] == str(workspace_path)
+    font_assets = result.data["font_assets"]
+    assert font_assets[0]["family"] == "Noto Sans SC"
+    assert font_assets[0]["from"] == str(font_path)
+    assert font_assets[0]["to"] == str(staged_font)
+    assert font_assets[0]["src"] == "assets/NotoSansSC.ttf"
+    assert font_assets[0]["format"] == "truetype"
+    jsonschema.validate(instance=result.data, schema=HyperFramesCompose.output_schema)
+
+    malformed_payload = dict(result.data)
+    malformed_payload["font_assets"] = [{"src": "assets/NotoSansSC.ttf"}]
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            instance=malformed_payload,
+            schema=HyperFramesCompose.output_schema,
+        )
+
+
+def test_hyperframes_scaffold_emits_lint_safe_font_families(tmp_path: Path) -> None:
+    workspace_path = tmp_path / "projects" / "demo" / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "renderer_family": "animation-first",
+                "cuts": [
+                    {
+                        "id": "cut-1",
+                        "type": "text_card",
+                        "in_seconds": 0,
+                        "out_seconds": 1,
+                        "text": "Hello HyperFrames",
+                    }
+                ],
+            },
+            "asset_manifest": {"assets": []},
+            "playbook": {
+                "typography": {
+                    "headings": {"font": "Inter"},
+                    "body": {"font": "Inter"},
+                }
+            },
+        }
+    )
+
+    assert result.success is True
+    html = (workspace_path / "index.html").read_text(encoding="utf-8")
+    font_lines = [line.strip() for line in html.splitlines() if "font-family:" in line]
+    assert font_lines
+    assert all("var(--font" not in line for line in font_lines)
+    assert all("Noto Sans SC" not in line for line in font_lines)
+    assert all("Microsoft YaHei" not in line for line in font_lines)
+    assert all("PingFang SC" not in line for line in font_lines)
+    assert any("font-family: Inter, sans-serif;" in line for line in font_lines)
+
+
+def test_hyperframes_scaffold_fails_cjk_without_packaged_font(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    workspace_path = tmp_path / "projects" / "demo" / "hyperframes"
+    monkeypatch.setattr(
+        HyperFramesCompose,
+        "_find_cjk_font_source",
+        staticmethod(lambda workspace: None),
+    )
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "cuts": [
+                    {
+                        "id": "cut-1",
+                        "type": "text_card",
+                        "in_seconds": 0,
+                        "out_seconds": 1,
+                        "text": "万象成章",
+                    }
+                ]
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "CJK text detected" in (result.error or "")
+    assert "NotoSansSC.ttf" in (result.error or "")
+    assert "FileNotFoundError" not in (result.error or "")
+    assert not workspace_path.exists()
+
+
+def test_hyperframes_scaffold_prepares_sparse_keyframe_video(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    source_video = tmp_path / "source.mp4"
+    source_video.write_bytes(b"sparse-video")
+    workspace_path = tmp_path / "projects" / "demo" / "hyperframes"
+
+    monkeypatch.setattr(
+        HyperFramesCompose,
+        "_needs_dense_keyframes",
+        lambda self, src_path: True,
+    )
+
+    def fake_reencode(src_path: Path, dest: Path) -> None:
+        assert src_path == source_video
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(b"dense-video")
+
+    monkeypatch.setattr(
+        HyperFramesCompose,
+        "_reencode_video_dense_keyframes",
+        staticmethod(fake_reencode),
+    )
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "renderer_family": "animation-first",
+                "cuts": [
+                    {
+                        "id": "cut-1",
+                        "type": "video",
+                        "source": str(source_video),
+                        "in_seconds": 0,
+                        "out_seconds": 1,
+                    }
+                ],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is True
+    dense_video = workspace_path / "assets" / "source.dense.mp4"
+    assert dense_video.read_bytes() == b"dense-video"
+    html = (workspace_path / "index.html").read_text(encoding="utf-8")
+    assert "assets/source.dense.mp4" in html
+    assert result.data is not None
+    assert result.data["asset_copies"][0]["transform"] == "dense_keyframes"
+
+
+def test_hyperframes_single_keyframe_interval_uses_clip_duration(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    source_video = tmp_path / "single-keyframe.mp4"
+    source_video.write_bytes(b"video")
+
+    monkeypatch.setattr(
+        "tools.video.hyperframes_compose.shutil.which",
+        lambda name: "/usr/bin/ffprobe" if name == "ffprobe" else None,
+    )
+
+    def fake_run(*args: Any, **kwargs: Any) -> SimpleNamespace:
+        cmd = args[0]
+        assert "-skip_frame" in cmd
+        return SimpleNamespace(returncode=0, stdout="0.000000\n")
+
+    monkeypatch.setattr("tools.video.hyperframes_compose.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        HyperFramesCompose,
+        "_video_duration_seconds",
+        staticmethod(lambda src_path: 12.0),
+    )
+
+    assert HyperFramesCompose._max_keyframe_interval_seconds(source_video) == 12.0
+    assert HyperFramesCompose()._needs_dense_keyframes(source_video) is True
+
+
+def test_hyperframes_scaffold_stages_same_basename_assets_without_collision(
+    tmp_path: Path,
+) -> None:
+    first_asset = tmp_path / "first" / "hero.png"
+    second_asset = tmp_path / "second" / "hero.png"
+    first_asset.parent.mkdir()
+    second_asset.parent.mkdir()
+    first_asset.write_bytes(b"first-image-bytes")
+    second_asset.write_bytes(b"second-image-data")
+    workspace_path = tmp_path / "projects" / "demo" / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "renderer_family": "animation-first",
+                "cuts": [
+                    {
+                        "id": "cut-1",
+                        "type": "image",
+                        "source": "first-hero",
+                        "in_seconds": 0,
+                        "out_seconds": 1,
+                    },
+                    {
+                        "id": "cut-2",
+                        "type": "image",
+                        "source": "second-hero",
+                        "in_seconds": 1,
+                        "out_seconds": 2,
+                    },
+                ],
+            },
+            "asset_manifest": {
+                "assets": [
+                    {"id": "first-hero", "path": str(first_asset)},
+                    {"id": "second-hero", "path": str(second_asset)},
+                ]
+            },
+        }
+    )
+
+    assert result.success is True, result.error
+    assert result.data is not None
+    staged_paths = [Path(copy["to"]) for copy in result.data["asset_copies"]]
+    assert len(staged_paths) == 2
+    assert len({path.name for path in staged_paths}) == 2
+    assert staged_paths[0].read_bytes() == first_asset.read_bytes()
+    assert staged_paths[1].read_bytes() == second_asset.read_bytes()
+    html = (workspace_path / "index.html").read_text(encoding="utf-8")
+    assert all(f"assets/{path.name}" in html for path in staged_paths)
+    jsonschema.validate(instance=result.data, schema=HyperFramesCompose.output_schema)
+
+    malformed_payload = dict(result.data)
+    malformed_payload["asset_copies"] = [{"to": str(staged_paths[0])}]
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            instance=malformed_payload,
+            schema=HyperFramesCompose.output_schema,
+        )
+
+
+def test_hyperframes_scaffold_stages_same_basename_narration_without_collision(
+    tmp_path: Path,
+) -> None:
+    import re
+
+    first_audio = tmp_path / "first" / "voice.wav"
+    second_audio = tmp_path / "second" / "voice.wav"
+    first_audio.parent.mkdir()
+    second_audio.parent.mkdir()
+    first_audio.write_bytes(b"first-voice-bytes")
+    second_audio.write_bytes(b"second-voice-data")
+    workspace_path = tmp_path / "projects" / "demo" / "hyperframes"
+
+    result = HyperFramesCompose().execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "renderer_family": "animation-first",
+                "cuts": [
+                    {
+                        "id": "cut-1",
+                        "type": "text_card",
+                        "text": "Hello",
+                        "in_seconds": 0,
+                        "out_seconds": 2,
+                    }
+                ],
+                "audio": {
+                    "narration": {
+                        "segments": [
+                            {
+                                "asset_id": "voice-1",
+                                "start_seconds": 0,
+                                "end_seconds": 1,
+                            },
+                            {
+                                "asset_id": "voice-2",
+                                "start_seconds": 1,
+                                "end_seconds": 2,
+                            },
+                        ]
+                    }
+                },
+            },
+            "asset_manifest": {
+                "assets": [
+                    {"id": "voice-1", "path": str(first_audio)},
+                    {"id": "voice-2", "path": str(second_audio)},
+                ]
+            },
+        }
+    )
+
+    assert result.success is True, result.error
+    html = (workspace_path / "index.html").read_text(encoding="utf-8")
+    narration_sources = re.findall(r'<audio id="nar-\d"[^>]+src="([^"]+)"', html)
+    assert len(narration_sources) == 2
+    assert len(set(narration_sources)) == 2
+    staged_paths = [workspace_path / src for src in narration_sources]
+    assert staged_paths[0].read_bytes() == first_audio.read_bytes()
+    assert staged_paths[1].read_bytes() == second_audio.read_bytes()
+
+
+def test_hyperframes_scaffold_reports_staged_audio_assets_in_payload_and_schema(
+    tmp_path: Path,
+) -> None:
+    narration = tmp_path / "audio" / "voice.wav"
+    music = tmp_path / "audio" / "music.wav"
+    narration.parent.mkdir()
+    narration.write_bytes(b"voice-bytes")
+    music.write_bytes(b"music-bytes")
+    workspace_path = tmp_path / "projects" / "demo" / "hyperframes"
+    tool = HyperFramesCompose()
+
+    result = tool.execute(
+        {
+            "operation": "scaffold_workspace",
+            "workspace_path": str(workspace_path),
+            "edit_decisions": {
+                "renderer_family": "animation-first",
+                "cuts": [
+                    {
+                        "id": "cut-1",
+                        "type": "text_card",
+                        "text": "Hello",
+                        "in_seconds": 0,
+                        "out_seconds": 2,
+                    }
+                ],
+                "audio": {
+                    "narration": {
+                        "segments": [
+                            {
+                                "asset_id": "voice",
+                                "start_seconds": 0,
+                                "end_seconds": 2,
+                            }
+                        ]
+                    },
+                    "music": {"asset_id": "music", "volume": 0.2},
+                },
+            },
+            "asset_manifest": {
+                "assets": [
+                    {"id": "voice", "path": str(narration)},
+                    {"id": "music", "path": str(music)},
+                ]
+            },
+        }
+    )
+
+    assert result.success is True, result.error
+    assert result.data is not None
+    assert "audio_assets" in tool.output_schema["properties"]
+    audio_assets = result.data["audio_assets"]
+    assert [asset["track"] for asset in audio_assets] == ["narration", "music"]
+    assert [asset["asset_id"] for asset in audio_assets] == ["voice", "music"]
+    assert [asset["from"] for asset in audio_assets] == [str(narration), str(music)]
+    assert [Path(asset["to"]).read_bytes() for asset in audio_assets] == [
+        narration.read_bytes(),
+        music.read_bytes(),
+    ]
+    assert [asset["src"] for asset in audio_assets] == [
+        "assets/voice.wav",
+        "assets/music.wav",
+    ]
+    jsonschema.validate(instance=result.data, schema=tool.output_schema)
+
+    malformed_payload = dict(result.data)
+    malformed_payload["audio_assets"] = [{"track": "music", "src": "assets/music.wav"}]
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance=malformed_payload, schema=tool.output_schema)
+
+
+def test_hyperframes_render_auto_workers_one_for_video_heavy(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    tool = HyperFramesCompose()
+    output_path = Path("projects/demo/renders/final.mp4")
+    workspace_path = Path("projects/demo/hyperframes")
+
+    monkeypatch.setattr(
+        tool,
+        "_runtime_check",
+        lambda: {"runtime_available": True, "reasons": []},
+    )
+    monkeypatch.setattr(
+        tool,
+        "_scaffold",
+        lambda inputs: SimpleNamespace(success=True, error=None, data={"ok": True}),
+    )
+    monkeypatch.setattr(
+        tool,
+        "_lint",
+        lambda inputs: SimpleNamespace(success=True, error=None, data={"ok": True}),
+    )
+    monkeypatch.setattr(
+        tool,
+        "_validate",
+        lambda inputs: SimpleNamespace(success=True, error=None, data={"ok": True}),
+    )
+
+    render_args: list[str] = []
+
+    def fake_run_hf(args, cwd=None, timeout=None, check=False):
+        render_args[:] = args
+        rendered = Path(args[args.index("--output") + 1])
+        rendered.parent.mkdir(parents=True, exist_ok=True)
+        rendered.write_bytes(b"rendered")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(tool, "_run_hf", fake_run_hf)
+
+    result = tool.execute(
+        {
+            "operation": "render",
+            "workspace_path": str(workspace_path),
+            "output_path": str(output_path),
+            "edit_decisions": {
+                "render_runtime": "hyperframes",
+                "renderer_family": "animation-first",
+                "cuts": [
+                    {
+                        "id": f"cut-{i}",
+                        "type": "video",
+                        "source": f"clip-{i}.mp4",
+                        "in_seconds": i,
+                        "out_seconds": i + 1,
+                    }
+                    for i in range(6)
+                ],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is True
+    assert "--workers" in render_args
+    assert render_args[render_args.index("--workers") + 1] == "1"
+    assert result.data is not None
+    assert result.data["workers"] == 1
+
+
+def test_hyperframes_render_forwards_strict_flag_to_cli(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    tool = HyperFramesCompose()
+    output_path = Path("projects/demo/renders/final.mp4")
+    workspace_path = Path("projects/demo/hyperframes")
+
+    monkeypatch.setattr(
+        tool,
+        "_runtime_check",
+        lambda: {"runtime_available": True, "reasons": []},
+    )
+    monkeypatch.setattr(
+        tool,
+        "_scaffold",
+        lambda inputs: SimpleNamespace(success=True, error=None, data={"ok": True}),
+    )
+    monkeypatch.setattr(
+        tool,
+        "_lint",
+        lambda inputs: SimpleNamespace(success=True, error=None, data={"ok": True}),
+    )
+    monkeypatch.setattr(
+        tool,
+        "_validate",
+        lambda inputs: SimpleNamespace(success=True, error=None, data={"ok": True}),
+    )
+
+    render_args: list[str] = []
+
+    def fake_run_hf(args, cwd=None, timeout=None, check=False):
+        render_args[:] = args
+        rendered = Path(args[args.index("--output") + 1])
+        rendered.parent.mkdir(parents=True, exist_ok=True)
+        rendered.write_bytes(b"rendered")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(tool, "_run_hf", fake_run_hf)
+
+    result = tool.execute(
+        {
+            "operation": "render",
+            "workspace_path": str(workspace_path),
+            "output_path": str(output_path),
+            "strict": True,
+            "edit_decisions": {
+                "render_runtime": "hyperframes",
+                "renderer_family": "animation-first",
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is True
+    assert "--strict" in render_args
+
+
+def test_hyperframes_render_rejects_invalid_quality_before_cli(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    tool = HyperFramesCompose()
+    output_path = Path("projects/demo/renders/final.mp4")
+    workspace_path = Path("projects/demo/hyperframes")
+
+    monkeypatch.setattr(
+        tool,
+        "_runtime_check",
+        lambda: {"runtime_available": True, "reasons": []},
+    )
+    setup_calls: list[str] = []
+
+    def record_setup(name: str):
+        def _record(inputs):
+            setup_calls.append(name)
+            return SimpleNamespace(success=True, error=None, data={"ok": True})
+
+        return _record
+
+    monkeypatch.setattr(tool, "_scaffold", record_setup("scaffold"))
+    monkeypatch.setattr(tool, "_lint", record_setup("lint"))
+    monkeypatch.setattr(tool, "_validate", record_setup("validate"))
+    render_calls: list[list[str]] = []
+
+    def fake_run_hf(args, cwd=None, timeout=None, check=False):
+        render_calls.append(args)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(tool, "_run_hf", fake_run_hf)
+
+    result = tool.execute(
+        {
+            "operation": "render",
+            "workspace_path": str(workspace_path),
+            "output_path": str(output_path),
+            "quality": "cinema",
+            "edit_decisions": {
+                "render_runtime": "hyperframes",
+                "renderer_family": "animation-first",
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "quality" in (result.error or "")
+    assert "draft" in (result.error or "")
+    assert setup_calls == []
+    assert render_calls == []
+
+
+def test_hyperframes_render_rejects_invalid_fps_before_cli(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    tool = HyperFramesCompose()
+    output_path = Path("projects/demo/renders/final.mp4")
+    workspace_path = Path("projects/demo/hyperframes")
+
+    monkeypatch.setattr(
+        tool,
+        "_runtime_check",
+        lambda: {"runtime_available": True, "reasons": []},
+    )
+    setup_calls: list[str] = []
+
+    def record_setup(name: str):
+        def _record(inputs):
+            setup_calls.append(name)
+            return SimpleNamespace(success=True, error=None, data={"ok": True})
+
+        return _record
+
+    monkeypatch.setattr(tool, "_scaffold", record_setup("scaffold"))
+    monkeypatch.setattr(tool, "_lint", record_setup("lint"))
+    monkeypatch.setattr(tool, "_validate", record_setup("validate"))
+    render_calls: list[list[str]] = []
+
+    def fake_run_hf(args, cwd=None, timeout=None, check=False):
+        render_calls.append(args)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(tool, "_run_hf", fake_run_hf)
+
+    result = tool.execute(
+        {
+            "operation": "render",
+            "workspace_path": str(workspace_path),
+            "output_path": str(output_path),
+            "fps": 25,
+            "edit_decisions": {
+                "render_runtime": "hyperframes",
+                "renderer_family": "animation-first",
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "fps" in (result.error or "").lower()
+    assert "24" in (result.error or "")
+    assert setup_calls == []
+    assert render_calls == []
+
+
+def test_hyperframes_render_rejects_invalid_workers_before_cli(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    tool = HyperFramesCompose()
+    output_path = Path("projects/demo/renders/final.mp4")
+    workspace_path = Path("projects/demo/hyperframes")
+
+    monkeypatch.setattr(
+        tool,
+        "_runtime_check",
+        lambda: {"runtime_available": True, "reasons": []},
+    )
+    setup_calls: list[str] = []
+
+    def record_setup(name: str):
+        def _record(inputs):
+            setup_calls.append(name)
+            return SimpleNamespace(success=True, error=None, data={"ok": True})
+
+        return _record
+
+    monkeypatch.setattr(tool, "_scaffold", record_setup("scaffold"))
+    monkeypatch.setattr(tool, "_lint", record_setup("lint"))
+    monkeypatch.setattr(tool, "_validate", record_setup("validate"))
+    render_calls: list[list[str]] = []
+
+    def fake_run_hf(args, cwd=None, timeout=None, check=False):
+        render_calls.append(args)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(tool, "_run_hf", fake_run_hf)
+
+    result = tool.execute(
+        {
+            "operation": "render",
+            "workspace_path": str(workspace_path),
+            "output_path": str(output_path),
+            "workers": 0,
+            "edit_decisions": {
+                "render_runtime": "hyperframes",
+                "renderer_family": "animation-first",
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "workers" in (result.error or "").lower()
+    assert "1" in (result.error or "")
+    assert setup_calls == []
+    assert render_calls == []
+
+
+def test_hyperframes_render_rejects_string_workers_before_cli(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    tool = HyperFramesCompose()
+    output_path = Path("projects/demo/renders/final.mp4")
+    workspace_path = Path("projects/demo/hyperframes")
+
+    monkeypatch.setattr(
+        tool,
+        "_runtime_check",
+        lambda: {"runtime_available": True, "reasons": []},
+    )
+    setup_calls: list[str] = []
+
+    def record_setup(name: str):
+        def _record(inputs):
+            setup_calls.append(name)
+            return SimpleNamespace(success=True, error=None, data={"ok": True})
+
+        return _record
+
+    monkeypatch.setattr(tool, "_scaffold", record_setup("scaffold"))
+    monkeypatch.setattr(tool, "_lint", record_setup("lint"))
+    monkeypatch.setattr(tool, "_validate", record_setup("validate"))
+    render_calls: list[list[str]] = []
+
+    def fake_run_hf(args, cwd=None, timeout=None, check=False):
+        render_calls.append(args)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(tool, "_run_hf", fake_run_hf)
+
+    result = tool.execute(
+        {
+            "operation": "render",
+            "workspace_path": str(workspace_path),
+            "output_path": str(output_path),
+            "workers": "2",
+            "edit_decisions": {
+                "render_runtime": "hyperframes",
+                "renderer_family": "animation-first",
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "workers" in (result.error or "").lower()
+    assert "integer" in (result.error or "").lower()
+    assert setup_calls == []
+    assert render_calls == []
+
+
+def test_hyperframes_render_rejects_invalid_strict_before_cli(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    tool = HyperFramesCompose()
+    output_path = Path("projects/demo/renders/final.mp4")
+    workspace_path = Path("projects/demo/hyperframes")
+
+    monkeypatch.setattr(
+        tool,
+        "_runtime_check",
+        lambda: {"runtime_available": True, "reasons": []},
+    )
+    setup_calls: list[str] = []
+
+    def record_setup(name: str):
+        def _record(inputs):
+            setup_calls.append(name)
+            return SimpleNamespace(success=True, error=None, data={"ok": True})
+
+        return _record
+
+    monkeypatch.setattr(tool, "_scaffold", record_setup("scaffold"))
+    monkeypatch.setattr(tool, "_lint", record_setup("lint"))
+    monkeypatch.setattr(tool, "_validate", record_setup("validate"))
+    render_calls: list[list[str]] = []
+
+    def fake_run_hf(args, cwd=None, timeout=None, check=False):
+        render_calls.append(args)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(tool, "_run_hf", fake_run_hf)
+
+    result = tool.execute(
+        {
+            "operation": "render",
+            "workspace_path": str(workspace_path),
+            "output_path": str(output_path),
+            "strict": "false",
+            "edit_decisions": {
+                "render_runtime": "hyperframes",
+                "renderer_family": "animation-first",
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "strict" in (result.error or "").lower()
+    assert "boolean" in (result.error or "").lower()
+    assert setup_calls == []
+    assert render_calls == []
+
+
+def test_hyperframes_render_rejects_invalid_skip_contrast_before_cli(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    tool = HyperFramesCompose()
+    output_path = Path("projects/demo/renders/final.mp4")
+    workspace_path = Path("projects/demo/hyperframes")
+
+    monkeypatch.setattr(
+        tool,
+        "_runtime_check",
+        lambda: {"runtime_available": True, "reasons": []},
+    )
+    setup_calls: list[str] = []
+
+    def record_setup(name: str):
+        def _record(inputs):
+            setup_calls.append(name)
+            return SimpleNamespace(success=True, error=None, data={"ok": True})
+
+        return _record
+
+    monkeypatch.setattr(tool, "_scaffold", record_setup("scaffold"))
+    monkeypatch.setattr(tool, "_lint", record_setup("lint"))
+    monkeypatch.setattr(tool, "_validate", record_setup("validate"))
+    render_calls: list[list[str]] = []
+
+    def fake_run_hf(args, cwd=None, timeout=None, check=False):
+        render_calls.append(args)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(tool, "_run_hf", fake_run_hf)
+
+    result = tool.execute(
+        {
+            "operation": "render",
+            "workspace_path": str(workspace_path),
+            "output_path": str(output_path),
+            "skip_contrast": "true",
+            "edit_decisions": {
+                "render_runtime": "hyperframes",
+                "renderer_family": "animation-first",
+                "cuts": [{"id": "cut-1", "out_seconds": 1}],
+            },
+            "asset_manifest": {"assets": []},
+        }
+    )
+
+    assert result.success is False
+    assert "skip_contrast" in (result.error or "").lower()
+    assert "boolean" in (result.error or "").lower()
+    assert setup_calls == []
+    assert render_calls == []
+
+
+def test_hyperframes_validate_rejects_invalid_skip_contrast_before_cli(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    tool = HyperFramesCompose()
+    workspace_path = tmp_path / "hyperframes"
+    workspace_path.mkdir()
+    (workspace_path / "index.html").write_text("<div id='root'></div>", encoding="utf-8")
+
+    run_calls: list[list[str]] = []
+
+    def fake_run_hf(args, cwd=None, timeout=None, check=False):
+        run_calls.append(args)
+        return SimpleNamespace(returncode=0, stdout='{"ok": true}', stderr="")
+
+    monkeypatch.setattr(tool, "_run_hf", fake_run_hf)
+
+    result = tool.execute(
+        {
+            "operation": "validate",
+            "workspace_path": str(workspace_path),
+            "skip_contrast": "true",
+        }
+    )
+
+    assert result.success is False
+    assert "skip_contrast" in (result.error or "").lower()
+    assert "boolean" in (result.error or "").lower()
+    assert run_calls == []
 
 
 # ------------------------------------------------------------------
@@ -496,9 +2596,9 @@ def test_render_rejects_repo_root_renders_output_path(monkeypatch):
     assert root_renders.exists() == had_root_renders
 
 
-def test_video_compose_rejects_unknown_render_runtime(tmp_path):
+def test_video_compose_rejects_unknown_render_runtime(project_renders_dir):
     """Governance: an unknown render_runtime must fail, not silently fall back."""
-    comp_out = tmp_path / "out.mp4"
+    comp_out = project_renders_dir / "out.mp4"
     result = VideoCompose().execute(
         {
             "operation": "render",
@@ -523,14 +2623,14 @@ def test_video_compose_rejects_unknown_render_runtime(tmp_path):
     assert "Unknown render_runtime" in (result.error or "")
 
 
-def test_video_compose_rejects_missing_render_runtime(tmp_path):
+def test_video_compose_rejects_missing_render_runtime(project_renders_dir):
     """Regression: missing render_runtime MUST NOT silently fall back to Remotion.
 
     Prior behavior: empty/missing render_runtime fell through to the
     Remotion-default path, which defeated the auditable-runtime-selection
     governance contract.
     """
-    comp_out = tmp_path / "out.mp4"
+    comp_out = project_renders_dir / "out.mp4"
     result = VideoCompose().execute(
         {
             "operation": "render",
@@ -560,7 +2660,7 @@ def test_video_compose_rejects_missing_render_runtime(tmp_path):
 
 
 def test_video_compose_blocks_unapproved_runtime_swap_before_render(
-    tmp_path, monkeypatch
+    tmp_path, monkeypatch, project_renders_dir
 ):
     composer = VideoCompose()
 
@@ -570,6 +2670,7 @@ def test_video_compose_blocks_unapproved_runtime_swap_before_render(
     monkeypatch.setattr(composer, "_compose", fail_if_rendered)
     monkeypatch.setattr(composer, "_remotion_render", fail_if_rendered)
 
+    output_path = project_renders_dir / "out.mp4"
     result = composer.execute(
         {
             "operation": "render",
@@ -588,7 +2689,7 @@ def test_video_compose_blocks_unapproved_runtime_swap_before_render(
             },
             "asset_manifest": {"assets": [{"id": "a1", "path": "missing.mp4"}]},
             "brief": {"metadata": {"render_runtime": "remotion"}},
-            "output_path": str(tmp_path / "out.mp4"),
+            "output_path": str(output_path),
         }
     )
 
@@ -596,12 +2697,15 @@ def test_video_compose_blocks_unapproved_runtime_swap_before_render(
     err = (result.error or "").lower()
     assert "unapproved render_runtime swap" in err
     assert "before render" in err
-    assert not (tmp_path / "out.mp4").exists()
+    assert not output_path.exists()
 
 
-def test_video_compose_blocks_revise_final_review(tmp_path, monkeypatch):
+def test_video_compose_blocks_revise_final_review(
+    monkeypatch,
+    project_renders_dir,
+):
     composer = VideoCompose()
-    output_path = tmp_path / "out.mp4"
+    output_path = project_renders_dir / "out.mp4"
 
     monkeypatch.setattr(composer, "_pre_compose_validation", lambda *args, **kwargs: None)
 
@@ -684,10 +2788,43 @@ def test_video_compose_input_schema_accepts_all_runtime_lock_artifacts():
     assert "decision_log" in props
 
 
+def test_video_compose_input_schema_exposes_hyperframes_render_options():
+    props = VideoCompose.input_schema["properties"]
+
+    assert {
+        "workspace_path",
+        "playbook",
+        "playbook_name",
+        "quality",
+        "fps",
+        "strict",
+        "skip_contrast",
+        "workers",
+    } <= set(props)
+    assert props["quality"]["enum"] == ["draft", "standard", "high"]
+    assert props["fps"]["enum"] == [24, 30, 60]
+    assert props["workers"]["minimum"] == 1
+
+
 def test_video_compose_idempotency_key_includes_runtime_lock_artifacts():
     fields = set(VideoCompose.idempotency_key_fields)
 
     assert {"proposal_packet", "production_proposal", "brief", "decision_log"} <= fields
+
+
+def test_video_compose_idempotency_key_includes_hyperframes_render_options():
+    fields = set(VideoCompose.idempotency_key_fields)
+
+    assert {
+        "workspace_path",
+        "playbook",
+        "playbook_name",
+        "quality",
+        "fps",
+        "strict",
+        "skip_contrast",
+        "workers",
+    } <= fields
 
 
 def test_runtime_swap_detected_flips_when_proposal_packet_disagrees(tmp_path):
@@ -996,6 +3133,29 @@ def test_both_runtimes_visible_in_render_engines_when_available():
     assert "silent" in info["runtime_governance"].lower()
 
 
+def test_video_compose_remotion_components_info_is_snapshot(monkeypatch):
+    monkeypatch.setattr(VideoCompose, "_remotion_available", lambda self: True)
+    monkeypatch.setattr(VideoCompose, "_hyperframes_available", lambda self: False)
+
+    tool = VideoCompose()
+    original_components = list(tool._REMOTION_COMPONENTS)
+    info = tool.get_info()
+
+    info["remotion_components"].append("leaked_component")
+
+    assert tool._REMOTION_COMPONENTS == original_components
+
+
+def test_video_compose_render_runtime_aliases_are_independent(monkeypatch):
+    monkeypatch.setattr(VideoCompose, "_remotion_available", lambda self: True)
+    monkeypatch.setattr(VideoCompose, "_hyperframes_available", lambda self: False)
+
+    info = VideoCompose().get_info()
+    info["render_runtimes"]["remotion"] = False
+
+    assert info["render_engines"]["remotion"] is True
+
+
 def _valid_runtime_decision(options: list[dict]) -> dict:
     """Build a minimal schema-valid decision_log entry with given options."""
     return {
@@ -1185,6 +3345,28 @@ def test_transcript_comparison_passes_clean_audio(tmp_path):
     assert result["word_accuracy"] >= 0.9
     # issues may still have informational content but no CRITICAL TTS leak
     assert not any("tts punctuation leak" in i.lower() for i in result["issues"])
+
+
+def test_transcript_comparison_rejects_non_strict_transcript_json(tmp_path):
+    transcript_path = tmp_path / "transcript.json"
+    transcript_path.write_text(
+        '{"word_timestamps":[{"word":NaN,"start":0.0,"end":0.1}]}\n',
+        encoding="utf-8",
+    )
+
+    try:
+        result = VideoCompose._compare_transcript_to_script(transcript_path, "hello")
+    except Exception as exc:  # pragma: no cover - this is the regression symptom.
+        pytest.fail(
+            "transcript_comparison should report a parse issue instead of "
+            f"raising {type(exc).__name__}: {exc}"
+        )
+
+    assert result["transcript_matches_script"] is False
+    assert any(
+        "could not parse transcript" in issue and "strict JSON" in issue
+        for issue in result["issues"]
+    )
 
 
 def test_transcript_comparison_graceful_when_inputs_missing(tmp_path):
@@ -1467,7 +3649,8 @@ def test_hyperframes_root_composition_has_data_start_and_duration(tmp_path):
 
 
 def test_video_compose_blocks_hyperframes_when_runtime_unavailable(
-    tmp_path, monkeypatch
+    monkeypatch,
+    project_renders_dir,
 ):
     """Governance: if render_runtime='hyperframes' is locked but runtime is
     missing, the tool must NOT silently substitute another engine."""
@@ -1494,7 +3677,7 @@ def test_video_compose_blocks_hyperframes_when_runtime_unavailable(
                 "renderer_family": "animation-first",
             },
             "asset_manifest": {"assets": [{"id": "a1", "path": "does-not-matter.png"}]},
-            "output_path": str(tmp_path / "out.mp4"),
+            "output_path": str(project_renders_dir / "out.mp4"),
         }
     )
     assert not result.success
@@ -1571,8 +3754,17 @@ def test_scaffold_workspace_generates_html_and_assets(tmp_path: Path):
 
     # HyperFrames authoring contract requirements we MUST emit:
     assert 'data-composition-id="root"' in html
+    assert '<div id="root" data-composition-id="root"' in html
+    assert "#root {" in html
+    assert '[data-composition-id="root"] {' not in html
     assert 'window.__timelines["root"]' in html
+    assert "tl.from(" not in html
     assert 'paused: true' in html
+    assert "timeScale: function" in html
+    assert "totalDuration: function" in html
+    assert "totalTime: function" in html
+    assert "getChildren: function" in html
+    assert "paused: function" in html
     assert 'class="clip' in html
     assert "gsap" in html.lower()
     assert "https://cdn.jsdelivr.net" not in html

@@ -14,6 +14,7 @@ and what remains Remotion-only.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -38,6 +39,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 log = logging.getLogger("hyperframes_compose")
@@ -46,6 +48,20 @@ log = logging.getLogger("hyperframes_compose")
 _IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif", ".webp", ".gif"}
 _VIDEO_EXTENSIONS = {".mp4", ".mov", ".webm", ".mkv", ".m4v"}
 _AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac"}
+_CJK_CHAR_RE = re.compile(
+    r"[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]"
+)
+_CJK_FONT_FAMILY = "Noto Sans SC"
+_CJK_FONT_FILENAME = "NotoSansSC.ttf"
+_DENSE_KEYFRAME_THRESHOLD_SECONDS = 5.0
+_HYPERFRAMES_AUTO_RESOLVED_FONTS = {
+    "outfit": "Outfit",
+    "montserrat": "Montserrat",
+    "inter": "Inter",
+    "jetbrains mono": "JetBrains Mono",
+    "poppins": "Poppins",
+    "playfair display": "Playfair Display",
+}
 
 
 class HyperFramesCompose(BaseTool):
@@ -142,7 +158,10 @@ class HyperFramesCompose(BaseTool):
             },
             "output_path": {
                 "type": "string",
-                "description": "Output MP4 path. Used by operation='render'.",
+                "description": (
+                    "Project-scoped output MP4 path. Used by operation='render', "
+                    "e.g. projects/<project-name>/renders/final.mp4."
+                ),
             },
             "edit_decisions": {
                 "type": "object",
@@ -201,11 +220,208 @@ class HyperFramesCompose(BaseTool):
                 "minimum": 1,
                 "description": (
                     "Number of parallel Chrome workers for `hyperframes render`. "
-                    "Defaults to the CLI default (auto). On WSL2 with video-heavy "
-                    "compositions set to 2 to avoid worker timeout."
+                    "Defaults to the CLI default unless the composition is "
+                    "video-heavy; with >5 video cuts the tool automatically "
+                    "uses 1 worker to avoid headless Chrome timeouts."
                 ),
             },
         },
+        "allOf": [
+            {
+                "if": {"properties": {"operation": {"const": "render"}}},
+                "then": {"required": ["output_path"]},
+            },
+        ],
+    }
+    output_schema = {
+        "type": "object",
+        "properties": {
+            "operation": {
+                "type": "string",
+                "enum": [
+                    "render",
+                    "scaffold_workspace",
+                    "add_block",
+                ],
+            },
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "workspace": {"type": "string"},
+            "workspace_path": {"type": "string"},
+            "width": {"type": "integer", "minimum": 0},
+            "height": {"type": "integer", "minimum": 0},
+            "fps": {"type": "integer", "minimum": 1},
+            "quality": {"type": "string"},
+            "workers": {"type": ["integer", "null"], "minimum": 1},
+            "steps": {"type": "object"},
+            "total_duration_seconds": {"type": "number", "minimum": 0},
+            "cut_count": {"type": "integer", "minimum": 0},
+            "asset_copies": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "from": {"type": "string", "minLength": 1},
+                        "to": {"type": "string", "minLength": 1},
+                        "transform": {"type": "string", "minLength": 1},
+                        "keyframe_interval_threshold_seconds": {
+                            "type": "number",
+                            "minimum": 0,
+                        },
+                    },
+                    "required": ["from", "to"],
+                },
+            },
+            "audio_assets": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "track": {
+                            "type": "string",
+                            "enum": ["narration", "music"],
+                        },
+                        "asset_id": {"type": ["string", "null"]},
+                        "from": {"type": "string", "minLength": 1},
+                        "to": {"type": "string", "minLength": 1},
+                        "src": {"type": "string", "minLength": 1},
+                    },
+                    "required": ["track", "asset_id", "from", "to", "src"],
+                },
+            },
+            "font_assets": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "family": {"type": "string", "minLength": 1},
+                        "from": {"type": "string", "minLength": 1},
+                        "to": {"type": "string", "minLength": 1},
+                        "src": {"type": "string", "minLength": 1},
+                        "format": {"type": "string", "minLength": 1},
+                    },
+                    "required": ["family", "from", "to", "src", "format"],
+                },
+            },
+            "block_name": {"type": "string"},
+            "runtime_check": {
+                "type": "object",
+                "properties": {
+                    "runtime_available": {"type": "boolean"},
+                    "node_major": {"type": ["integer", "null"], "minimum": 0},
+                    "ffmpeg_available": {"type": "boolean"},
+                    "npx_available": {"type": "boolean"},
+                    "npm_package": {"type": "string", "minLength": 1},
+                    "npm_package_version": {"type": ["string", "null"]},
+                    "npm_resolve_error": {"type": ["string", "null"]},
+                    "reasons": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                },
+                "required": [
+                    "runtime_available",
+                    "node_major",
+                    "ffmpeg_available",
+                    "npx_available",
+                    "npm_package",
+                    "npm_package_version",
+                    "npm_resolve_error",
+                    "reasons",
+                ],
+            },
+            "cli_doctor": {
+                "type": "object",
+                "properties": {
+                    "exit_code": {"type": "integer"},
+                    "stdout_tail": {"type": "string"},
+                    "stderr_tail": {"type": "string"},
+                },
+                "required": ["exit_code", "stdout_tail", "stderr_tail"],
+            },
+            "cli_doctor_error": {"type": "string"},
+            "exit_code": {"type": "integer"},
+            "report": {"type": "object"},
+            "stdout_tail": {"type": "string"},
+            "stderr_tail": {"type": "string"},
+        },
+        "anyOf": [
+            {
+                "properties": {
+                    "operation": {"const": "render"},
+                    "steps": {
+                        "type": "object",
+                        "properties": {
+                            "scaffold": {"type": "object"},
+                            "lint": {"type": "object"},
+                            "validate": {"type": "object"},
+                            "render": {
+                                "type": "object",
+                                "properties": {
+                                    "exit_code": {"type": "integer", "const": 0},
+                                    "cli_output_path": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                    },
+                                    "stdout_tail": {"type": "string"},
+                                    "stderr_tail": {"type": "string"},
+                                    "workers": {"type": ["integer", "null"]},
+                                },
+                                "required": ["exit_code", "cli_output_path"],
+                            },
+                        },
+                        "required": ["scaffold", "lint", "validate", "render"],
+                    }
+                },
+                "required": [
+                    "operation",
+                    "output",
+                    "output_path",
+                    "workspace",
+                    "workspace_path",
+                    "width",
+                    "height",
+                    "fps",
+                    "quality",
+                    "steps",
+                ],
+            },
+            {
+                "properties": {"operation": {"const": "scaffold_workspace"}},
+                "required": [
+                    "operation",
+                    "workspace",
+                    "workspace_path",
+                    "width",
+                    "height",
+                    "fps",
+                    "total_duration_seconds",
+                    "cut_count",
+                    "asset_copies",
+                    "audio_assets",
+                    "font_assets",
+                ],
+            },
+            {
+                "properties": {"operation": {"const": "add_block"}},
+                "required": [
+                    "operation",
+                    "block_name",
+                    "workspace",
+                    "workspace_path",
+                    "exit_code",
+                ],
+            },
+            {"required": ["runtime_check"]},
+            {
+                "not": {"required": ["operation"]},
+                "required": ["exit_code", "stderr_tail"],
+                "anyOf": [
+                    {"required": ["report"]},
+                    {"required": ["stdout_tail"]},
+                ],
+            },
+        ],
     }
 
     resource_profile = ResourceProfile(
@@ -234,8 +450,8 @@ class HyperFramesCompose(BaseTool):
         "writes MP4 to output_path",
     ]
     user_visible_verification = [
-        "Play the rendered MP4 and verify scene pacing, typography, and audio",
-        "Inspect workspace_path/index.html in a browser via `npx hyperframes preview`",
+        "Inspect rendered MP4 metadata, audio streams, and sampled frames for scene pacing, typography, and audio",
+        "Inspect workspace_path/index.html or sampled frames; run interactive HyperFrames preview only if the user explicitly requests it",
     ]
 
     # ------------------------------------------------------------------
@@ -398,12 +614,23 @@ class HyperFramesCompose(BaseTool):
         return 0.0
 
     def estimate_runtime(self, inputs: dict[str, Any]) -> float:
+        if not isinstance(inputs, dict):
+            return 30.0
         ed = inputs.get("edit_decisions") or {}
+        if not isinstance(ed, dict):
+            return 30.0
         cuts = ed.get("cuts", [])
+        if not isinstance(cuts, list):
+            return 30.0
         total = 0.0
         for c in cuts:
-            out_s = float(c.get("out_seconds", 0) or 0)
-            in_s = float(c.get("in_seconds", 0) or 0)
+            if not isinstance(c, dict):
+                continue
+            try:
+                out_s = float(c.get("out_seconds", 0) or 0)
+                in_s = float(c.get("in_seconds", 0) or 0)
+            except (TypeError, ValueError):
+                continue
             total += max(0.0, out_s - in_s)
         return 30.0 + total * 0.5
 
@@ -412,7 +639,9 @@ class HyperFramesCompose(BaseTool):
     # ------------------------------------------------------------------
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
-        operation = inputs["operation"]
+        operation = inputs.get("operation")
+        if not operation:
+            return ToolResult(success=False, error="operation is required")
         start = time.time()
         try:
             if operation == "doctor":
@@ -487,17 +716,302 @@ class HyperFramesCompose(BaseTool):
         """
         workspace = self._require_workspace(inputs)
         edit_decisions = inputs.get("edit_decisions") or {}
+        if not isinstance(edit_decisions, dict):
+            return ToolResult(
+                success=False,
+                error="edit_decisions must be an object for scaffold_workspace",
+            )
         asset_manifest = inputs.get("asset_manifest") or {}
+        if not isinstance(asset_manifest, dict):
+            return ToolResult(
+                success=False,
+                error="asset_manifest must be an object for scaffold_workspace",
+            )
+        assets = asset_manifest.get("assets", [])
+        if not isinstance(assets, list):
+            return ToolResult(
+                success=False,
+                error="asset_manifest.assets must be an array for scaffold_workspace",
+            )
+        for index, asset in enumerate(assets):
+            if not isinstance(asset, dict):
+                return ToolResult(
+                    success=False,
+                    error=(
+                        f"asset_manifest.assets[{index}] must be an object "
+                        "for scaffold_workspace"
+                    ),
+                )
+            asset_id = asset.get("id")
+            if asset_id is not None and not isinstance(asset_id, str):
+                return ToolResult(
+                    success=False,
+                    error=(
+                        f"asset_manifest.assets[{index}].id must be a string "
+                        "for scaffold_workspace"
+                    ),
+                )
+            asset_path = asset.get("path")
+            if asset_path is not None and not isinstance(asset_path, str):
+                return ToolResult(
+                    success=False,
+                    error=(
+                        f"asset_manifest.assets[{index}].path must be a string "
+                        "for scaffold_workspace"
+                    ),
+                )
+            if asset_path is not None:
+                local_asset_path = Path(asset_path)
+                if local_asset_path.exists() and not local_asset_path.is_file():
+                    return ToolResult(
+                        success=False,
+                        error=(
+                            f"asset_manifest.assets[{index}].path must reference "
+                            "a file when the local path exists for scaffold_workspace"
+                        ),
+                    )
         playbook = inputs.get("playbook") or {}
+        if not isinstance(playbook, dict):
+            return ToolResult(
+                success=False,
+                error="playbook must be an object for scaffold_workspace",
+            )
         profile_name = inputs.get("profile")
 
-        if not edit_decisions.get("cuts"):
+        cuts = edit_decisions.get("cuts")
+        if not isinstance(cuts, list):
+            return ToolResult(
+                success=False,
+                error="edit_decisions.cuts must be a non-empty array for scaffold_workspace",
+            )
+        if not cuts:
             return ToolResult(
                 success=False,
                 error="edit_decisions with non-empty cuts[] is required for scaffold_workspace",
             )
+        for index, cut in enumerate(cuts):
+            if not isinstance(cut, dict):
+                return ToolResult(
+                    success=False,
+                    error=(
+                        f"edit_decisions.cuts[{index}] must be an object "
+                        "for scaffold_workspace"
+                    ),
+                )
+            source = cut.get("source")
+            if source is not None and not isinstance(source, str):
+                return ToolResult(
+                    success=False,
+                    error=(
+                        f"edit_decisions.cuts[{index}].source must be a string "
+                        "for scaffold_workspace"
+                    ),
+                )
+            cut_type = cut.get("type")
+            if cut_type is not None and not isinstance(cut_type, str):
+                return ToolResult(
+                    success=False,
+                    error=(
+                        f"edit_decisions.cuts[{index}].type must be a string "
+                        "for scaffold_workspace"
+                    ),
+                )
+            for seconds_field in ("in_seconds", "out_seconds"):
+                seconds_value = cut.get(seconds_field)
+                if seconds_value is None:
+                    continue
+                if isinstance(seconds_value, bool):
+                    return ToolResult(
+                        success=False,
+                        error=(
+                            f"edit_decisions.cuts[{index}].{seconds_field} "
+                            "must be a number for scaffold_workspace"
+                        ),
+                    )
+                try:
+                    float(seconds_value)
+                except (TypeError, ValueError):
+                    return ToolResult(
+                        success=False,
+                        error=(
+                            f"edit_decisions.cuts[{index}].{seconds_field} "
+                            "must be a number for scaffold_workspace"
+                        ),
+                    )
+            for text_field in ("text", "title", "subtitle", "caption", "reason"):
+                text_value = cut.get(text_field)
+                if text_value is not None and not isinstance(text_value, str):
+                    return ToolResult(
+                        success=False,
+                        error=(
+                            f"edit_decisions.cuts[{index}].{text_field} "
+                            "must be a string for scaffold_workspace"
+                        ),
+                    )
+        audio = edit_decisions.get("audio", {})
+        if not isinstance(audio, dict):
+            return ToolResult(
+                success=False,
+                error="edit_decisions.audio must be an object for scaffold_workspace",
+            )
+        narration = audio.get("narration", {})
+        if not isinstance(narration, dict):
+            return ToolResult(
+                success=False,
+                error=(
+                    "edit_decisions.audio.narration must be an object "
+                    "for scaffold_workspace"
+                ),
+            )
+        narration_segments = narration.get("segments", [])
+        if not isinstance(narration_segments, list):
+            return ToolResult(
+                success=False,
+                error=(
+                    "edit_decisions.audio.narration.segments must be an array "
+                    "for scaffold_workspace"
+                ),
+            )
+        for index, segment in enumerate(narration_segments):
+            if not isinstance(segment, dict):
+                return ToolResult(
+                    success=False,
+                    error=(
+                        "edit_decisions.audio.narration.segments"
+                        f"[{index}] must be an object for scaffold_workspace"
+                    ),
+                )
+            segment_asset_id = segment.get("asset_id")
+            if segment_asset_id is not None and not isinstance(segment_asset_id, str):
+                return ToolResult(
+                    success=False,
+                    error=(
+                        "edit_decisions.audio.narration.segments"
+                        f"[{index}].asset_id must be a string for scaffold_workspace"
+                    ),
+                )
+            for seconds_field in ("start_seconds", "end_seconds"):
+                seconds_value = segment.get(seconds_field)
+                if seconds_value is None:
+                    continue
+                if isinstance(seconds_value, bool):
+                    return ToolResult(
+                        success=False,
+                        error=(
+                            "edit_decisions.audio.narration.segments"
+                            f"[{index}].{seconds_field} must be a number "
+                            "for scaffold_workspace"
+                        ),
+                    )
+                try:
+                    float(seconds_value)
+                except (TypeError, ValueError):
+                    return ToolResult(
+                        success=False,
+                        error=(
+                            "edit_decisions.audio.narration.segments"
+                            f"[{index}].{seconds_field} must be a number "
+                            "for scaffold_workspace"
+                        ),
+                    )
+        music = audio.get("music", {})
+        if not isinstance(music, dict):
+            return ToolResult(
+                success=False,
+                error="edit_decisions.audio.music must be an object for scaffold_workspace",
+            )
+        music_asset_id = music.get("asset_id")
+        if music_asset_id is not None and not isinstance(music_asset_id, str):
+            return ToolResult(
+                success=False,
+                error=(
+                    "edit_decisions.audio.music.asset_id must be a string "
+                    "for scaffold_workspace"
+                ),
+            )
+        music_src = music.get("src")
+        if music_src is not None and not isinstance(music_src, str):
+            return ToolResult(
+                success=False,
+                error=(
+                    "edit_decisions.audio.music.src must be a string "
+                    "for scaffold_workspace"
+                ),
+            )
+        for music_number_field in (
+            "fade_in_seconds",
+            "fadeInSeconds",
+            "fade_out_seconds",
+            "fadeOutSeconds",
+            "volume",
+        ):
+            music_number_value = music.get(music_number_field)
+            if music_number_value is None:
+                continue
+            if isinstance(music_number_value, bool):
+                return ToolResult(
+                    success=False,
+                    error=(
+                        f"edit_decisions.audio.music.{music_number_field} "
+                        "must be a number for scaffold_workspace"
+                    ),
+                )
+            try:
+                float(music_number_value)
+            except (TypeError, ValueError):
+                return ToolResult(
+                    success=False,
+                    error=(
+                        f"edit_decisions.audio.music.{music_number_field} "
+                        "must be a number for scaffold_workspace"
+                    ),
+                )
+        metadata = edit_decisions.get("metadata", {})
+        if not isinstance(metadata, dict):
+            return ToolResult(
+                success=False,
+                error="edit_decisions.metadata must be an object for scaffold_workspace",
+            )
+        metadata_title = metadata.get("title")
+        if metadata_title is not None and not isinstance(metadata_title, str):
+            return ToolResult(
+                success=False,
+                error=(
+                    "edit_decisions.metadata.title must be a string "
+                    "for scaffold_workspace"
+                ),
+            )
 
-        width, height, fps = self._resolve_dimensions(profile_name, inputs.get("fps", 30))
+        fps_input = inputs.get("fps", 30)
+        allowed_fps = self.input_schema["properties"]["fps"]["enum"]
+        if fps_input not in allowed_fps:
+            return ToolResult(
+                success=False,
+                error=(
+                    f"Invalid fps {fps_input!r}; expected one of "
+                    f"{', '.join(str(fps) for fps in allowed_fps)}."
+                ),
+            )
+
+        if (
+            self._contains_cjk(edit_decisions)
+            and self._find_cjk_font_source(workspace) is None
+        ):
+            return ToolResult(
+                success=False,
+                error=(
+                    "CJK text detected in HyperFrames edit_decisions, but "
+                    f"{_CJK_FONT_FILENAME} was not found under the project, "
+                    f"workspace, or ~/.fonts. Add projects/<project-id>/fonts/"
+                    f"{_CJK_FONT_FILENAME} before scaffolding to avoid missing "
+                    "Chinese glyphs."
+                ),
+            )
+
+        try:
+            width, height, fps = self._resolve_dimensions(profile_name, fps_input)
+        except ValueError as exc:
+            return ToolResult(success=False, error=str(exc))
 
         workspace.mkdir(parents=True, exist_ok=True)
         (workspace / "compositions").mkdir(exist_ok=True)
@@ -506,14 +1020,16 @@ class HyperFramesCompose(BaseTool):
 
         # Resolve asset IDs → file paths + copy into workspace.
         resolved_cuts, asset_copies = self._resolve_and_stage_assets(
-            edit_decisions.get("cuts", []),
-            asset_manifest.get("assets", []),
+            cuts,
+            assets,
             workspace,
         )
 
-        audio_refs = self._resolve_audio_refs(
-            edit_decisions.get("audio", {}),
-            asset_manifest.get("assets", []),
+        font_assets = self._stage_cjk_fonts_if_needed(edit_decisions, workspace)
+
+        audio_refs, audio_assets = self._resolve_audio_refs(
+            audio,
+            assets,
             workspace,
         )
 
@@ -532,6 +1048,7 @@ class HyperFramesCompose(BaseTool):
                     },
                 },
                 indent=2,
+                allow_nan=False,
             ),
             encoding="utf-8",
         )
@@ -549,7 +1066,9 @@ class HyperFramesCompose(BaseTool):
             height=height,
             total_duration=total_duration,
             css_vars=css_vars,
-            title=edit_decisions.get("metadata", {}).get("title")
+            font_assets=font_assets,
+            font_face_css=self._font_face_css(font_assets),
+            title=metadata.get("title")
             or f"Video Production Buddy {edit_decisions.get('renderer_family', 'composition')}",
         )
         (workspace / "index.html").write_text(html, encoding="utf-8")
@@ -559,12 +1078,15 @@ class HyperFramesCompose(BaseTool):
             data={
                 "operation": "scaffold_workspace",
                 "workspace": str(workspace),
+                "workspace_path": str(workspace),
                 "width": width,
                 "height": height,
                 "fps": fps,
                 "total_duration_seconds": total_duration,
                 "cut_count": len(resolved_cuts),
                 "asset_copies": asset_copies,
+                "audio_assets": audio_assets,
+                "font_assets": font_assets,
             },
             artifacts=[str(workspace / "index.html")],
         )
@@ -577,7 +1099,10 @@ class HyperFramesCompose(BaseTool):
                 error=f"No index.html in {workspace}. Run scaffold_workspace first.",
             )
         proc = self._run_hf(["lint", "--json"], cwd=workspace, timeout=120, check=False)
-        data: dict[str, Any] = {"exit_code": proc.returncode}
+        data: dict[str, Any] = {
+            "workspace_path": str(workspace),
+            "exit_code": proc.returncode,
+        }
         payload = self._parse_json_output(proc.stdout)
         if payload is not None:
             data["report"] = payload
@@ -592,6 +1117,15 @@ class HyperFramesCompose(BaseTool):
         )
 
     def _validate(self, inputs: dict[str, Any]) -> ToolResult:
+        if "skip_contrast" in inputs and not isinstance(inputs["skip_contrast"], bool):
+            return ToolResult(
+                success=False,
+                error=(
+                    f"Invalid skip_contrast {inputs['skip_contrast']!r}; "
+                    "expected a boolean."
+                ),
+            )
+
         workspace = self._require_workspace(inputs)
         if not (workspace / "index.html").exists():
             return ToolResult(
@@ -602,7 +1136,10 @@ class HyperFramesCompose(BaseTool):
         if inputs.get("skip_contrast"):
             args.append("--no-contrast")
         proc = self._run_hf(args, cwd=workspace, timeout=300, check=False)
-        data: dict[str, Any] = {"exit_code": proc.returncode}
+        data: dict[str, Any] = {
+            "workspace_path": str(workspace),
+            "exit_code": proc.returncode,
+        }
         payload = self._parse_json_output(proc.stdout)
         if payload is not None:
             data["report"] = payload
@@ -627,7 +1164,13 @@ class HyperFramesCompose(BaseTool):
         `.agents/skills/hyperframes-registry/SKILL.md`.
         """
         workspace = self._require_workspace(inputs)
-        block = (inputs.get("block_name") or "").strip()
+        raw_block = inputs.get("block_name")
+        if raw_block is not None and not isinstance(raw_block, str):
+            return ToolResult(
+                success=False,
+                error="block_name must be a string for operation='add_block'",
+            )
+        block = (raw_block or "").strip()
         if not block:
             return ToolResult(
                 success=False,
@@ -647,6 +1190,7 @@ class HyperFramesCompose(BaseTool):
             "operation": "add_block",
             "block_name": block,
             "workspace": str(workspace),
+            "workspace_path": str(workspace),
             "exit_code": proc.returncode,
         }
         payload = self._parse_json_output(proc.stdout)
@@ -664,6 +1208,75 @@ class HyperFramesCompose(BaseTool):
 
     def _render(self, inputs: dict[str, Any]) -> ToolResult:
         """Full pipeline: scaffold → lint → validate → render."""
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="HyperFrames render",
+        )
+        if output_error:
+            return output_error
+
+        quality = inputs.get("quality", "standard")
+        allowed_qualities = self.input_schema["properties"]["quality"]["enum"]
+        if quality not in allowed_qualities:
+            return ToolResult(
+                success=False,
+                error=(
+                    f"Invalid quality {quality!r}; expected one of "
+                    f"{', '.join(allowed_qualities)}."
+                ),
+            )
+
+        fps_input = inputs.get("fps", 30)
+        allowed_fps = self.input_schema["properties"]["fps"]["enum"]
+        if fps_input not in allowed_fps:
+            return ToolResult(
+                success=False,
+                error=(
+                    f"Invalid fps {fps_input!r}; expected one of "
+                    f"{', '.join(str(fps) for fps in allowed_fps)}."
+                ),
+            )
+
+        if "workers" in inputs:
+            workers_input = inputs["workers"]
+            if isinstance(workers_input, bool) or not isinstance(workers_input, int):
+                return ToolResult(
+                    success=False,
+                    error=f"Invalid workers {workers_input!r}; expected an integer >= 1.",
+                )
+            workers_value = workers_input
+            workers_minimum = self.input_schema["properties"]["workers"]["minimum"]
+            if workers_value < workers_minimum:
+                return ToolResult(
+                    success=False,
+                    error=(
+                        f"Invalid workers {workers_input!r}; expected an integer "
+                        f">= {workers_minimum}."
+                    ),
+                )
+
+        if "strict" in inputs and not isinstance(inputs["strict"], bool):
+            return ToolResult(
+                success=False,
+                error=f"Invalid strict {inputs['strict']!r}; expected a boolean.",
+            )
+        if "skip_contrast" in inputs and not isinstance(inputs["skip_contrast"], bool):
+            return ToolResult(
+                success=False,
+                error=(
+                    f"Invalid skip_contrast {inputs['skip_contrast']!r}; "
+                    "expected a boolean."
+                ),
+            )
+
+        try:
+            width, height, fps = self._resolve_dimensions(
+                inputs.get("profile"), fps_input
+            )
+        except ValueError as exc:
+            return ToolResult(success=False, error=str(exc))
+
         runtime_ok = self._runtime_check()
         if not runtime_ok["runtime_available"]:
             return ToolResult(
@@ -678,7 +1291,6 @@ class HyperFramesCompose(BaseTool):
             )
 
         workspace = self._require_workspace(inputs)
-        output_path = Path(inputs.get("output_path") or (workspace / "renders" / "final.mp4"))
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         steps: dict[str, Any] = {}
@@ -724,23 +1336,27 @@ class HyperFramesCompose(BaseTool):
             )
 
         # 4. Render.
-        width, height, fps = self._resolve_dimensions(
-            inputs.get("profile"), inputs.get("fps", 30)
+        effective_workers = self._effective_workers(inputs)
+        cli_output_path = (
+            output_path if output_path.is_absolute() else output_path.resolve(strict=False)
         )
-        quality = inputs.get("quality", "standard")
         args = [
             "render",
-            "--output", str(output_path),
+            "--output", str(cli_output_path),
             "--fps", str(fps),
             "--quality", quality,
         ]
-        if "workers" in inputs:
-            args += ["--workers", str(int(inputs["workers"]))]
+        if inputs.get("strict", False):
+            args.append("--strict")
+        if effective_workers is not None:
+            args += ["--workers", str(effective_workers)]
         proc = self._run_hf(args, cwd=workspace, timeout=1800, check=False)
         steps["render"] = {
             "exit_code": proc.returncode,
+            "cli_output_path": str(cli_output_path),
             "stdout_tail": (proc.stdout or "")[-4000:],
             "stderr_tail": (proc.stderr or "")[-4000:],
+            "workers": effective_workers,
         }
         if proc.returncode != 0:
             return ToolResult(
@@ -754,7 +1370,7 @@ class HyperFramesCompose(BaseTool):
                 success=False,
                 error=(
                     f"hyperframes render exited 0 but output file missing: "
-                    f"{output_path}. Check stdout_tail for the real path."
+                    f"{output_path}. CLI output path was {cli_output_path}."
                 ),
                 data={"steps": steps},
             )
@@ -764,11 +1380,14 @@ class HyperFramesCompose(BaseTool):
             data={
                 "operation": "render",
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "workspace": str(workspace),
+                "workspace_path": str(workspace),
                 "width": width,
                 "height": height,
                 "fps": fps,
                 "quality": quality,
+                "workers": effective_workers,
                 "steps": steps,
             },
             artifacts=[str(output_path)],
@@ -810,7 +1429,7 @@ class HyperFramesCompose(BaseTool):
         cuts: list[dict],
         assets: list[dict],
         workspace: Path,
-    ) -> tuple[list[dict], list[dict[str, str]]]:
+    ) -> tuple[list[dict], list[dict[str, Any]]]:
         """Resolve asset IDs in cuts[].source, copy files into workspace/assets/.
 
         HyperFrames resolves `src=` relative to the composition HTML file, so
@@ -820,8 +1439,10 @@ class HyperFramesCompose(BaseTool):
         """
         asset_lookup = {a["id"]: a for a in assets if "id" in a}
         assets_dir = workspace / "assets"
-        copies: list[dict[str, str]] = []
+        copies: list[dict[str, Any]] = []
         resolved: list[dict] = []
+        staged_by_source: dict[Path, tuple[Path, dict[str, Any]]] = {}
+        used_destinations: set[Path] = set()
         for cut in cuts:
             source = cut.get("source", "")
             resolved_cut = dict(cut)
@@ -829,24 +1450,442 @@ class HyperFramesCompose(BaseTool):
                 resolved_cut["source"] = asset_lookup[source].get("path", source)
             src_path = Path(resolved_cut["source"]) if resolved_cut.get("source") else None
             if src_path and src_path.exists() and not self._is_inside(src_path, workspace):
-                dest = assets_dir / src_path.name
-                if not dest.exists() or dest.stat().st_size != src_path.stat().st_size:
-                    shutil.copy2(src_path, dest)
+                source_key = src_path.resolve(strict=False)
+                if source_key in staged_by_source:
+                    dest, report = staged_by_source[source_key]
+                else:
+                    dest, report = self._stage_external_asset(
+                        src_path,
+                        assets_dir,
+                        used_destinations=used_destinations,
+                    )
+                    staged_by_source[source_key] = (dest, report)
+                    copies.append(report)
                 resolved_cut["source"] = str(dest)
-                copies.append({"from": str(src_path), "to": str(dest)})
             resolved.append(resolved_cut)
         return resolved, copies
+
+    def _stage_external_asset(
+        self,
+        src_path: Path,
+        assets_dir: Path,
+        *,
+        used_destinations: Optional[set[Path]] = None,
+    ) -> tuple[Path, dict[str, Any]]:
+        """Copy or prepare an external asset for HyperFrames workspace use."""
+        assets_dir.mkdir(parents=True, exist_ok=True)
+
+        if src_path.suffix.lower() in _VIDEO_EXTENSIONS and self._needs_dense_keyframes(
+            src_path
+        ):
+            dest = self._asset_destination(
+                src_path,
+                assets_dir,
+                used_destinations=used_destinations,
+                staged_name=f"{src_path.stem}.dense.mp4",
+            )
+            if not dest.exists() or dest.stat().st_mtime < src_path.stat().st_mtime:
+                self._reencode_video_dense_keyframes(src_path, dest)
+            return dest, {
+                "from": str(src_path),
+                "to": str(dest),
+                "transform": "dense_keyframes",
+                "keyframe_interval_threshold_seconds": _DENSE_KEYFRAME_THRESHOLD_SECONDS,
+            }
+
+        dest = self._asset_destination(
+            src_path,
+            assets_dir,
+            used_destinations=used_destinations,
+        )
+        if not dest.exists() or dest.stat().st_size != src_path.stat().st_size:
+            shutil.copy2(src_path, dest)
+        return dest, {"from": str(src_path), "to": str(dest)}
+
+    @staticmethod
+    def _asset_destination(
+        src_path: Path,
+        assets_dir: Path,
+        *,
+        used_destinations: Optional[set[Path]] = None,
+        staged_name: Optional[str] = None,
+    ) -> Path:
+        candidate = assets_dir / (staged_name or src_path.name)
+        if used_destinations is None:
+            return candidate
+        if candidate not in used_destinations:
+            used_destinations.add(candidate)
+            return candidate
+
+        stem = re.sub(r"[^A-Za-z0-9_.-]+", "-", candidate.stem).strip("-") or "asset"
+        suffix = candidate.suffix
+        digest = hashlib.sha1(
+            str(src_path.resolve(strict=False)).encode("utf-8")
+        ).hexdigest()[:8]
+        unique = assets_dir / f"{stem}-{digest}{suffix}"
+        counter = 2
+        while unique in used_destinations:
+            unique = assets_dir / f"{stem}-{digest}-{counter}{suffix}"
+            counter += 1
+        used_destinations.add(unique)
+        return unique
+
+    def _needs_dense_keyframes(self, src_path: Path) -> bool:
+        max_interval = self._max_keyframe_interval_seconds(src_path)
+        return (
+            max_interval is not None
+            and max_interval > _DENSE_KEYFRAME_THRESHOLD_SECONDS
+        )
+
+    @staticmethod
+    def _max_keyframe_interval_seconds(src_path: Path) -> Optional[float]:
+        ffprobe = shutil.which("ffprobe")
+        if not ffprobe:
+            log.warning(
+                "ffprobe not found; skipping HyperFrames dense-keyframe check for %s",
+                src_path,
+            )
+            return None
+
+        try:
+            proc = subprocess.run(
+                [
+                    ffprobe,
+                    "-v",
+                    "error",
+                    "-select_streams",
+                    "v:0",
+                    "-skip_frame",
+                    "nokey",
+                    "-show_entries",
+                    "frame=best_effort_timestamp_time,pkt_pts_time",
+                    "-of",
+                    "csv=p=0",
+                    str(src_path),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+
+        if proc.returncode != 0:
+            return None
+
+        timestamps: list[float] = []
+        for line in (proc.stdout or "").splitlines():
+            for raw in line.replace(",", " ").split():
+                try:
+                    timestamps.append(float(raw))
+                    break
+                except ValueError:
+                    continue
+
+        timestamps = sorted(set(timestamps))
+        duration = HyperFramesCompose._video_duration_seconds(src_path)
+
+        intervals: list[float] = []
+        if len(timestamps) >= 2:
+            intervals.extend(b - a for a, b in zip(timestamps, timestamps[1:]))
+
+        if duration is not None:
+            if timestamps:
+                intervals.append(max(0.0, timestamps[0]))
+                intervals.append(max(0.0, duration - timestamps[-1]))
+            else:
+                intervals.append(duration)
+
+        if intervals:
+            return max(intervals)
+        return None
+
+    @staticmethod
+    def _video_duration_seconds(src_path: Path) -> Optional[float]:
+        ffprobe = shutil.which("ffprobe")
+        if not ffprobe:
+            return None
+
+        try:
+            proc = subprocess.run(
+                [
+                    ffprobe,
+                    "-v",
+                    "error",
+                    "-show_entries",
+                    "format=duration",
+                    "-of",
+                    "default=noprint_wrappers=1:nokey=1",
+                    str(src_path),
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+
+        if proc.returncode != 0:
+            return None
+
+        try:
+            duration = float((proc.stdout or "").strip().splitlines()[0])
+        except (IndexError, ValueError):
+            return None
+        return duration if duration >= 0 else None
+
+    @staticmethod
+    def _reencode_video_dense_keyframes(src_path: Path, dest: Path) -> None:
+        ffmpeg = shutil.which("ffmpeg")
+        if not ffmpeg:
+            raise RuntimeError("ffmpeg not found; cannot prepare dense-keyframe video")
+
+        tmp = dest.with_name(f"{dest.stem}.tmp{dest.suffix}")
+        tmp.unlink(missing_ok=True)
+        cmd = [
+            ffmpeg,
+            "-y",
+            "-i",
+            str(src_path),
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a?",
+            "-c:v",
+            "libx264",
+            "-r",
+            "30",
+            "-g",
+            "30",
+            "-keyint_min",
+            "30",
+            "-sc_threshold",
+            "0",
+            "-pix_fmt",
+            "yuv420p",
+            "-movflags",
+            "+faststart",
+            "-c:a",
+            "copy",
+            str(tmp),
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+        if proc.returncode != 0:
+            tmp.unlink(missing_ok=True)
+            tail = ((proc.stderr or proc.stdout) or "")[-1200:]
+            raise RuntimeError(
+                f"ffmpeg dense-keyframe preparation failed for {src_path}: {tail}"
+            )
+        tmp.replace(dest)
+
+    def _stage_cjk_fonts_if_needed(
+        self,
+        edit_decisions: dict[str, Any],
+        workspace: Path,
+    ) -> list[dict[str, str]]:
+        """Package a local CJK font when generated HTML contains CJK text."""
+        if not self._contains_cjk(edit_decisions):
+            return []
+
+        source = self._find_cjk_font_source(workspace)
+        if source is None:
+            raise FileNotFoundError(
+                "CJK text detected in HyperFrames edit_decisions, but "
+                f"{_CJK_FONT_FILENAME} was not found under the project, "
+                f"workspace, or ~/.fonts. Add projects/<project-id>/fonts/"
+                f"{_CJK_FONT_FILENAME} before scaffolding to avoid missing "
+                "Chinese glyphs."
+            )
+
+        assets_dir = workspace / "assets"
+        assets_dir.mkdir(parents=True, exist_ok=True)
+        dest = assets_dir / _CJK_FONT_FILENAME
+        if not dest.exists() or dest.stat().st_size != source.stat().st_size:
+            shutil.copy2(source, dest)
+
+        return [
+            {
+                "family": _CJK_FONT_FAMILY,
+                "from": str(source),
+                "to": str(dest),
+                "src": self._rel_from_workspace(str(dest)),
+                "format": "truetype",
+            }
+        ]
+
+    @classmethod
+    def _contains_cjk(cls, value: Any) -> bool:
+        if isinstance(value, str):
+            return bool(_CJK_CHAR_RE.search(value))
+        if isinstance(value, dict):
+            return any(cls._contains_cjk(v) for v in value.values())
+        if isinstance(value, list):
+            return any(cls._contains_cjk(v) for v in value)
+        return False
+
+    @staticmethod
+    def _find_cjk_font_source(workspace: Path) -> Optional[Path]:
+        search_roots = [workspace, *workspace.parents]
+        for root in search_roots:
+            for candidate in (
+                root / "fonts" / _CJK_FONT_FILENAME,
+                root / "assets" / _CJK_FONT_FILENAME,
+            ):
+                if candidate.exists():
+                    return candidate
+
+        home_font = Path.home() / ".fonts" / _CJK_FONT_FILENAME
+        if home_font.exists():
+            return home_font
+        return None
+
+    @staticmethod
+    def _font_face_css(font_assets: list[dict[str, str]]) -> str:
+        blocks: list[str] = []
+        for asset in font_assets:
+            family = HyperFramesCompose._escape_text(asset["family"])
+            src = HyperFramesCompose._escape_attr(asset["src"])
+            fmt = HyperFramesCompose._escape_attr(asset.get("format", "truetype"))
+            blocks.append(
+                "@font-face {\n"
+                f"      font-family: \"{family}\";\n"
+                f"      src: url(\"{src}\") format(\"{fmt}\");\n"
+                "      font-weight: 100 900;\n"
+                "      font-style: normal;\n"
+                "      font-display: swap;\n"
+                "    }"
+            )
+        return "\n    ".join(blocks)
+
+    @classmethod
+    def _font_family_css(
+        cls,
+        requested: Any,
+        font_assets: list[dict[str, str]],
+    ) -> str:
+        requested_family = cls._primary_font_family(requested)
+        declared_fonts = {
+            str(asset.get("family") or "").strip().casefold(): str(asset.get("family"))
+            for asset in font_assets
+            if str(asset.get("family") or "").strip()
+        }
+        requested_key = requested_family.casefold()
+
+        if requested_key in declared_fonts:
+            families = [declared_fonts[requested_key]]
+        else:
+            families = [
+                _HYPERFRAMES_AUTO_RESOLVED_FONTS.get(requested_key, "Inter")
+            ]
+
+        seen = {family.casefold() for family in families}
+        for family in declared_fonts.values():
+            family_key = family.casefold()
+            if family_key not in seen:
+                families.append(family)
+                seen.add(family_key)
+
+        family_css = ", ".join(cls._quote_font_family(family) for family in families)
+        return f"{family_css}, sans-serif"
+
+    @staticmethod
+    def _primary_font_family(value: Any) -> str:
+        raw = str(value or "").split(",", 1)[0].strip()
+        return raw.strip("\"'") or "Inter"
+
+    @staticmethod
+    def _quote_font_family(family: str) -> str:
+        if re.search(r"[^a-zA-Z0-9_-]", family):
+            escaped = family.replace("\\", "\\\\").replace('"', '\\"')
+            return f'"{escaped}"'
+        return family
+
+    def _effective_workers(self, inputs: dict[str, Any]) -> Optional[int]:
+        if "workers" in inputs:
+            return int(inputs["workers"])
+
+        edit_decisions = inputs.get("edit_decisions") or {}
+        asset_manifest = inputs.get("asset_manifest") or {}
+        video_count = self._count_video_cuts(
+            edit_decisions.get("cuts", []),
+            asset_manifest.get("assets", []),
+        )
+        if video_count > 5:
+            return 1
+        return None
+
+    @staticmethod
+    def _count_video_cuts(cuts: list[dict], assets: list[dict]) -> int:
+        asset_lookup = {a["id"]: a for a in assets if "id" in a}
+        count = 0
+        for cut in cuts or []:
+            source = cut.get("source", "")
+            if source in asset_lookup:
+                source = asset_lookup[source].get("path", source)
+            cut_type = (cut.get("type") or "").lower()
+            ext = Path(str(source)).suffix.lower() if source else ""
+            if ext in _VIDEO_EXTENSIONS or cut_type in {
+                "video",
+                "video_clip",
+                "background_video",
+                "b_roll",
+                "broll",
+            }:
+                count += 1
+        return count
 
     def _resolve_audio_refs(
         self,
         audio: dict[str, Any],
         assets: list[dict],
         workspace: Path,
-    ) -> dict[str, Any]:
+    ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         """Resolve narration / music asset IDs and stage them."""
         asset_lookup = {a["id"]: a for a in assets if "id" in a}
         assets_dir = workspace / "assets"
         out: dict[str, Any] = {"narration": [], "music": None}
+        audio_assets: list[dict[str, Any]] = []
+        staged_by_source: dict[Path, Path] = {}
+        used_destinations = (
+            {path for path in assets_dir.iterdir() if path.is_file()}
+            if assets_dir.exists()
+            else set()
+        )
+
+        def stage_audio_source(
+            src_path: Path,
+            *,
+            track: str,
+            asset_id: Optional[str],
+        ) -> Path:
+            if self._is_inside(src_path, workspace):
+                return src_path
+
+            source_key = src_path.resolve(strict=False)
+            if source_key in staged_by_source:
+                return staged_by_source[source_key]
+
+            assets_dir.mkdir(parents=True, exist_ok=True)
+            dest = self._asset_destination(
+                src_path,
+                assets_dir,
+                used_destinations=used_destinations,
+            )
+            if not dest.exists() or dest.stat().st_size != src_path.stat().st_size:
+                shutil.copy2(src_path, dest)
+            staged_by_source[source_key] = dest
+            audio_assets.append(
+                {
+                    "track": track,
+                    "asset_id": asset_id,
+                    "from": str(src_path),
+                    "to": str(dest),
+                    "src": self._rel_from_workspace(str(dest)),
+                }
+            )
+            return dest
 
         for seg in audio.get("narration", {}).get("segments", []) or []:
             aid = seg.get("asset_id")
@@ -855,12 +1894,7 @@ class HyperFramesCompose(BaseTool):
             src = Path(asset_lookup[aid].get("path", ""))
             if not src.exists():
                 continue
-            if not self._is_inside(src, workspace):
-                dest = assets_dir / src.name
-                if not dest.exists() or dest.stat().st_size != src.stat().st_size:
-                    shutil.copy2(src, dest)
-            else:
-                dest = src
+            dest = stage_audio_source(src, track="narration", asset_id=aid)
             out["narration"].append(
                 {
                     "src": str(dest),
@@ -878,12 +1912,7 @@ class HyperFramesCompose(BaseTool):
         elif music.get("src"):
             music_src_path = Path(music["src"])
         if music_src_path and music_src_path.exists():
-            if not self._is_inside(music_src_path, workspace):
-                dest = assets_dir / music_src_path.name
-                if not dest.exists() or dest.stat().st_size != music_src_path.stat().st_size:
-                    shutil.copy2(music_src_path, dest)
-            else:
-                dest = music_src_path
+            dest = stage_audio_source(music_src_path, track="music", asset_id=m_id)
             fade_in = float(
                 music.get("fade_in_seconds") or music.get("fadeInSeconds") or 0
             )
@@ -903,7 +1932,7 @@ class HyperFramesCompose(BaseTool):
                 music_src_path,
             )
 
-        return out
+        return out, audio_assets
 
     @staticmethod
     def _is_inside(path: Path, root: Path) -> bool:
@@ -984,6 +2013,8 @@ class HyperFramesCompose(BaseTool):
         height: int,
         total_duration: float,
         css_vars: dict[str, str],
+        font_assets: list[dict[str, str]],
+        font_face_css: str,
         title: str,
     ) -> str:
         """Emit a HyperFrames-contract-compliant index.html.
@@ -1000,6 +2031,12 @@ class HyperFramesCompose(BaseTool):
         provides a functional starting skeleton.
         """
         vars_css = "\n      ".join(f"{k}: {v};" for k, v in css_vars.items())
+        body_font_family = self._font_family_css(
+            css_vars.get("--font-body"), font_assets
+        )
+        heading_font_family = self._font_family_css(
+            css_vars.get("--font-heading"), font_assets
+        )
 
         clip_html: list[str] = []
         entrance_tweens: list[str] = []
@@ -1040,11 +2077,12 @@ class HyperFramesCompose(BaseTool):
   <meta charset="utf-8">
   <title>{self._escape_text(title)}</title>
   <style>
+    {font_face_css}
     :root {{
       {vars_css}
     }}
-    body {{ margin: 0; background: var(--color-bg); color: var(--color-fg); font-family: var(--font-body); }}
-    [data-composition-id="root"] {{
+    body {{ margin: 0; background: var(--color-bg); color: var(--color-fg); font-family: {body_font_family}; }}
+    #root {{
       position: relative;
       width: {width}px;
       height: {height}px;
@@ -1053,13 +2091,13 @@ class HyperFramesCompose(BaseTool):
     .clip {{ position: absolute; inset: 0; }}
     .clip.video-clip, .clip.image-clip {{ object-fit: cover; width: 100%; height: 100%; }}
     .clip.text-card {{ display: flex; align-items: center; justify-content: center; padding: 120px 160px; box-sizing: border-box; text-align: center; }}
-    .clip.text-card h1 {{ font-family: var(--font-heading); font-weight: 700; font-size: 96px; line-height: 1.1; margin: 0; color: var(--color-fg); }}
+    .clip.text-card h1 {{ font-family: {heading_font_family}; font-weight: 700; font-size: 96px; line-height: 1.1; margin: 0; color: var(--color-fg); }}
     .clip.text-card .subtitle {{ font-size: 36px; margin-top: 24px; color: var(--color-accent); }}
   </style>
   {gsap_shim_script()}
 </head>
 <body>
-  <div data-composition-id="root" data-start="0" data-duration="{self._f(total_duration)}" data-width="{width}" data-height="{height}">
+  <div id="root" data-composition-id="root" data-start="0" data-duration="{self._f(total_duration)}" data-width="{width}" data-height="{height}">
     {"".join(clip_html)}
     {"".join(audio_html)}
     <script>
@@ -1100,14 +2138,7 @@ class HyperFramesCompose(BaseTool):
                 f'data-start="{self._f(in_s)}" data-duration="{self._f(duration)}" '
                 f'data-track-index="1">{inner}</div>'
             )
-            # Mild entrance — fade + lift. +0.1 s offset lets the cut's
-            # container fade-in complete before text animates, avoiding a
-            # simultaneous opacity flash on the first frame.
-            tween = (
-                f'tl.from("#{cut_id} h1", {{ y: 40, opacity: 0, duration: 0.6, '
-                f'ease: "power3.out" }}, {self._f(in_s + 0.1)});'
-            )
-            return html, tween
+            return html, None
 
         if ext in _IMAGE_EXTENSIONS and src_path:
             rel = self._rel_from_workspace(str(src_path))
@@ -1117,12 +2148,7 @@ class HyperFramesCompose(BaseTool):
                 f'data-start="{self._f(in_s)}" data-duration="{self._f(duration)}" '
                 f'data-track-index="1" alt="">'
             )
-            # +0.1 s offset matches text-card entrance delay for visual consistency.
-            tween = (
-                f'tl.from("#{cut_id}", {{ scale: 1.05, opacity: 0, duration: 0.5, '
-                f'ease: "power2.out" }}, {self._f(in_s + 0.1)});'
-            )
-            return html, tween
+            return html, None
 
         if ext in _VIDEO_EXTENSIONS and src_path:
             rel = self._rel_from_workspace(str(src_path))

@@ -19,6 +19,10 @@ next stage is subtitle timing.
 | `transcriber` | Speech-to-text with word timestamps, language detection, optional diarization |
 | `qwen_asr` | Bailian/DashScope transcript text; no word timestamps or diarization |
 
+`transcriber` requires an explicit `output_dir` under the project workspace, for
+example `projects/<project-name>/artifacts/transcripts/`. Do not let transcript
+JSON/SRT sidecars land next to arbitrary source media.
+
 ## How It Works
 
 1. **Model loading:** faster-whisper loads the specified model size (tiny through large-v3). Defaults to `base` for speed. Use `large-v3` for production quality.

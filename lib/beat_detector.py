@@ -253,7 +253,7 @@ def _cli(argv: list[str]) -> int:
         print(f"error: audio file not found: {path}", file=sys.stderr)
         return 2
     report = analyze(path)
-    print(json.dumps(report, indent=2))
+    print(json.dumps(report, indent=2, allow_nan=False))
     return 0
 
 

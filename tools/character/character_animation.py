@@ -26,14 +26,47 @@ from tools.base_tool import (
     ToolStability,
     ToolTier,
 )
+from tools.output_paths import (
+    require_explicit_output_path,
+    require_optional_project_artifact_destination,
+    require_optional_project_media_destination,
+    require_optional_project_media_directory_destination,
+)
 
 
-def _write_json(path: str | None, data: dict[str, Any]) -> list[str]:
+class StrictJsonArtifactError(ValueError):
+    """Raised when a character artifact cannot be persisted as strict JSON."""
+
+
+class CharacterArtifactPathError(ValueError):
+    """Raised when a character artifact output path violates project layout."""
+
+
+def _write_json(
+    path: str | None,
+    data: dict[str, Any],
+    tool_name: str,
+    artifact_label: str,
+) -> list[str]:
     if not path:
         return []
-    out = Path(path)
+    out, output_error = require_optional_project_artifact_destination(
+        {"output_path": path},
+        "output_path",
+        tool_name,
+        artifact_label=artifact_label,
+    )
+    if output_error:
+        raise CharacterArtifactPathError(output_error.error or "Invalid output_path")
+    assert out is not None
+    try:
+        serialized = json.dumps(data, indent=2, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        raise StrictJsonArtifactError(
+            f"Character animation artifact must be strict JSON serializable: {exc}"
+        ) from exc
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    out.write_text(serialized, encoding="utf-8")
     return [str(out)]
 
 
@@ -85,32 +118,37 @@ def _render_preview_mp4(preview_path: Path, video_path: Path, duration_seconds: 
     frame_dir = video_path.parent / f"{video_path.stem}_frames"
     frame_dir.mkdir(parents=True, exist_ok=True)
     frame_count = max(2, int(duration_seconds * fps))
-    with sync_playwright() as p:
-        browser = p.chromium.launch()
-        page = browser.new_page(viewport={"width": 1280, "height": 720})
-        page.goto(preview_path.resolve().as_uri(), wait_until="networkidle")
-        for frame in range(frame_count):
-            if frame:
-                page.wait_for_timeout(int(1000 / fps))
-            page.screenshot(path=str(frame_dir / f"frame_{frame:04d}.png"))
-        browser.close()
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            try:
+                page = browser.new_page(viewport={"width": 1280, "height": 720})
+                page.goto(preview_path.resolve().as_uri(), wait_until="networkidle")
+                for frame in range(frame_count):
+                    if frame:
+                        page.wait_for_timeout(int(1000 / fps))
+                    page.screenshot(path=str(frame_dir / f"frame_{frame:04d}.png"))
+            finally:
+                browser.close()
 
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-framerate",
-        str(fps),
-        "-i",
-        str(frame_dir / "frame_%04d.png"),
-        "-r",
-        str(fps),
-        "-pix_fmt",
-        "yuv420p",
-        str(video_path),
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(result.stderr.strip() or "ffmpeg failed to render preview MP4")
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-framerate",
+            str(fps),
+            "-i",
+            str(frame_dir / "frame_%04d.png"),
+            "-r",
+            str(fps),
+            "-pix_fmt",
+            "yuv420p",
+            str(video_path),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or "ffmpeg failed to render preview MP4")
+    finally:
+        shutil.rmtree(frame_dir, ignore_errors=True)
 
 
 class CharacterSpecGenerator(BaseTool):
@@ -136,7 +174,14 @@ class CharacterSpecGenerator(BaseTool):
             "output_path": {"type": "string"},
         },
     }
-    output_schema = {"type": "object", "properties": {"character_design": {"type": "object"}}}
+    output_schema = {
+        "type": "object",
+        "required": ["character_design"],
+        "properties": {
+            "character_design": {"type": "object"},
+            "output_path": {"type": "string"},
+        },
+    }
     artifact_schema = {"artifact": "character_design"}
     idempotency_key_fields = ["characters", "brief", "style", "output_path"]
     side_effects = ["optionally writes character_design JSON to output_path"]
@@ -181,10 +226,25 @@ class CharacterSpecGenerator(BaseTool):
                 "brief": inputs.get("brief", ""),
             },
         }
-        artifacts = _write_json(inputs.get("output_path"), artifact)
+        try:
+            artifacts = _write_json(
+                inputs.get("output_path"),
+                artifact,
+                self.name,
+                "character_design artifact",
+            )
+        except (StrictJsonArtifactError, CharacterArtifactPathError) as exc:
+            return ToolResult(
+                success=False,
+                error=str(exc),
+                duration_seconds=round(time.time() - start, 2),
+            )
+        data = {"character_design": artifact}
+        if artifacts:
+            data["output_path"] = artifacts[0]
         return ToolResult(
             success=True,
-            data={"character_design": artifact},
+            data=data,
             artifacts=artifacts,
             duration_seconds=round(time.time() - start, 2),
         )
@@ -211,6 +271,14 @@ class SvgRigBuilder(BaseTool):
         "required": ["character_design"],
         "properties": {
             "character_design": {"type": "object"},
+            "output_path": {"type": "string"},
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["rig_plan"],
+        "properties": {
+            "rig_plan": {"type": "object"},
             "output_path": {"type": "string"},
         },
     }
@@ -284,10 +352,25 @@ class SvgRigBuilder(BaseTool):
                 }
             )
         artifact = {"version": "1.0", "characters": rig_characters, "metadata": {"source": self.name}}
-        artifacts = _write_json(inputs.get("output_path"), artifact)
+        try:
+            artifacts = _write_json(
+                inputs.get("output_path"),
+                artifact,
+                self.name,
+                "rig_plan artifact",
+            )
+        except (StrictJsonArtifactError, CharacterArtifactPathError) as exc:
+            return ToolResult(
+                success=False,
+                error=str(exc),
+                duration_seconds=round(time.time() - start, 2),
+            )
+        data = {"rig_plan": artifact}
+        if artifacts:
+            data["output_path"] = artifacts[0]
         return ToolResult(
             success=True,
-            data={"rig_plan": artifact},
+            data=data,
             artifacts=artifacts,
             duration_seconds=round(time.time() - start, 2),
         )
@@ -313,6 +396,14 @@ class PoseLibraryBuilder(BaseTool):
         "type": "object",
         "required": ["rig_plan"],
         "properties": {"rig_plan": {"type": "object"}, "output_path": {"type": "string"}},
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["pose_library"],
+        "properties": {
+            "pose_library": {"type": "object"},
+            "output_path": {"type": "string"},
+        },
     }
     artifact_schema = {"artifact": "pose_library"}
     idempotency_key_fields = ["rig_plan", "output_path"]
@@ -376,10 +467,25 @@ class PoseLibraryBuilder(BaseTool):
                 }
             )
         artifact = {"version": "1.0", "characters": characters, "metadata": {"source": self.name}}
-        artifacts = _write_json(inputs.get("output_path"), artifact)
+        try:
+            artifacts = _write_json(
+                inputs.get("output_path"),
+                artifact,
+                self.name,
+                "pose_library artifact",
+            )
+        except (StrictJsonArtifactError, CharacterArtifactPathError) as exc:
+            return ToolResult(
+                success=False,
+                error=str(exc),
+                duration_seconds=round(time.time() - start, 2),
+            )
+        data = {"pose_library": artifact}
+        if artifacts:
+            data["output_path"] = artifacts[0]
         return ToolResult(
             success=True,
-            data={"pose_library": artifact},
+            data=data,
             artifacts=artifacts,
             duration_seconds=round(time.time() - start, 2),
         )
@@ -408,6 +514,14 @@ class ActionTimelineCompiler(BaseTool):
             "scene_plan": {"type": "object"},
             "character_ids": {"type": "array", "items": {"type": "string"}},
             "fps": {"type": "number"},
+            "output_path": {"type": "string"},
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["action_timeline"],
+        "properties": {
+            "action_timeline": {"type": "object"},
             "output_path": {"type": "string"},
         },
     }
@@ -477,10 +591,25 @@ class ActionTimelineCompiler(BaseTool):
             "scenes": scenes,
             "metadata": {"source": self.name},
         }
-        artifacts = _write_json(inputs.get("output_path"), artifact)
+        try:
+            artifacts = _write_json(
+                inputs.get("output_path"),
+                artifact,
+                self.name,
+                "action_timeline artifact",
+            )
+        except (StrictJsonArtifactError, CharacterArtifactPathError) as exc:
+            return ToolResult(
+                success=False,
+                error=str(exc),
+                duration_seconds=round(time.time() - start, 2),
+            )
+        data = {"action_timeline": artifact}
+        if artifacts:
+            data["output_path"] = artifacts[0]
         return ToolResult(
             success=True,
-            data={"action_timeline": artifact},
+            data=data,
             artifacts=artifacts,
             duration_seconds=round(time.time() - start, 2),
         )
@@ -512,14 +641,26 @@ class CharacterRigRenderer(BaseTool):
     ]
     input_schema = {
         "type": "object",
-        "required": ["action_timeline"],
+        "required": ["action_timeline", "output_path"],
         "properties": {
             "action_timeline": {"type": "object"},
             "rig_plan": {"type": "object"},
             "pose_library": {"type": "object"},
-            "output_path": {"type": "string"},
+            "output_path": {
+                "type": "string",
+                "description": (
+                    "Project-scoped HTML preview path under "
+                    "projects/<project-name>/assets/... or projects/<project-name>/renders/..."
+                ),
+            },
             "workspace_path": {"type": "string"},
-            "video_output_path": {"type": "string"},
+            "video_output_path": {
+                "type": "string",
+                "description": (
+                    "Optional project-scoped preview video path under "
+                    "projects/<project-name>/assets/... or projects/<project-name>/renders/..."
+                ),
+            },
             "render_video": {"type": "boolean", "default": False},
             "duration_seconds": {"type": "number", "minimum": 0.1, "default": 3},
             "fps": {"type": "integer", "minimum": 1, "default": 12},
@@ -527,19 +668,35 @@ class CharacterRigRenderer(BaseTool):
     }
     output_schema = {
         "type": "object",
+        "required": [
+            "output_path",
+            "preview_path",
+            "render_package",
+            "workspace_path",
+            "hyperframes_workspace",
+            "composition_path",
+            "asset_manifest",
+            "edit_decisions",
+        ],
         "properties": {
+            "output_path": {"type": "string"},
             "preview_path": {"type": "string"},
+            "render_package": {"type": "string"},
+            "workspace_path": {"type": "string"},
             "hyperframes_workspace": {"type": "string"},
             "composition_path": {"type": "string"},
+            "video_output_path": {"type": "string"},
             "video_path": {"type": "string"},
             "asset_manifest": {"type": "object"},
             "edit_decisions": {"type": "object"},
+            "video_asset_manifest": {"type": "object"},
+            "video_edit_decisions": {"type": "object"},
         },
     }
     side_effects = [
         "writes a lightweight HTML preview to output_path",
-        "writes a HyperFrames workspace/package",
-        "optionally writes preview MP4",
+        "writes a HyperFrames workspace/package to workspace_path when provided",
+        "optionally writes preview MP4 to video_output_path when provided",
     ]
     idempotency_key_fields = [
         "action_timeline",
@@ -552,13 +709,38 @@ class CharacterRigRenderer(BaseTool):
         "duration_seconds",
         "fps",
     ]
-    user_visible_verification = ["Open preview and check character visibility and motion"]
+    user_visible_verification = [
+        "Inspect the preview with headless checks or sampled frames; launch an interactive preview only when explicitly requested"
+    ]
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
         start = time.time()
-        output_path = Path(inputs.get("output_path", "projects/character-preview/preview.html"))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="character animation preview",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+        workspace_path, workspace_error = require_optional_project_media_directory_destination(
+            inputs,
+            "workspace_path",
+            self.name,
+            artifact_label="HyperFrames workspace",
+        )
+        if workspace_error:
+            return workspace_error
+        video_output_path, video_output_error = require_optional_project_media_destination(
+            inputs,
+            "video_output_path",
+            self.name,
+            artifact_label="character preview video",
+        )
+        if video_output_error:
+            return video_output_error
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        timeline_json = json.dumps(inputs["action_timeline"])
+        timeline_json = json.dumps(inputs["action_timeline"], allow_nan=False)
         rig_characters = (inputs.get("rig_plan") or {}).get("characters", [])
         if not rig_characters:
             seen_ids = {
@@ -650,10 +832,7 @@ class CharacterRigRenderer(BaseTool):
             ]
             or [float(inputs.get("duration_seconds", 3))]
         )
-        workspace_path = Path(
-            inputs.get("workspace_path")
-            or output_path.parent / "hyperframes"
-        )
+        workspace_path = workspace_path or output_path.parent / "hyperframes"
         composition_dir = workspace_path / "compositions"
         composition_dir.mkdir(parents=True, exist_ok=True)
         (workspace_path / "assets").mkdir(parents=True, exist_ok=True)
@@ -668,6 +847,7 @@ class CharacterRigRenderer(BaseTool):
                     },
                 },
                 indent=2,
+                allow_nan=False,
             ),
             encoding="utf-8",
         )
@@ -753,8 +933,10 @@ class CharacterRigRenderer(BaseTool):
             },
         }
         data: dict[str, Any] = {
+            "output_path": str(output_path),
             "preview_path": str(output_path),
             "render_package": "hyperframes_workspace",
+            "workspace_path": str(workspace_path),
             "hyperframes_workspace": str(workspace_path),
             "composition_path": str(composition_path),
             "asset_manifest": asset_manifest,
@@ -763,10 +945,7 @@ class CharacterRigRenderer(BaseTool):
         artifacts = [str(output_path), str(workspace_path / "hyperframes.json"), str(composition_path)]
         render_video = bool(inputs.get("render_video") or inputs.get("video_output_path"))
         if render_video:
-            video_path = Path(
-                inputs.get("video_output_path")
-                or output_path.with_suffix(".mp4")
-            )
+            video_path = video_output_path or output_path.with_suffix(".mp4")
             video_path.parent.mkdir(parents=True, exist_ok=True)
             duration_seconds = float(inputs.get("duration_seconds", 3))
             fps = int(inputs.get("fps", 12))
@@ -809,6 +988,7 @@ class CharacterRigRenderer(BaseTool):
             }
             data.update(
                 {
+                    "video_output_path": str(video_path),
                     "video_path": str(video_path),
                     "video_asset_manifest": video_asset_manifest,
                     "video_edit_decisions": video_edit_decisions,
@@ -849,6 +1029,14 @@ class CharacterAnimationReviewer(BaseTool):
             "review_level": {"type": "string", "enum": ["static", "browser", "final"], "default": "static"},
             "browser_preview_checked": {"type": "boolean", "default": False},
             "frame_samples_checked": {"type": "boolean", "default": False},
+            "output_path": {"type": "string"},
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["character_qa_report"],
+        "properties": {
+            "character_qa_report": {"type": "object"},
             "output_path": {"type": "string"},
         },
     }
@@ -939,10 +1127,25 @@ class CharacterAnimationReviewer(BaseTool):
                 "confidence": "static artifact review; run Playwright/FFmpeg checks in compose for final output",
             },
         }
-        artifacts = _write_json(inputs.get("output_path"), report)
+        try:
+            artifacts = _write_json(
+                inputs.get("output_path"),
+                report,
+                self.name,
+                "character_qa_report artifact",
+            )
+        except (StrictJsonArtifactError, CharacterArtifactPathError) as exc:
+            return ToolResult(
+                success=False,
+                error=str(exc),
+                duration_seconds=round(time.time() - start, 2),
+            )
+        data = {"character_qa_report": report}
+        if artifacts:
+            data["output_path"] = artifacts[0]
         return ToolResult(
             success=True,
-            data={"character_qa_report": report},
+            data=data,
             artifacts=artifacts,
             duration_seconds=round(time.time() - start, 2),
         )

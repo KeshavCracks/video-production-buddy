@@ -25,6 +25,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 # Model checkpoint filenames by variant
@@ -66,7 +67,7 @@ class LipSync(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["video_path", "audio_path"],
+        "required": ["video_path", "audio_path", "output_path"],
         "properties": {
             "video_path": {
                 "type": "string",
@@ -78,7 +79,10 @@ class LipSync(BaseTool):
             },
             "output_path": {
                 "type": "string",
-                "description": "Output video path (defaults to {stem}_lipsync.mp4)",
+                "description": (
+                    "Explicit project-scoped output video path under "
+                    "projects/<project-name>/assets/... or projects/<project-name>/renders/..."
+                ),
             },
             "model": {
                 "type": "string",
@@ -101,6 +105,32 @@ class LipSync(BaseTool):
             },
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "video_input",
+            "audio_input",
+            "output",
+            "output_path",
+            "model",
+            "face_padding",
+            "resize_factor",
+        ],
+        "properties": {
+            "video_input": {"type": "string"},
+            "audio_input": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "model": {"type": "string", "enum": list(MODEL_CHECKPOINTS.keys())},
+            "face_padding": {
+                "type": "array",
+                "items": {"type": "integer"},
+                "minItems": 4,
+                "maxItems": 4,
+            },
+            "resize_factor": {"type": "integer"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=2, ram_mb=4096, vram_mb=4096, disk_mb=2000
@@ -115,7 +145,7 @@ class LipSync(BaseTool):
     ]
     side_effects = ["writes lip-synced video to output_path"]
     user_visible_verification = [
-        "Watch output video to verify lip movements match the new audio",
+        "Inspect sampled frames and timing metadata to verify lip movements match the new audio",
         "Check face region for visual artifacts or jitter",
     ]
 
@@ -161,12 +191,6 @@ class LipSync(BaseTool):
         return None
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
-        if self.get_status() != ToolStatus.AVAILABLE:
-            return ToolResult(
-                success=False,
-                error="Wav2Lip not available. " + self.install_instructions,
-            )
-
         video_path = Path(inputs["video_path"])
         audio_path = Path(inputs["audio_path"])
 
@@ -175,10 +199,14 @@ class LipSync(BaseTool):
         if not audio_path.exists():
             return ToolResult(success=False, error=f"Audio not found: {audio_path}")
 
-        output_path = Path(
-            inputs.get("output_path", str(video_path.with_stem(f"{video_path.stem}_lipsync")))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="lip-synced video",
         )
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        if output_error:
+            return output_error
+        assert output_path is not None
 
         model_variant = inputs.get("model", "wav2lip")
         if model_variant not in MODEL_CHECKPOINTS:
@@ -189,6 +217,13 @@ class LipSync(BaseTool):
                     f"Supported: {', '.join(MODEL_CHECKPOINTS)}"
                 ),
             )
+
+        if self.get_status() != ToolStatus.AVAILABLE:
+            return ToolResult(
+                success=False,
+                error="Wav2Lip not available. " + self.install_instructions,
+            )
+
         face_padding = inputs.get("face_padding", [0, 10, 0, 0])
         resize_factor = inputs.get("resize_factor", 1)
 
@@ -214,6 +249,7 @@ class LipSync(BaseTool):
             )
 
         start = time.time()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
         cmd = [
             "python", str(inference_script),
@@ -246,6 +282,7 @@ class LipSync(BaseTool):
                 "video_input": str(video_path),
                 "audio_input": str(audio_path),
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "model": model_variant,
                 "resize_factor": resize_factor,
                 "face_padding": face_padding,

@@ -19,6 +19,7 @@ from tools.base_tool import (
     ToolStability,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 # Built-in grading profiles using FFmpeg colorbalance/curves/eq filters
@@ -101,10 +102,13 @@ class ColorGrade(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["input_path"],
+        "required": ["input_path", "output_path"],
         "properties": {
             "input_path": {"type": "string"},
-            "output_path": {"type": "string"},
+            "output_path": {
+                "type": "string",
+                "description": "Project-scoped output path under projects/<project-name>/assets/... or projects/<project-name>/renders/...",
+            },
             "profile": {
                 "type": "string",
                 "enum": list(PROFILES.keys()),
@@ -124,6 +128,27 @@ class ColorGrade(BaseTool):
             "custom_vf": {"type": "string"},
             "codec": {"type": "string", "default": "libx264"},
             "crf": {"type": "integer", "default": 20},
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "input",
+            "output",
+            "output_path",
+            "profile",
+            "lut",
+            "intensity",
+            "filter",
+        ],
+        "properties": {
+            "input": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "profile": {"type": ["string", "null"]},
+            "lut": {"type": ["string", "null"]},
+            "intensity": {"type": "number"},
+            "filter": {"type": "string"},
         },
     }
 
@@ -149,10 +174,14 @@ class ColorGrade(BaseTool):
         if not input_path.exists():
             return ToolResult(success=False, error=f"Input not found: {input_path}")
 
-        output_path = Path(
-            inputs.get("output_path", str(input_path.with_stem(f"{input_path.stem}_graded")))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="graded video",
         )
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        if output_error:
+            return output_error
+        assert output_path is not None
         codec = inputs.get("codec", "libx264")
         crf = inputs.get("crf", 20)
 
@@ -164,6 +193,7 @@ class ColorGrade(BaseTool):
             return ToolResult(success=False, error="No profile, lut_path, or custom_vf specified")
 
         start = time.time()
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
         cmd = [
             "ffmpeg", "-y",
@@ -192,6 +222,7 @@ class ColorGrade(BaseTool):
             data={
                 "input": str(input_path),
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "profile": inputs.get("profile"),
                 "lut": inputs.get("lut_path"),
                 "intensity": inputs.get("intensity", 1.0),

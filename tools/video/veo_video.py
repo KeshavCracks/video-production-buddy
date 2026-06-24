@@ -26,7 +26,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
-from tools.video._shared import validate_video_operation
+from tools.video._shared import require_generated_video_output_path, validate_video_operation
 
 
 class VeoVideo(BaseTool):
@@ -67,7 +67,7 @@ class VeoVideo(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {"type": "string"},
             "operation": {
@@ -128,6 +128,39 @@ class VeoVideo(BaseTool):
             "output_path": {"type": "string"},
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "model",
+            "prompt",
+            "output",
+            "output_path",
+            "has_audio",
+            "operation",
+            "format",
+            "file_size_bytes",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "veo"},
+            "model": {"type": "string"},
+            "prompt": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "has_audio": {"type": "boolean"},
+            "operation": {
+                "type": "string",
+                "enum": ["text_to_video", "image_to_video", "reference_to_video", "first_last_frame_to_video"],
+            },
+            "format": {"type": "string", "const": "mp4"},
+            "file_size_bytes": {"type": "integer", "minimum": 0},
+            "duration_seconds": {"type": "number", "minimum": 0},
+            "file_size_mb": {"type": "number", "minimum": 0},
+            "video_width": {"type": "integer", "minimum": 0},
+            "video_height": {"type": "integer", "minimum": 0},
+            "video_codec": {"type": "string"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=512, vram_mb=0, disk_mb=500, network_required=True
@@ -155,8 +188,8 @@ class VeoVideo(BaseTool):
     ]
     side_effects = ["writes video file to output_path", "calls fal.ai API"]
     user_visible_verification = [
-        "Watch generated clip for visual quality and motion",
-        "Listen for audio synchronization and quality",
+        "Inspect sampled frames for visual quality and motion",
+        "Inspect audio stream metadata and timing alignment for synchronization and quality",
     ]
 
     def _get_api_key(self) -> str | None:
@@ -212,13 +245,6 @@ class VeoVideo(BaseTool):
         return None
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
-        api_key = self._get_api_key()
-        if not api_key:
-            return ToolResult(
-                success=False,
-                error="FAL_KEY / FAL_AI_API_KEY not set. " + self.install_instructions,
-            )
-
         operation = inputs.get("operation", "text_to_video")
         operation_error = validate_video_operation(
             operation,
@@ -226,6 +252,16 @@ class VeoVideo(BaseTool):
         )
         if operation_error:
             return ToolResult(success=False, error=operation_error)
+        output_path, output_error = require_generated_video_output_path(inputs, self.name)
+        if output_error:
+            return output_error
+
+        api_key = self._get_api_key()
+        if not api_key:
+            return ToolResult(
+                success=False,
+                error="FAL_KEY / FAL_AI_API_KEY not set. " + self.install_instructions,
+            )
 
         import requests
 
@@ -352,7 +388,6 @@ class VeoVideo(BaseTool):
             video_response = requests.get(video_url, timeout=120)
             video_response.raise_for_status()
 
-            output_path = Path(inputs.get("output_path", "veo_output.mp4"))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(video_response.content)
 

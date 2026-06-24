@@ -24,6 +24,7 @@ from tools.base_tool import (
     ToolStability,
     ToolTier,
 )
+from tools.output_paths import require_explicit_project_media_directory_destination
 
 
 class VisualQA(BaseTool):
@@ -78,8 +79,9 @@ class VisualQA(BaseTool):
             "output_dir": {
                 "type": "string",
                 "description": (
-                    "Directory to save extracted frames. Defaults to a "
-                    "'review_frames' subdirectory next to the input file."
+                    "Required for review operations. Project-scoped directory "
+                    "for extracted frames under projects/<project-name>/assets/... "
+                    "or projects/<project-name>/renders/..."
                 ),
             },
             "checks": {
@@ -110,6 +112,97 @@ class VisualQA(BaseTool):
                     "max_duration": {"type": "number"},
                     "pixel_format": {"type": "string"},
                     "has_audio": {"type": "boolean"},
+                },
+            },
+        },
+        "allOf": [
+            {
+                "if": {
+                    "properties": {"operation": {"const": "review"}},
+                    "required": ["operation"],
+                },
+                "then": {"required": ["output_dir"]},
+            },
+        ],
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["operation", "input"],
+        "allOf": [
+            {
+                "if": {
+                    "properties": {"operation": {"const": "review"}},
+                    "required": ["operation"],
+                },
+                "then": {"required": ["frame_count", "frames", "output_dir"]},
+            },
+            {
+                "if": {
+                    "properties": {"operation": {"const": "probe"}},
+                    "required": ["operation"],
+                },
+                "then": {
+                    "required": [
+                        "duration",
+                        "file_size_mb",
+                        "has_audio",
+                        "validation_issues",
+                        "validation_passed",
+                    ]
+                },
+            },
+            {
+                "if": {
+                    "properties": {"operation": {"const": "audio_levels"}},
+                    "required": ["operation"],
+                },
+                "then": {"required": ["levels"]},
+            },
+        ],
+        "properties": {
+            "operation": {
+                "type": "string",
+                "enum": ["review", "probe", "audio_levels"],
+            },
+            "input": {"type": "string"},
+            "output_dir": {"type": "string"},
+            "frame_count": {"type": "integer", "minimum": 0},
+            "frames": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["timestamp", "path"],
+                    "properties": {
+                        "timestamp": {"type": "number"},
+                        "path": {"type": ["string", "null"]},
+                        "error": {"type": "string"},
+                    },
+                },
+            },
+            "duration": {"type": "number", "minimum": 0},
+            "file_size_mb": {"type": "number", "minimum": 0},
+            "has_audio": {"type": "boolean"},
+            "width": {"type": "integer", "minimum": 1},
+            "height": {"type": "integer", "minimum": 1},
+            "pixel_format": {"type": "string"},
+            "video_codec": {"type": "string"},
+            "frame_rate": {"type": "string"},
+            "audio_codec": {"type": "string"},
+            "sample_rate": {"type": "string"},
+            "channels": {"type": "integer", "minimum": 0},
+            "validation_issues": {"type": "array", "items": {"type": "string"}},
+            "validation_passed": {"type": "boolean"},
+            "levels": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["timestamp"],
+                    "properties": {
+                        "timestamp": {"type": "number"},
+                        "mean_volume_db": {"type": ["number", "null"]},
+                        "max_volume_db": {"type": ["number", "null"]},
+                        "error": {"type": "string"},
+                    },
                 },
             },
         },
@@ -155,6 +248,16 @@ class VisualQA(BaseTool):
     def _review(self, inputs: dict[str, Any]) -> ToolResult:
         """Extract frames at specified timestamps for visual review."""
         input_path = inputs["input_path"]
+        output_dir, output_error = require_explicit_project_media_directory_destination(
+            inputs,
+            "output_dir",
+            self.name,
+            artifact_label="extracted review frames",
+        )
+        if output_error:
+            return output_error
+        assert output_dir is not None
+
         timestamps = inputs.get("timestamps", [])
 
         if not timestamps:
@@ -168,15 +271,12 @@ class VisualQA(BaseTool):
                 max(dur - 1.0, 0),
             ]
 
-        output_dir = inputs.get("output_dir")
-        if not output_dir:
-            output_dir = str(Path(input_path).parent / "review_frames")
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         frames = []
         for ts in timestamps:
             ts_label = f"{ts:.1f}".replace(".", "_")
-            frame_path = str(Path(output_dir) / f"frame_{ts_label}s.jpg")
+            frame_path = str(output_dir / f"frame_{ts_label}s.jpg")
             cmd = [
                 "ffmpeg", "-y",
                 "-ss", str(ts),
@@ -204,6 +304,7 @@ class VisualQA(BaseTool):
             data={
                 "operation": "review",
                 "input": input_path,
+                "output_dir": str(output_dir),
                 "frame_count": len([f for f in frames if f.get("path")]),
                 "frames": frames,
             },

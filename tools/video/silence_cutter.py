@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import time
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,10 @@ from tools.base_tool import (
     ToolResult,
     ToolStability,
     ToolTier,
+)
+from tools.output_paths import (
+    require_explicit_output_path,
+    require_explicit_project_sidecar_path,
 )
 
 
@@ -63,10 +68,17 @@ class SilenceCutter(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["input_path"],
+        "required": ["input_path", "output_path"],
         "properties": {
             "input_path": {"type": "string"},
-            "output_path": {"type": "string"},
+            "output_path": {
+                "type": "string",
+                "description": (
+                    "Project-scoped output path. Use projects/<project-name>/artifacts/... "
+                    "for mark mode metadata, or projects/<project-name>/assets/... / "
+                    "projects/<project-name>/renders/... for rendered video modes."
+                ),
+            },
             "mode": {
                 "type": "string",
                 "enum": ["remove", "speed_up", "mark"],
@@ -101,6 +113,25 @@ class SilenceCutter(BaseTool):
             "crf": {"type": "integer", "default": 18},
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": ["silence_segments", "output", "output_path"],
+        "properties": {
+            "message": {"type": "string"},
+            "mode": {"type": "string", "enum": ["mark", "remove", "speed_up"]},
+            "silence_segments": {"type": "integer"},
+            "speech_segments": {"type": "integer"},
+            "silence_duration_seconds": {"type": "number"},
+            "speech_duration_seconds": {"type": "number"},
+            "input": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "input_duration": {"type": "number"},
+            "output_duration": {"type": ["number", "null"]},
+            "silence_removed_seconds": {"type": "number"},
+            "time_saved_percent": {"type": "number"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=4, ram_mb=2048, vram_mb=0, disk_mb=4000, network_required=False
@@ -118,9 +149,9 @@ class SilenceCutter(BaseTool):
         "codec",
         "crf",
     ]
-    side_effects = ["writes cut video to output_path"]
+    side_effects = ["writes silence metadata or cut video to output_path"]
     user_visible_verification = [
-        "Watch output for unnaturally clipped words at cut points",
+        "Inspect cut timestamps and waveform/text alignment for unnaturally clipped words at cut points",
         "Compare duration: output should be noticeably shorter than input",
     ]
 
@@ -132,6 +163,23 @@ class SilenceCutter(BaseTool):
         mode = inputs.get("mode", "remove")
         start = time.time()
 
+        if mode == "mark":
+            validated_output_path, output_error = require_explicit_project_sidecar_path(
+                inputs,
+                "output_path",
+                self.name,
+                artifact_label="silence metadata",
+            )
+        else:
+            validated_output_path, output_error = require_explicit_output_path(
+                inputs,
+                self.name,
+                artifact_label="silence-cut video",
+            )
+        if output_error:
+            return output_error
+        assert validated_output_path is not None
+
         # Step 1: Detect silence segments
         threshold_db = inputs.get("silence_threshold_db", -35)
         min_dur = inputs.get("min_silence_duration", 0.5)
@@ -141,15 +189,55 @@ class SilenceCutter(BaseTool):
 
         if not silences:
             elapsed = time.time() - start
+            if mode == "mark":
+                output_json = validated_output_path
+                output_json.parent.mkdir(parents=True, exist_ok=True)
+                total_duration = self._get_duration(input_path)
+                result_data = {
+                    "silences": [],
+                    "speech_segments": (
+                        [{"start": 0.0, "end": total_duration}]
+                        if total_duration > 0
+                        else []
+                    ),
+                    "total_duration": total_duration,
+                    "silence_duration": 0.0,
+                    "speech_duration": total_duration,
+                }
+                output_json.write_text(
+                    json.dumps(result_data, indent=2, allow_nan=False),
+                    encoding="utf-8",
+                )
+                return ToolResult(
+                    success=True,
+                    data={
+                        "message": "No silence detected",
+                        "mode": "mark",
+                        "silence_segments": 0,
+                        "speech_segments": len(result_data["speech_segments"]),
+                        "silence_duration_seconds": 0.0,
+                        "speech_duration_seconds": round(total_duration, 2),
+                        "output": str(output_json),
+                        "output_path": str(output_json),
+                    },
+                    artifacts=[str(output_json)],
+                    duration_seconds=round(elapsed, 2),
+                )
+
+            output_path = validated_output_path
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            if output_path != input_path:
+                shutil.copy2(input_path, output_path)
             return ToolResult(
                 success=True,
                 data={
                     "message": "No silence detected — video unchanged",
                     "silence_segments": 0,
                     "input": str(input_path),
-                    "output": str(input_path),
+                    "output": str(output_path),
+                    "output_path": str(output_path),
                 },
-                artifacts=[str(input_path)],
+                artifacts=[str(output_path)],
                 duration_seconds=round(elapsed, 2),
             )
 
@@ -164,9 +252,7 @@ class SilenceCutter(BaseTool):
         # Step 3: Handle based on mode
         if mode == "mark":
             elapsed = time.time() - start
-            output_json = Path(
-                inputs.get("output_path", str(input_path.with_suffix(".silence.json")))
-            )
+            output_json = validated_output_path
             result_data = {
                 "silences": silences,
                 "speech_segments": speech_segments,
@@ -175,7 +261,14 @@ class SilenceCutter(BaseTool):
                 "speech_duration": sum(s["end"] - s["start"] for s in speech_segments),
             }
             output_json.parent.mkdir(parents=True, exist_ok=True)
-            output_json.write_text(json.dumps(result_data, indent=2), encoding="utf-8")
+            try:
+                serialized = json.dumps(result_data, indent=2, allow_nan=False)
+            except (TypeError, ValueError) as exc:
+                return ToolResult(
+                    success=False,
+                    error=f"Silence metadata must be strict JSON serializable: {exc}",
+                )
+            output_json.write_text(serialized, encoding="utf-8")
             return ToolResult(
                 success=True,
                 data={
@@ -185,14 +278,13 @@ class SilenceCutter(BaseTool):
                     "silence_duration_seconds": round(result_data["silence_duration"], 2),
                     "speech_duration_seconds": round(result_data["speech_duration"], 2),
                     "output": str(output_json),
+                    "output_path": str(output_json),
                 },
                 artifacts=[str(output_json)],
                 duration_seconds=round(elapsed, 2),
             )
 
-        output_path = Path(
-            inputs.get("output_path", str(input_path.with_stem(f"{input_path.stem}_cut")))
-        )
+        output_path = validated_output_path
         output_path.parent.mkdir(parents=True, exist_ok=True)
         codec = inputs.get("codec", "libx264")
         crf = inputs.get("crf", 18)
@@ -222,6 +314,7 @@ class SilenceCutter(BaseTool):
                 "mode": mode,
                 "input": str(input_path),
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "input_duration": round(total_duration, 2),
                 "output_duration": round(speech_dur, 2) if mode == "remove" else None,
                 "silence_removed_seconds": round(silence_dur, 2),

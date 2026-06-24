@@ -4,6 +4,7 @@ import sys
 import types
 from pathlib import Path
 
+import jsonschema
 import pytest
 
 from lib.corpus import Corpus
@@ -27,6 +28,80 @@ class _PartialFailureSource:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_bytes(b"x" * 2048)
         raise OSError("interrupted download")
+
+
+class _EmptySource:
+    name = "empty"
+
+    def is_available(self) -> bool:
+        return True
+
+    def search(self, query: str, filters) -> list[Candidate]:
+        return []
+
+
+class _FakeCache:
+    def stats(self) -> dict[str, object]:
+        return {"entries": 0, "bytes": 0}
+
+
+def test_corpus_builder_success_payload_matches_output_schema(
+    monkeypatch,
+    tmp_path,
+):
+    import tools.video.clip_cache as clip_cache
+    import tools.video.stock_sources as stock_sources
+
+    monkeypatch.chdir(tmp_path)
+    source = _EmptySource()
+    monkeypatch.setattr(stock_sources, "all_sources", lambda: [source])
+    monkeypatch.setattr(stock_sources, "available_sources", lambda: [source])
+    monkeypatch.setattr(
+        stock_sources,
+        "source_summary",
+        lambda: {
+            "configured": 1,
+            "total": 1,
+            "available_source_names": [source.name],
+            "unavailable_source_names": [],
+        },
+    )
+    monkeypatch.setattr(clip_cache, "get_default_cache", lambda: _FakeCache())
+
+    tool = CorpusBuilder()
+    output_properties = tool.output_schema["properties"]
+    assert {
+        "corpus_dir",
+        "queries_run",
+        "candidates_seen",
+        "clips_added",
+        "clips_skipped_existing",
+        "clips_failed",
+        "per_source_counts",
+        "added_ids",
+        "total_corpus_size",
+        "requested_sources",
+        "resolved_sources",
+        "source_provider_summary",
+        "cache_hits",
+        "cache_misses",
+        "cache_bytes_saved",
+        "cache_stats",
+        "errors",
+    } <= set(output_properties)
+
+    result = tool.execute(
+        {
+            "corpus_dir": "projects/demo/corpus",
+            "queries": [{"query": "rain at night"}],
+            "sources": [source.name],
+        }
+    )
+
+    assert result.success is True
+    assert result.data["corpus_dir"] == "projects/demo/corpus"
+    assert result.data["clips_added"] == 0
+    jsonschema.validate(instance=result.data, schema=tool.output_schema)
 
 
 def test_corpus_builder_removes_partial_file_when_download_fails(monkeypatch, tmp_path):
@@ -64,6 +139,34 @@ def test_save_as_jpeg_reports_failed_cv2_write(monkeypatch, tmp_path):
     monkeypatch.setitem(sys.modules, "cv2", fake_cv2)
 
     assert not _save_as_jpeg(tmp_path / "input.png", tmp_path / "thumb.jpg")
+
+
+def test_corpus_builder_requires_project_corpus_dir_before_source_lookup(
+    monkeypatch, tmp_path
+):
+    import tools.video.stock_sources as stock_sources
+
+    corpus_dir = tmp_path / "corpus"
+    lookup_calls: list[str] = []
+
+    def fail_available_sources():
+        lookup_calls.append("available_sources")
+        raise AssertionError("stock sources should not be resolved for invalid corpus_dir")
+
+    monkeypatch.setattr(stock_sources, "available_sources", fail_available_sources)
+
+    result = CorpusBuilder().execute(
+        {
+            "corpus_dir": str(corpus_dir),
+            "queries": [{"query": "rain at night"}],
+        }
+    )
+
+    assert not result.success
+    assert "corpus_dir" in (result.error or "")
+    assert "projects/<project-name>/corpus" in (result.error or "")
+    assert lookup_calls == []
+    assert not corpus_dir.exists()
 
 
 def test_corpus_builder_idempotency_key_includes_population_inputs():

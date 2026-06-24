@@ -33,6 +33,10 @@ PHASE2_TOOLS = [
 ]
 
 
+def _project_graphics_output(name: str) -> str:
+    return f"projects/test-phase2/assets/images/{name}"
+
+
 # ---- Contract: every tool inherits BaseTool and has required fields ----
 
 class TestPhase2ToolContracts:
@@ -174,10 +178,17 @@ class TestPhase2ErrorHandling:
         # Either succeeds (provider available) or fails gracefully
         assert isinstance(r, ToolResult)
 
-    def test_diagram_gen_empty_boxes(self):
+    def test_diagram_gen_empty_boxes(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
         tool = DiagramGen()
         if tool.get_status() == ToolStatus.AVAILABLE:
-            r = tool.execute({"diagram_type": "boxes", "boxes": []})
+            r = tool.execute(
+                {
+                    "diagram_type": "boxes",
+                    "boxes": [],
+                    "output_path": _project_graphics_output("empty-boxes.png"),
+                }
+            )
             assert isinstance(r, ToolResult)
 
 
@@ -190,37 +201,40 @@ class TestCodeSnippetUnit:
         if tool.get_status() != ToolStatus.AVAILABLE:
             pytest.skip("Pygments/Pillow not installed")
 
-    def test_render_python(self, has_deps, tmp_path):
+    def test_render_python(self, has_deps, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
         tool = CodeSnippet()
         r = tool.execute({
             "code": "def hello():\n    print('Hello, world!')\n",
             "language": "python",
             "theme": "monokai",
-            "output_path": str(tmp_path / "test.png"),
+            "output_path": _project_graphics_output("test.png"),
         })
         assert r.success
         assert Path(r.data["output"]).exists()
         assert r.data["line_count"] == 3
 
-    def test_render_with_title(self, has_deps, tmp_path):
+    def test_render_with_title(self, has_deps, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
         tool = CodeSnippet()
         r = tool.execute({
             "code": "console.log('test');",
             "language": "javascript",
             "theme": "dracula",
             "title": "example.js",
-            "output_path": str(tmp_path / "titled.png"),
+            "output_path": _project_graphics_output("titled.png"),
         })
         assert r.success
 
-    def test_render_different_themes(self, has_deps, tmp_path):
+    def test_render_different_themes(self, has_deps, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
         tool = CodeSnippet()
         for theme_name in ["monokai", "github_dark", "light"]:
             r = tool.execute({
                 "code": "x = 42",
                 "language": "python",
                 "theme": theme_name,
-                "output_path": str(tmp_path / f"{theme_name}.png"),
+                "output_path": _project_graphics_output(f"{theme_name}.png"),
             })
             assert r.success, f"Theme {theme_name} failed"
 
@@ -234,7 +248,8 @@ class TestDiagramGenUnit:
         if tool.get_status() != ToolStatus.AVAILABLE:
             pytest.skip("No diagram renderer available")
 
-    def test_render_box_diagram(self, has_deps, tmp_path):
+    def test_render_box_diagram(self, has_deps, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
         tool = DiagramGen()
         r = tool.execute({
             "diagram_type": "boxes",
@@ -249,18 +264,19 @@ class TestDiagramGenUnit:
                 {"from": 1, "to": 2, "label": "result"},
             ],
             "theme": "dark",
-            "output_path": str(tmp_path / "boxes.png"),
+            "output_path": _project_graphics_output("boxes.png"),
         })
         assert r.success
         assert Path(r.data["output"]).exists()
         assert r.data["box_count"] == 3
 
-    def test_render_mermaid_fallback(self, has_deps, tmp_path):
+    def test_render_mermaid_fallback(self, has_deps, tmp_path, monkeypatch):
         """If mmdc not installed, falls back to text card."""
+        monkeypatch.chdir(tmp_path)
         tool = DiagramGen()
         r = tool.execute({
             "diagram_type": "mermaid",
             "definition": "graph TD\n  A[Start] --> B[End]",
-            "output_path": str(tmp_path / "mermaid.png"),
+            "output_path": _project_graphics_output("mermaid.png"),
         })
         assert r.success

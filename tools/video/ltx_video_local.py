@@ -16,7 +16,15 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
-from tools.video._shared import LTX_LOCAL_VARIANTS, estimate_local_runtime, generate_local_video, local_generation_status, local_install_instructions
+from tools.video._shared import (
+    LTX_LOCAL_VARIANTS,
+    estimate_local_runtime,
+    generate_local_video,
+    local_generation_status,
+    local_install_instructions,
+    local_video_output_schema,
+    require_generated_video_output_path,
+)
 
 
 class LTXVideoLocal(BaseTool):
@@ -51,7 +59,7 @@ class LTXVideoLocal(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {"type": "string"},
             "operation": {"type": "string", "enum": ["text_to_video", "image_to_video"], "default": "text_to_video"},
@@ -67,6 +75,7 @@ class LTXVideoLocal(BaseTool):
             "output_path": {"type": "string"},
         },
     }
+    output_schema = local_video_output_schema("ltx_video_local")
 
     resource_profile = ResourceProfile(cpu_cores=2, ram_mb=16000, vram_mb=12000, disk_mb=4000, network_required=False)
     retry_policy = RetryPolicy(max_retries=1)
@@ -84,7 +93,7 @@ class LTXVideoLocal(BaseTool):
         "seed",
     ]
     side_effects = ["writes video file to output_path", "may download model weights"]
-    user_visible_verification = ["Watch generated clip for motion coherence and artifacts"]
+    user_visible_verification = ["Inspect sampled frames for motion coherence and artifacts"]
 
     def get_status(self) -> ToolStatus:
         return local_generation_status("LTXPipeline")
@@ -96,6 +105,9 @@ class LTXVideoLocal(BaseTool):
         return estimate_local_runtime(LTX_LOCAL_VARIANTS["ltx2-local"]["speed"])
 
     def execute(self, inputs: dict[str, object]) -> ToolResult:
+        _, output_error = require_generated_video_output_path(inputs, self.name)
+        if output_error:
+            return output_error
         if self.get_status() != ToolStatus.AVAILABLE:
             return ToolResult(success=False, error="Local LTX video generation is unavailable. " + self.install_instructions)
         start = time.time()
@@ -105,4 +117,3 @@ class LTXVideoLocal(BaseTool):
             return ToolResult(success=False, error=f"Local LTX video generation failed: {exc}")
         result.duration_seconds = round(time.time() - start, 2)
         return result
-

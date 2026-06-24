@@ -32,6 +32,7 @@ def test_seedance_polls_returned_queue_urls(monkeypatch, tmp_path, seedance_env)
     """Seedance must poll the queue URLs returned by the same submission."""
     import requests
 
+    monkeypatch.chdir(tmp_path)
     model_path = "bytedance/seedance-2.0/text-to-video"
     submit_url = f"https://queue.fal.run/{model_path}"
     status_url = f"{submit_url}/requests/req-123/status"
@@ -62,20 +63,39 @@ def test_seedance_polls_returned_queue_urls(monkeypatch, tmp_path, seedance_env)
     monkeypatch.setattr(requests, "post", fake_post)
     monkeypatch.setattr(requests, "get", fake_get)
 
-    out = tmp_path / "seedance.mp4"
-    result = SeedanceVideo().execute({"prompt": "A calm product reveal", "output_path": str(out)})
+    output_path = "projects/demo/assets/video/seedance.mp4"
+    out = tmp_path / output_path
+    result = SeedanceVideo().execute({"prompt": "A calm product reveal", "output_path": output_path})
 
     assert result.success, result.error
     assert out.read_bytes() == b"fake-video"
     assert status_url in get_urls
     assert response_url in get_urls
     assert not any("/fal-ai/bytedance/" in url for url in get_urls)
+    output_properties = SeedanceVideo.output_schema["properties"]
+    assert {
+        "provider",
+        "model",
+        "prompt",
+        "operation",
+        "variant",
+        "aspect_ratio",
+        "resolution",
+        "generate_audio",
+        "seed",
+        "output",
+        "output_path",
+        "format",
+        "duration_seconds",
+    } <= set(output_properties)
+    jsonschema.validate(instance=result.data, schema=SeedanceVideo.output_schema)
 
 
 def test_seedance_fallback_queue_urls_match_submission_base(monkeypatch, tmp_path, seedance_env):
     """If fal.ai omits queue URLs, construct them from the POST base path."""
     import requests
 
+    monkeypatch.chdir(tmp_path)
     model_path = "bytedance/seedance-2.0/fast/image-to-video"
     submit_url = f"https://queue.fal.run/{model_path}"
     status_url = f"{submit_url}/requests/req-fallback/status"
@@ -100,14 +120,15 @@ def test_seedance_fallback_queue_urls_match_submission_base(monkeypatch, tmp_pat
     monkeypatch.setattr(requests, "post", fake_post)
     monkeypatch.setattr(requests, "get", fake_get)
 
-    out = tmp_path / "seedance-fallback.mp4"
+    output_path = "projects/demo/assets/video/seedance-fallback.mp4"
+    out = tmp_path / output_path
     result = SeedanceVideo().execute(
         {
             "prompt": "A calm product reveal",
             "operation": "image_to_video",
             "model_variant": "fast",
             "image_url": "https://example.test/start.png",
-            "output_path": str(out),
+            "output_path": output_path,
         }
     )
 
@@ -171,6 +192,7 @@ def test_seedance_schema_requires_image_to_video_start_frame():
             "prompt": "A product starts moving",
             "operation": "image_to_video",
             "image_url": "https://example.test/start.png",
+            "output_path": "projects/demo/assets/video/seedance-i2v.mp4",
         },
         schema=SeedanceVideo.input_schema,
     )
@@ -191,6 +213,7 @@ def test_seedance_schema_requires_reference_to_video_inputs():
             "prompt": "Keep the same character identity",
             "operation": "reference_to_video",
             "reference_image_urls": ["https://example.test/ref.png"],
+            "output_path": "projects/demo/assets/video/seedance-ref.mp4",
         },
         schema=SeedanceVideo.input_schema,
     )

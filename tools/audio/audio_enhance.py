@@ -20,6 +20,7 @@ from tools.base_tool import (
     ToolStability,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 PRESETS = {
@@ -105,10 +106,13 @@ class AudioEnhance(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["input_path"],
+        "required": ["input_path", "output_path"],
         "properties": {
             "input_path": {"type": "string"},
-            "output_path": {"type": "string"},
+            "output_path": {
+                "type": "string",
+                "description": "Project-scoped output path under projects/<project-name>/assets/... or projects/<project-name>/renders/...",
+            },
             "preset": {
                 "type": "string",
                 "enum": list(PRESETS.keys()),
@@ -120,6 +124,17 @@ class AudioEnhance(BaseTool):
             },
             "audio_codec": {"type": "string", "default": "aac"},
             "audio_bitrate": {"type": "string", "default": "192k"},
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["input", "output", "output_path", "preset", "filter"],
+        "properties": {
+            "input": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "preset": {"type": ["string", "null"]},
+            "filter": {"type": "string"},
         },
     }
 
@@ -134,7 +149,7 @@ class AudioEnhance(BaseTool):
     ]
     side_effects = ["writes enhanced audio/video to output_path"]
     user_visible_verification = [
-        "Listen to enhanced audio and compare with original",
+        "Inspect waveform, loudness, and noise metrics against the original audio",
         "Verify speech is clear without artifacts or pumping",
     ]
 
@@ -143,9 +158,14 @@ class AudioEnhance(BaseTool):
         if not input_path.exists():
             return ToolResult(success=False, error=f"Input not found: {input_path}")
 
-        output_path = Path(
-            inputs.get("output_path", str(input_path.with_stem(f"{input_path.stem}_enhanced")))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="enhanced audio/video",
         )
+        if output_error:
+            return output_error
+        assert output_path is not None
         output_path.parent.mkdir(parents=True, exist_ok=True)
         audio_codec = inputs.get("audio_codec", "aac")
         audio_bitrate = inputs.get("audio_bitrate", "192k")
@@ -191,6 +211,7 @@ class AudioEnhance(BaseTool):
             data={
                 "input": str(input_path),
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "preset": inputs.get("preset"),
                 "filter": af,
             },

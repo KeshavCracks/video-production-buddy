@@ -157,7 +157,7 @@ class OpenAITTS(BaseTool):
 
         start = time.time()
         try:
-            result = self._generate(inputs)
+            result = self._generate(inputs, output_path)
         except Exception as exc:
             return ToolResult(success=False, error=f"OpenAI TTS failed: {exc}")
 
@@ -167,7 +167,7 @@ class OpenAITTS(BaseTool):
             result.data.setdefault("output_path", str(output_path))
         return result
 
-    def _generate(self, inputs: dict[str, Any]) -> ToolResult:
+    def _generate(self, inputs: dict[str, Any], output_path: Path) -> ToolResult:
         from openai import OpenAI
 
         from tools.analysis.audio_probe import probe_duration
@@ -177,7 +177,6 @@ class OpenAITTS(BaseTool):
         model = inputs.get("model", "gpt-4o-mini-tts")
         voice = inputs.get("voice", "alloy")
         fmt = inputs.get("format", "mp3")
-        output_path = Path(inputs["output_path"])
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         kwargs: dict[str, Any] = {

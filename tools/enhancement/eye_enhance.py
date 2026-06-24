@@ -29,6 +29,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 # MediaPipe Face Mesh landmark indices for eye regions.
 # These form polygons around each eye area.
@@ -79,10 +80,13 @@ class EyeEnhance(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["input_path"],
+        "required": ["input_path", "output_path"],
         "properties": {
             "input_path": {"type": "string"},
-            "output_path": {"type": "string"},
+            "output_path": {
+                "type": "string",
+                "description": "Project-scoped output path under projects/<project-name>/assets/... or projects/<project-name>/renders/...",
+            },
             "operations": {
                 "type": "array",
                 "items": {
@@ -115,6 +119,20 @@ class EyeEnhance(BaseTool):
             },
             "codec": {"type": "string", "default": "libx264"},
             "crf": {"type": "integer", "default": 18},
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["input", "output", "output_path", "method", "operations"],
+        "properties": {
+            "input": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "method": {"type": "string"},
+            "operations": {"type": "array", "items": {"type": "string"}},
+            "frames_processed": {"type": "integer"},
+            "frames_enhanced": {"type": "integer"},
+            "note": {"type": "string"},
         },
     }
 
@@ -169,9 +187,14 @@ class EyeEnhance(BaseTool):
         except ValueError as e:
             return ToolResult(success=False, error=str(e))
         inputs = {**inputs, "operations": operations}
-        output_path = Path(
-            inputs.get("output_path", str(input_path.with_stem(f"{input_path.stem}_eye_enhanced")))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="eye-enhanced video",
         )
+        if output_error:
+            return output_error
+        assert output_path is not None
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         start = time.time()
@@ -187,6 +210,7 @@ class EyeEnhance(BaseTool):
             return result
 
         elapsed = time.time() - start
+        result.data.setdefault("output_path", str(output_path))
         result.duration_seconds = round(elapsed, 2)
         return result
 
@@ -594,6 +618,7 @@ class EyeEnhance(BaseTool):
             data={
                 "input": str(input_path),
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "method": "ffmpeg_global_brightness",
                 "operations": ["global_brightness_contrast"],
                 "note": "Install mediapipe + opencv-python for precise eye-region enhancement",

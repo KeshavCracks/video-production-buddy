@@ -51,6 +51,7 @@ _DIGEST_LENGTH = 12
 def safe_clip_file_name(clip_id: str, ext: str) -> str:
     """Return a filesystem-local file or directory name for a candidate id."""
     raw = str(clip_id)
+    ext = _safe_file_extension(ext)
     safe = _SAFE_FILENAME_CHARS_RE.sub("_", raw).strip("._-")
     if not safe:
         safe = "clip"
@@ -62,6 +63,26 @@ def safe_clip_file_name(clip_id: str, ext: str) -> str:
         )
         safe = f"{safe[:max_stem]}-{digest}"
     return f"{safe}{ext}"
+
+
+def _safe_file_extension(ext: str) -> str:
+    """Normalize an extension to a single local filename suffix."""
+    raw = str(ext or "")
+    if not raw:
+        return ""
+    normalized = raw.replace("\\", "/")
+    if "/" not in normalized and normalized.startswith("."):
+        suffix = normalized
+    else:
+        suffix = Path(normalized).suffix
+    if not suffix:
+        return ""
+    safe_suffix = _SAFE_FILENAME_CHARS_RE.sub("_", suffix).strip("_")
+    if not safe_suffix or safe_suffix == ".":
+        return ""
+    if not safe_suffix.startswith("."):
+        safe_suffix = f".{safe_suffix.lstrip('.')}"
+    return safe_suffix
 
 
 def stable_source_id(prefix: str, value: str, length: int = 8) -> str:

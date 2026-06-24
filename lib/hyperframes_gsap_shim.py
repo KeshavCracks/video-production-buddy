@@ -7,9 +7,12 @@ def gsap_shim_script() -> str:
     """Return an inline script implementing the GSAP subset we generate.
 
     HyperFrames can drive any object registered in ``window.__timelines`` when
-    it exposes the GSAP-like ``duration/time/seek/play/pause`` methods. The
-    generated Video Production Buddy compositions only use a small subset of GSAP, so this
-    avoids a remote CDN dependency for local validation and test renders.
+    it exposes the GSAP-like
+    ``duration/totalDuration/time/totalTime/seek/timeScale/play/pause/paused``
+    methods. HyperFrames also inspects timelines with ``getChildren()`` during
+    capture. The generated Video Production Buddy compositions only use a small
+    subset of GSAP, so this avoids a remote CDN dependency for local validation
+    and test renders.
     """
     return """<script>
 (function () {
@@ -78,6 +81,8 @@ def gsap_shim_script() -> str:
     let cursor = 0;
     let lastStart = 0;
     let currentTime = 0;
+    let playbackScale = 1;
+    let isPaused = !(options && options.paused === false);
     function position(value) {
       if (typeof value === "number") return value;
       if (value === "<") return lastStart;
@@ -152,10 +157,27 @@ def gsap_shim_script() -> str:
         return add("to", targets, toVars, at);
       },
       duration: function () { return cursor; },
+      totalDuration: function () { return cursor; },
+      getChildren: function () { return []; },
       time: function () { return currentTime; },
+      totalTime: function (value) {
+        if (arguments.length === 0) return currentTime;
+        return seek(value);
+      },
       seek: seek,
-      play: function () { return api; },
-      pause: function () { return api; }
+      timeScale: function (value) {
+        if (arguments.length === 0) return playbackScale;
+        playbackScale = Number(value);
+        if (!Number.isFinite(playbackScale)) playbackScale = 1;
+        return api;
+      },
+      play: function () { isPaused = false; return api; },
+      pause: function () { isPaused = true; return api; },
+      paused: function (value) {
+        if (arguments.length === 0) return isPaused;
+        isPaused = Boolean(value);
+        return api;
+      }
     };
     if (options && options.paused === false) api.play();
     return api;

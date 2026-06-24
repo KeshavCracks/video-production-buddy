@@ -18,6 +18,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class LocalDiffusion(BaseTool):
@@ -36,7 +37,7 @@ class LocalDiffusion(BaseTool):
         "Install diffusers for local Stable Diffusion:\n"
         "  pip install diffusers transformers accelerate torch"
     )
-    agent_skills = []
+    agent_skills = ["flux-best-practices"]
 
     capabilities = ["generate_image", "generate_illustration", "text_to_image"]
     supports = {
@@ -57,7 +58,7 @@ class LocalDiffusion(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {"type": "string"},
             "negative_prompt": {"type": "string", "default": ""},
@@ -70,6 +71,23 @@ class LocalDiffusion(BaseTool):
             "seed": {"type": "integer"},
             "num_inference_steps": {"type": "integer", "default": 30},
             "guidance_scale": {"type": "number", "default": 7.5},
+            "output_path": {
+                "type": "string",
+                "description": (
+                    "Explicit project-scoped output image path under "
+                    "projects/<project-name>/assets/... or projects/<project-name>/renders/..."
+                ),
+            },
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["provider", "model", "prompt", "output", "output_path"],
+        "properties": {
+            "provider": {"type": "string", "const": "local_diffusion"},
+            "model": {"type": "string"},
+            "prompt": {"type": "string"},
+            "output": {"type": "string"},
             "output_path": {"type": "string"},
         },
     }
@@ -102,6 +120,15 @@ class LocalDiffusion(BaseTool):
         return 30.0  # ~30s on a mid-range GPU
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="generated image",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+
         if self.get_status() != ToolStatus.AVAILABLE:
             return ToolResult(
                 success=False,
@@ -142,7 +169,6 @@ class LocalDiffusion(BaseTool):
                 generator=generator,
             ).images[0]
 
-            output_path = Path(inputs.get("output_path", "generated_image.png"))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             image.save(str(output_path))
 
@@ -156,6 +182,7 @@ class LocalDiffusion(BaseTool):
                 "model": model_id,
                 "prompt": prompt,
                 "output": str(output_path),
+                "output_path": str(output_path),
             },
             artifacts=[str(output_path)],
             cost_usd=0.0,

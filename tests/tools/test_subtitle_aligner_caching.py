@@ -10,7 +10,14 @@ from __future__ import annotations
 
 import sys
 import types
+from pathlib import Path
 from unittest.mock import MagicMock
+
+import pytest
+
+
+def _project_subtitle_path(filename: str) -> Path:
+    return Path("projects/demo/assets/subtitles") / filename
 
 
 def _install_fake_faster_whisper(monkeypatch) -> MagicMock:
@@ -38,13 +45,77 @@ def _install_fake_faster_whisper(monkeypatch) -> MagicMock:
     return whisper_model_cls
 
 
+def test_segments_json_rejects_non_strict_json_before_alignment(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    from tools.audio import subtitle_aligner
+
+    segments_path = tmp_path / "segments.json"
+    segments_path.write_text(
+        '[{"audio_path":"/tmp/audio_synth.mp3","start_offset_seconds":NaN,"text":"hello"}]\n',
+        encoding="utf-8",
+    )
+    calls = []
+
+    def _forbidden_align(*args, **kwargs):
+        calls.append((args, kwargs))
+        return {"ok": True}
+
+    monkeypatch.setattr(subtitle_aligner, "align", _forbidden_align)
+
+    with pytest.raises(ValueError, match="strict JSON"):
+        subtitle_aligner.main(
+            [
+                "subtitle_aligner",
+                "--output",
+                str(_project_subtitle_path("from-json.ass")),
+                "--segments-json",
+                str(segments_path),
+            ]
+        )
+
+    assert calls == []
+
+
 class TestSubtitleAlignerCaching:
     """The model load is the hot path; re-loading per segment is the bug."""
+
+    def test_rejects_non_project_output_path_before_model_loading(self, monkeypatch, tmp_path):
+        from tools.audio import subtitle_aligner
+
+        forbidden_path = tmp_path / "outside" / "subtitles.ass"
+        calls = []
+
+        def _forbidden_align_segment(*args, **kwargs):
+            calls.append((args, kwargs))
+            raise AssertionError("model alignment must not run for invalid output paths")
+
+        monkeypatch.setattr(subtitle_aligner, "_align_segment", _forbidden_align_segment)
+
+        with pytest.raises(ValueError, match="projects/<project-name>/artifacts/"):
+            subtitle_aligner.align(
+                [
+                    subtitle_aligner.Segment(
+                        audio_path="/tmp/audio_synth.mp3",
+                        text="hello",
+                        start_offset_seconds=0.0,
+                    )
+                ],
+                output_path=forbidden_path,
+                model_size="base",
+            )
+
+        assert calls == []
+        assert not forbidden_path.exists()
+        assert not forbidden_path.parent.exists()
 
     def test_single_model_load_across_segments(self, monkeypatch, tmp_path):
         # Arrange — fake WhisperModel that records every instantiation.
         whisper_model_cls = _install_fake_faster_whisper(monkeypatch)
         from tools.audio import subtitle_aligner
+
+        monkeypatch.chdir(tmp_path)
 
         # Drop any cache state left by prior tests in this process so the
         # call_count assertion below reflects this test's loads only.
@@ -63,7 +134,7 @@ class TestSubtitleAlignerCaching:
         # Act
         subtitle_aligner.align(
             segments,
-            output_path=tmp_path / "out.ass",
+            output_path=_project_subtitle_path("out.ass"),
             model_size="base",
         )
 
@@ -85,6 +156,8 @@ class TestSubtitleAlignerCaching:
         whisper_model_cls = _install_fake_faster_whisper(monkeypatch)
         from tools.audio import subtitle_aligner
 
+        monkeypatch.chdir(tmp_path)
+
         if hasattr(subtitle_aligner, "_clear_model_cache"):
             subtitle_aligner._clear_model_cache()
 
@@ -100,8 +173,16 @@ class TestSubtitleAlignerCaching:
         )
 
         # Act — call align twice with different model sizes.
-        subtitle_aligner.align([seg_a, seg_b], output_path=tmp_path / "base.ass", model_size="base")
-        subtitle_aligner.align([seg_a], output_path=tmp_path / "tiny.ass", model_size="tiny")
+        subtitle_aligner.align(
+            [seg_a, seg_b],
+            output_path=_project_subtitle_path("base.ass"),
+            model_size="base",
+        )
+        subtitle_aligner.align(
+            [seg_a],
+            output_path=_project_subtitle_path("tiny.ass"),
+            model_size="tiny",
+        )
 
         # Assert — two distinct (model_size,...) tuples, two loads.
         assert whisper_model_cls.call_count == 2, (

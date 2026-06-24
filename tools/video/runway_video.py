@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import os
 import time
-from pathlib import Path
 from typing import Any
 
 from tools.base_tool import (
@@ -23,7 +22,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
-from tools.video._shared import validate_video_operation
+from tools.video._shared import require_generated_video_output_path, validate_video_operation
 
 _RATIO_MAP = {
     "16:9": "1280:720",
@@ -91,7 +90,7 @@ class RunwayVideo(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {"type": "string"},
             "operation": {
@@ -132,6 +131,38 @@ class RunwayVideo(BaseTool):
             "output_path": {"type": "string"},
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "model",
+            "prompt",
+            "operation",
+            "ratio",
+            "output",
+            "output_path",
+            "task_id",
+            "format",
+            "file_size_bytes",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "runway"},
+            "model": {"type": "string"},
+            "prompt": {"type": "string"},
+            "operation": {"type": "string", "enum": ["text_to_video", "image_to_video"]},
+            "ratio": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "task_id": {"type": "string"},
+            "format": {"type": "string", "const": "mp4"},
+            "file_size_bytes": {"type": "integer", "minimum": 0},
+            "duration_seconds": {"type": "number", "minimum": 0},
+            "file_size_mb": {"type": "number", "minimum": 0},
+            "video_width": {"type": "integer", "minimum": 0},
+            "video_height": {"type": "integer", "minimum": 0},
+            "video_codec": {"type": "string"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=512, vram_mb=0, disk_mb=500, network_required=True
@@ -148,7 +179,7 @@ class RunwayVideo(BaseTool):
         "image_url",
     ]
     side_effects = ["writes video file to output_path", "calls Runway API"]
-    user_visible_verification = ["Watch generated clip for visual quality and motion coherence"]
+    user_visible_verification = ["Inspect sampled frames for visual quality and motion coherence"]
 
     def get_status(self) -> ToolStatus:
         if os.environ.get("RUNWAY_API_KEY") or os.environ.get("RUNWAYML_API_SECRET"):
@@ -168,13 +199,6 @@ class RunwayVideo(BaseTool):
         return _RUNTIME_SECONDS.get(model, 30.0)
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
-        api_key = self._get_api_key()
-        if not api_key:
-            return ToolResult(
-                success=False,
-                error="RUNWAY_API_KEY not set. " + self.install_instructions,
-            )
-
         model = inputs.get("model", "gen4_turbo")
         operation = inputs.get("operation", "text_to_video")
         operation_error = validate_video_operation(operation, {"text_to_video", "image_to_video"})
@@ -182,6 +206,16 @@ class RunwayVideo(BaseTool):
             return ToolResult(success=False, error=operation_error)
         if operation == "image_to_video" and not inputs.get("image_url"):
             return ToolResult(success=False, error="image_to_video requires image_url")
+        output_path, output_error = require_generated_video_output_path(inputs, self.name)
+        if output_error:
+            return output_error
+
+        api_key = self._get_api_key()
+        if not api_key:
+            return ToolResult(
+                success=False,
+                error="RUNWAY_API_KEY not set. " + self.install_instructions,
+            )
 
         import requests
 
@@ -254,7 +288,6 @@ class RunwayVideo(BaseTool):
             video_response = requests.get(video_url, timeout=120)
             video_response.raise_for_status()
 
-            output_path = Path(inputs.get("output_path", "runway_output.mp4"))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(video_response.content)
 

@@ -25,7 +25,7 @@ silence_cutter.execute({
     "silence_threshold_db": -35,
     "min_silence_duration": 0.5,
     "padding_seconds": 0.08,    # prevents clipped words
-    "output_path": "<project>/assets/video/footage_cut.mp4"
+    "output_path": "projects/<project-name>/assets/video/footage_cut.mp4"
 })
 ```
 

@@ -17,7 +17,11 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
-from tools.video._shared import generate_ltx_modal_video
+from tools.video._shared import (
+    generate_ltx_modal_video,
+    require_generated_video_output_path,
+    validate_video_operation,
+)
 
 
 class LTXVideoModal(BaseTool):
@@ -61,7 +65,7 @@ class LTXVideoModal(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {"type": "string"},
             "operation": {"type": "string", "enum": ["text_to_video", "image_to_video"], "default": "text_to_video"},
@@ -75,6 +79,39 @@ class LTXVideoModal(BaseTool):
             "num_inference_steps": {"type": "integer"},
             "seed": {"type": "integer"},
             "output_path": {"type": "string"},
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "provider_name",
+            "mode",
+            "prompt",
+            "width",
+            "height",
+            "num_frames",
+            "fps",
+            "duration_seconds",
+            "operation",
+            "output",
+            "output_path",
+            "format",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "ltx-modal"},
+            "provider_name": {"type": "string"},
+            "mode": {"type": "string", "const": "modal"},
+            "prompt": {"type": "string"},
+            "width": {"type": "integer", "minimum": 0},
+            "height": {"type": "integer", "minimum": 0},
+            "num_frames": {"type": "integer", "minimum": 1},
+            "fps": {"type": "integer", "minimum": 1},
+            "duration_seconds": {"type": "number", "minimum": 0},
+            "operation": {"type": "string", "enum": ["text_to_video", "image_to_video"]},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "format": {"type": "string", "const": "mp4"},
         },
     }
 
@@ -95,7 +132,7 @@ class LTXVideoModal(BaseTool):
         "seed",
     ]
     side_effects = ["writes video file to output_path", "calls modal endpoint"]
-    user_visible_verification = ["Watch generated clip for motion quality and prompt adherence"]
+    user_visible_verification = ["Inspect sampled frames for motion quality and prompt adherence"]
 
     def get_status(self) -> ToolStatus:
         return ToolStatus.AVAILABLE if os.environ.get("MODAL_LTX2_ENDPOINT_URL") else ToolStatus.UNAVAILABLE
@@ -107,6 +144,20 @@ class LTXVideoModal(BaseTool):
         return 180.0
 
     def execute(self, inputs: dict[str, object]) -> ToolResult:
+        operation = inputs.get("operation", "text_to_video")
+        operation_error = validate_video_operation(operation, {"text_to_video", "image_to_video"})
+        if operation_error:
+            return ToolResult(success=False, error=operation_error)
+        if operation == "image_to_video" and not (
+            inputs.get("reference_image_path") or inputs.get("reference_image_url")
+        ):
+            return ToolResult(
+                success=False,
+                error="image_to_video requires reference_image_url or reference_image_path",
+            )
+        _, output_error = require_generated_video_output_path(inputs, self.name)
+        if output_error:
+            return output_error
         if self.get_status() != ToolStatus.AVAILABLE:
             return ToolResult(success=False, error="Modal LTX video generation is unavailable. " + self.install_instructions)
         start = time.time()
@@ -117,4 +168,3 @@ class LTXVideoModal(BaseTool):
         result.duration_seconds = round(time.time() - start, 2)
         result.cost_usd = self.estimate_cost(inputs)
         return result
-

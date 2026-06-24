@@ -20,6 +20,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class OpenAIImage(BaseTool):
@@ -55,7 +56,7 @@ class OpenAIImage(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {"type": "string"},
             "model": {
@@ -82,6 +83,17 @@ class OpenAIImage(BaseTool):
                 "default": "png",
             },
             "n": {"type": "integer", "default": 1, "minimum": 1, "maximum": 4},
+            "output_path": {"type": "string"},
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["provider", "model", "prompt", "output", "output_path"],
+        "properties": {
+            "provider": {"type": "string", "const": "openai"},
+            "model": {"type": "string"},
+            "prompt": {"type": "string"},
+            "output": {"type": "string"},
             "output_path": {"type": "string"},
         },
     }
@@ -119,6 +131,12 @@ class OpenAIImage(BaseTool):
         return quality_map.get(quality, 0.04) * n
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        _, output_error = require_explicit_output_path(
+            inputs, self.name, artifact_label="generated image"
+        )
+        if output_error:
+            return output_error
+
         if not os.environ.get("OPENAI_API_KEY"):
             return ToolResult(
                 success=False,
@@ -161,8 +179,7 @@ class OpenAIImage(BaseTool):
                 )
 
             image_data = base64.b64decode(response.data[0].b64_json)
-            ext = inputs.get("output_format", "png")
-            output_path = Path(inputs.get("output_path", f"generated_image.{ext}"))
+            output_path = Path(inputs["output_path"])
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(image_data)
 
@@ -176,6 +193,7 @@ class OpenAIImage(BaseTool):
                 "model": model,
                 "prompt": prompt,
                 "output": str(output_path),
+                "output_path": str(output_path),
             },
             artifacts=[str(output_path)],
             cost_usd=self.estimate_cost(inputs),

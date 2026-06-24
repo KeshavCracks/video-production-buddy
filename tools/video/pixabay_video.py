@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import time
-from pathlib import Path
 from typing import Any
 
 from tools.base_tool import (
@@ -19,6 +18,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class PixabayVideo(BaseTool):
@@ -37,7 +37,7 @@ class PixabayVideo(BaseTool):
         "Set PIXABAY_API_KEY to your Pixabay API key.\n"
         "  Get one free at https://pixabay.com/api/docs/"
     )
-    agent_skills = []
+    agent_skills = ["stock-sourcing"]
 
     capabilities = ["search_video", "download_video", "stock_video"]
     supports = {
@@ -60,7 +60,7 @@ class PixabayVideo(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["query"],
+        "required": ["query", "output_path"],
         "properties": {
             "query": {"type": "string", "description": "Search term (max 100 chars)"},
             "video_type": {
@@ -97,14 +97,61 @@ class PixabayVideo(BaseTool):
             "output_path": {"type": "string"},
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "video_id",
+            "user",
+            "tags",
+            "duration_seconds",
+            "width",
+            "height",
+            "query",
+            "output",
+            "output_path",
+            "total_results",
+            "results_returned",
+            "license",
+            "page_url",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "pixabay"},
+            "video_id": {"type": ["integer", "string"]},
+            "user": {"type": "string"},
+            "tags": {"type": "string"},
+            "duration_seconds": {"type": ["number", "null"], "minimum": 0},
+            "width": {"type": ["integer", "null"], "minimum": 0},
+            "height": {"type": ["integer", "null"], "minimum": 0},
+            "query": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "total_results": {"type": "integer", "minimum": 0},
+            "results_returned": {"type": "integer", "minimum": 0},
+            "license": {"type": "string"},
+            "page_url": {"type": "string"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=256, vram_mb=0, disk_mb=200, network_required=True
     )
     retry_policy = RetryPolicy(max_retries=2, retryable_errors=["rate_limit", "timeout"])
-    idempotency_key_fields = ["query", "output_path", "video_type", "category", "page"]
+    idempotency_key_fields = [
+        "query",
+        "output_path",
+        "video_type",
+        "category",
+        "min_duration",
+        "max_duration",
+        "editors_choice",
+        "safesearch",
+        "per_page",
+        "page",
+        "preferred_quality",
+    ]
     side_effects = ["writes video file to output_path", "calls Pixabay API"]
-    user_visible_verification = ["Watch downloaded clip to verify it matches the intended scene"]
+    user_visible_verification = ["Inspect sampled frames to verify the downloaded clip matches the intended scene"]
 
     def get_status(self) -> ToolStatus:
         if os.environ.get("PIXABAY_API_KEY"):
@@ -115,6 +162,14 @@ class PixabayVideo(BaseTool):
         return 0.0
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="stock video",
+        )
+        if output_error:
+            return output_error
+
         api_key = os.environ.get("PIXABAY_API_KEY")
         if not api_key:
             return ToolResult(
@@ -191,7 +246,6 @@ class PixabayVideo(BaseTool):
             video_response = requests.get(video_url, timeout=120)
             video_response.raise_for_status()
 
-            output_path = Path(inputs.get("output_path", f"pixabay_video_{hit['id']}.mp4"))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(video_response.content)
 
@@ -210,6 +264,7 @@ class PixabayVideo(BaseTool):
                 "height": video_info.get("height"),
                 "query": query,
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "total_results": data.get("total", 0),
                 "results_returned": len(hits),
                 "license": "Pixabay Content License (free, no attribution required)",

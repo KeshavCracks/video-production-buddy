@@ -61,6 +61,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import math
 import os
 import re
 import shutil
@@ -70,6 +71,8 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterator, Optional
+
+from schemas.artifacts import loads_strict_json
 
 try:
     import filelock  # type: ignore
@@ -115,8 +118,10 @@ def default_max_total_bytes() -> int:
     override = os.environ.get("VIDEO_PRODUCTION_BUDDY_CACHE_MAX_GB")
     if override:
         try:
-            return int(float(override) * 1024 * 1024 * 1024)
-        except ValueError:
+            max_gb = float(override)
+            if math.isfinite(max_gb) and max_gb > 0:
+                return int(max_gb * 1024 * 1024 * 1024)
+        except (OverflowError, ValueError):
             pass
     return _DEFAULT_MAX_TOTAL_BYTES
 
@@ -154,14 +159,16 @@ class CacheEntry:
     def from_dict(cls, d: dict[str, Any]) -> "CacheEntry":
         # Tolerate extra fields from future schema evolution — only
         # read the ones we know about. Missing fields default.
+        added_at = _finite_manifest_float(d.get("added_at", 0.0) or 0.0)
+        last_access_at = _finite_manifest_float(
+            d.get("last_access_at", added_at) or added_at
+        )
         return cls(
             clip_id=str(d["clip_id"]),
             file_name=str(d["file_name"]),
-            size_bytes=int(d.get("size_bytes", 0) or 0),
-            added_at=float(d.get("added_at", 0.0) or 0.0),
-            last_access_at=float(
-                d.get("last_access_at", d.get("added_at", 0.0)) or 0.0
-            ),
+            size_bytes=_finite_manifest_int(d.get("size_bytes", 0) or 0),
+            added_at=added_at,
+            last_access_at=last_access_at,
             source=str(d.get("source", "") or ""),
             source_id=str(d.get("source_id", "") or ""),
             source_url=str(d.get("source_url", "") or ""),
@@ -169,6 +176,17 @@ class CacheEntry:
             creator=str(d.get("creator", "") or ""),
             source_tags=str(d.get("source_tags", "") or ""),
         )
+
+
+def _finite_manifest_float(value: Any) -> float:
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError("manifest numeric fields must be finite")
+    return parsed
+
+
+def _finite_manifest_int(value: Any) -> int:
+    return int(_finite_manifest_float(value))
 
 
 # ----------------------------------------------------------------------
@@ -272,12 +290,15 @@ class ClipCache:
             return entries
         try:
             with open(self.manifest_path, "r", encoding="utf-8") as f:
-                for line in f:
+                for row_number, line in enumerate(f, start=1):
                     line = line.strip()
                     if not line:
                         continue
                     try:
-                        d = json.loads(line)
+                        d = loads_strict_json(
+                            line,
+                            context=f"clip cache manifest row {row_number}",
+                        )
                         entry = CacheEntry.from_dict(d)
                         entries[entry.clip_id] = entry
                     except (json.JSONDecodeError, KeyError, TypeError, ValueError):
@@ -296,13 +317,21 @@ class ClipCache:
         atomic on both POSIX and Windows. A crash between write and
         replace leaves the old manifest intact.
         """
+        try:
+            lines = [
+                json.dumps(entry.to_dict(), ensure_ascii=False, allow_nan=False) + "\n"
+                for entry in entries.values()
+            ]
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Clip cache manifest must be strict JSON serializable: {exc}"
+            ) from exc
         tmp_fd, tmp_name = tempfile.mkstemp(
             prefix="cache_manifest.", suffix=".tmp", dir=str(self.cache_dir)
         )
         try:
             with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
-                for entry in entries.values():
-                    f.write(json.dumps(entry.to_dict(), ensure_ascii=False) + "\n")
+                f.writelines(lines)
             os.replace(tmp_name, self.manifest_path)
         except Exception:
             # Best-effort cleanup of the tmpfile if replace failed

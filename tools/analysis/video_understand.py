@@ -109,14 +109,50 @@ class VideoUnderstand(BaseTool):
 
     output_schema = {
         "type": "object",
+        "required": ["frames", "summary", "mode", "model", "frame_count"],
         "properties": {
             "frames": {
                 "type": "array",
                 "description": "Per-frame analysis results",
+                "items": {
+                    "type": "object",
+                    "required": ["frame_index"],
+                    "properties": {
+                        "frame_index": {"type": "integer"},
+                        "description": {"type": "string"},
+                        "confidence": {"type": "number"},
+                        "query": {"type": "string"},
+                        "answer": {"type": "string"},
+                        "top_category": {"type": "string"},
+                        "categories": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "label": {"type": "string"},
+                                    "score": {"type": "number"},
+                                },
+                            },
+                        },
+                        "blur_score": {"type": "number"},
+                        "brightness": {"type": "number"},
+                        "contrast": {"type": "number"},
+                        "quality": {
+                            "type": "string",
+                            "enum": ["good", "issues_detected"],
+                        },
+                        "issues": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "resolution": {"type": "string"},
+                    },
+                },
             },
             "summary": {"type": "string"},
-            "mode": {"type": "string"},
+            "mode": {"type": "string", "enum": ["describe", "qa", "quality", "classify"]},
             "model": {"type": "string"},
+            "frame_count": {"type": "integer"},
         },
     }
 

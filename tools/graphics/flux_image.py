@@ -19,6 +19,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class FluxImage(BaseTool):
@@ -54,7 +55,7 @@ class FluxImage(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {"type": "string"},
             "negative_prompt": {"type": "string", "default": ""},
@@ -69,6 +70,18 @@ class FluxImage(BaseTool):
             "num_inference_steps": {"type": "integer"},
             "guidance_scale": {"type": "number"},
             "output_path": {"type": "string"},
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["provider", "model", "prompt", "output", "output_path", "seed"],
+        "properties": {
+            "provider": {"type": "string", "const": "flux"},
+            "model": {"type": "string"},
+            "prompt": {"type": "string"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "seed": {"type": ["integer", "string", "null"]},
         },
     }
 
@@ -105,6 +118,12 @@ class FluxImage(BaseTool):
         return 0.03  # dev tier
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        _, output_error = require_explicit_output_path(
+            inputs, self.name, artifact_label="generated image"
+        )
+        if output_error:
+            return output_error
+
         api_key = self._get_api_key()
         if not api_key:
             return ToolResult(
@@ -150,7 +169,7 @@ class FluxImage(BaseTool):
             image_response = requests.get(image_url, timeout=60)
             image_response.raise_for_status()
 
-            output_path = Path(inputs.get("output_path", "generated_image.png"))
+            output_path = Path(inputs["output_path"])
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(image_response.content)
 
@@ -164,6 +183,7 @@ class FluxImage(BaseTool):
                 "model": model,
                 "prompt": prompt,
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "seed": data.get("seed"),
             },
             artifacts=[str(output_path)],

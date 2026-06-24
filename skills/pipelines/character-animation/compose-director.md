@@ -20,6 +20,9 @@ proposal unless a `render_runtime_selection` decision explicitly changed it.
 
 1. Run `character_rig_renderer` to produce or refresh the HyperFrames package.
    The browser preview is a QA/debug artifact only, not the render path.
+   Pass an explicit preview `output_path` such as
+   `projects/<project-name>/renders/character_preview.html`; do not rely on a
+   default preview location.
 2. Verify the renderer emitted a HyperFrames `workspace_path`, composition HTML,
    `asset_manifest`, and `edit_decisions.render_runtime: "hyperframes"` handoff.
 3. Run `character_animation_reviewer` against rig, poses, timeline, and preview.
@@ -32,13 +35,17 @@ proposal unless a `render_runtime_selection` decision explicitly changed it.
 
 ## Browser QA
 
-When Playwright is available:
+When Playwright is available, use it in headless mode by default:
 
-- open the preview,
+- load the preview file in a headless browser context,
 - capture opening/middle/end frames,
 - check for console errors,
 - verify characters are visible,
 - compare frame deltas to ensure motion exists.
+
+Do not launch a desktop browser window unless the user explicitly requests an
+interactive preview. If they do, warn that it may open a local browser window
+and keep the final render path unchanged.
 
 When Playwright is unavailable, use static artifact checks and FFmpeg frame
 sampling, and report the reduced confidence.

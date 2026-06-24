@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
+import jsonschema
+
 from tools.compliance.compliance_check import ComplianceCheck
 
 
@@ -23,6 +25,32 @@ def test_timing_pass_within_tolerance():
           "failure_action": "revise"}
     r = tool.execute({"stage_output": stage, "checkpoint": cp})
     assert r.success and r.data["pass"] is True and r.data["deviation"] is None
+
+
+def test_success_payload_matches_output_schema():
+    tool = make_tool()
+    stage = {"sections": [{"beat_id": "B1", "narration": " ".join(["word"] * 120)}]}
+    cp = {
+        "id": "CP-S1",
+        "check_type": "timing",
+        "evaluation_method": "structural",
+        "criterion": "Section covering beat B1 (hook) must be within +/-10% of 50s",
+        "failure_action": "revise",
+    }
+
+    output_properties = tool.output_schema["properties"]
+    assert {
+        "checkpoint_id",
+        "pass",
+        "actual_value",
+        "deviation",
+        "failure_action",
+    } <= set(output_properties)
+
+    r = tool.execute({"stage_output": stage, "checkpoint": cp})
+
+    assert r.success is True
+    jsonschema.validate(instance=r.data, schema=tool.output_schema)
 
 
 def test_timing_fail_too_short():
@@ -133,6 +161,24 @@ def test_presence_prohibited_element_clean():
           "failure_action": "revise"}
     r = tool.execute({"stage_output": stage, "checkpoint": cp})
     assert r.success and r.data["pass"] is True
+
+
+def test_presence_does_not_match_term_inside_larger_word():
+    tool = make_tool()
+    stage = {"sections": [{"narration": "The product reveal is clean."}]}
+    cp = {
+        "id": "CP-B1",
+        "check_type": "presence",
+        "evaluation_method": "structural",
+        "criterion": "brand_name 'Pro' must appear in final scene",
+        "failure_action": "revise",
+    }
+
+    r = tool.execute({"stage_output": stage, "checkpoint": cp})
+
+    assert r.success
+    assert r.data["pass"] is False
+    assert r.data["actual_value"]["Pro"] == 0
 
 
 # ── Structural (beat mapping) ────────────────────────────────────────────────
@@ -274,6 +320,25 @@ def test_structured_presence_minimum_count_not_met():
     assert "frost wave" in (r.data.get("deviation") or "")
 
 
+def test_structured_presence_does_not_match_term_inside_larger_word():
+    tool = make_tool()
+    stage = {"sections": [{"narration": "The product reveal is clean."}]}
+    cp = {
+        "id": "CP-B1",
+        "check_type": "presence",
+        "evaluation_method": "structural",
+        "criterion": "anything",
+        "failure_action": "revise",
+        "structured": {"kind": "presence", "terms": ["Pro"], "min_count": 1},
+    }
+
+    r = tool.execute({"stage_output": stage, "checkpoint": cp})
+
+    assert r.success
+    assert r.data["pass"] is False
+    assert r.data["actual_value"]["Pro"] == 0
+
+
 def test_structured_presence_negated_finds_violation():
     """Negated structured presence rejects when prohibited terms appear."""
     tool = make_tool()
@@ -401,29 +466,3 @@ def test_legacy_path_unchanged_when_structured_absent():
     }
     r = tool.execute({"stage_output": stage, "checkpoint": cp})
     assert r.success and r.data["pass"] is True
-
-
-if __name__ == "__main__":
-    import traceback
-    tests = [
-        test_timing_pass_within_tolerance, test_timing_fail_too_short,
-        test_timing_sums_multiple_sections_for_beat, test_timing_unparseable_beat_id_fails_safe,
-        test_presence_brand_name_found, test_presence_brand_name_missing,
-        test_presence_motif_minimum_count_met, test_presence_motif_minimum_count_not_met,
-        test_presence_prohibited_element_found, test_presence_prohibited_element_clean,
-        test_structural_beat_mapping_found, test_structural_beat_mapping_not_found,
-        test_rejects_semantic_checkpoint, test_rejects_missing_stage_output,
-        test_rejects_missing_checkpoint, test_rejects_unknown_check_type,
-    ]
-    passed = failed = 0
-    for t in tests:
-        try:
-            t()
-            print(f"[PASS] {t.__name__}")
-            passed += 1
-        except Exception as e:
-            print(f"[FAIL] {t.__name__}: {e}")
-            traceback.print_exc()
-            failed += 1
-    print(f"\n{passed}/{passed+failed} tests passed")
-    sys.exit(0 if failed == 0 else 1)

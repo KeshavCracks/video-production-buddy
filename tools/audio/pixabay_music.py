@@ -30,6 +30,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class PixabayMusic(BaseTool):
@@ -73,7 +74,7 @@ class PixabayMusic(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["query"],
+        "required": ["query", "output_path"],
         "properties": {
             "query": {
                 "type": "string",
@@ -93,8 +94,40 @@ class PixabayMusic(BaseTool):
             },
             "output_path": {
                 "type": "string",
-                "description": "File path to save the downloaded MP3",
+                "description": (
+                    "Explicit project-scoped output MP3 path under "
+                    "projects/<project-name>/assets/... or projects/<project-name>/renders/..."
+                ),
             },
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "track_title",
+            "artist",
+            "duration_seconds",
+            "query",
+            "format",
+            "output",
+            "output_path",
+            "license",
+            "results_found",
+            "results_after_filter",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "pixabay_music"},
+            "track_title": {"type": "string"},
+            "artist": {"type": "string"},
+            "duration_seconds": {"type": ["number", "null"], "minimum": 0},
+            "query": {"type": "string"},
+            "format": {"type": "string", "const": "mp3"},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "license": {"type": "string"},
+            "results_found": {"type": "integer", "minimum": 0},
+            "results_after_filter": {"type": "integer", "minimum": 0},
         },
     }
 
@@ -105,7 +138,7 @@ class PixabayMusic(BaseTool):
     idempotency_key_fields = ["query", "output_path", "min_duration", "max_duration"]
     side_effects = ["writes audio file to output_path", "scrapes Pixabay website"]
     user_visible_verification = [
-        "Listen to downloaded track for mood and quality",
+        "Inspect audio metadata, duration, tags, and waveform metrics for mood and quality fit",
     ]
 
     _USER_AGENT = (
@@ -138,6 +171,17 @@ class PixabayMusic(BaseTool):
         return 0.0  # Pixabay Music is free
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="downloaded music track",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+        inputs = dict(inputs)
+        inputs["output_path"] = str(output_path)
+
         start = time.time()
 
         try:
@@ -186,6 +230,7 @@ class PixabayMusic(BaseTool):
                 "duration_seconds": track.get("duration"),
                 "query": inputs["query"],
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "format": "mp3",
                 "license": "Pixabay Content License (free, no attribution required)",
                 "results_found": len(tracks),
@@ -332,13 +377,7 @@ class PixabayMusic(BaseTool):
         elif audio_url.startswith("/"):
             audio_url = "https://pixabay.com" + audio_url
 
-        # Build output path
-        track_title = track.get("title", "pixabay_music")
-        safe_title = "".join(
-            c if c.isalnum() or c in "._- " else "_" for c in track_title
-        )
-        default_filename = f"pixabay_music_{safe_title[:60]}.mp3"
-        output_path = Path(inputs.get("output_path", default_filename))
+        output_path = Path(inputs["output_path"])
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
         request = urllib.request.Request(

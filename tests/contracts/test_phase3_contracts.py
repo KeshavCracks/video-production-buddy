@@ -145,7 +145,50 @@ class TestCapabilityMetadata:
         catalog = reg.capability_catalog()
         assert "tts" in catalog
         providers = {item["provider"] for item in catalog["tts"] if item["provider"] != "selector"}
-        assert providers == {"bailian", "doubao", "elevenlabs", "google_tts", "openai", "piper"}
+        assert providers == {
+            "bailian",
+            "doubao",
+            "elevenlabs",
+            "google_tts",
+            "minimax",
+            "openai",
+            "piper",
+        }
+
+    def test_human_facing_tts_inventory_matches_live_provider_tools(self):
+        reg = ToolRegistry()
+        catalog = reg.capability_catalog()
+        provider_tools = sorted(
+            item["name"]
+            for item in catalog["tts"]
+            if item["provider"] != "selector" and item["name"].endswith("_tts")
+        )
+
+        architecture = (PROJECT_ROOT / "docs" / "ARCHITECTURE.md").read_text(
+            encoding="utf-8"
+        )
+        architecture_tts_row = next(
+            line for line in architecture.splitlines() if line.startswith("| TTS and audio |")
+        )
+        project_context = (PROJECT_ROOT / "PROJECT_CONTEXT.md").read_text(
+            encoding="utf-8"
+        )
+        expected_skills = (
+            "["
+            + ", ".join(f'"{skill}"' for skill in TTSSelector.agent_skills)
+            + "]"
+        )
+
+        missing_from_architecture = [
+            name for name in provider_tools if f"`{name}`" not in architecture_tts_row
+        ]
+        missing_from_project_context = [
+            name for name in provider_tools if f"`{name}`" not in project_context
+        ]
+
+        assert not missing_from_architecture
+        assert not missing_from_project_context
+        assert f"`tts_selector.agent_skills = {expected_skills}`" in architecture
 
 
 # ---- Animated Explainer Pipeline ----

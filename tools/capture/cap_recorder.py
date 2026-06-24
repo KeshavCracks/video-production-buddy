@@ -39,6 +39,7 @@ from tools.base_tool import (
     ToolStability,
     ToolTier,
 )
+from tools.output_paths import require_explicit_project_media_destination
 
 
 def _find_cap_binary() -> str | None:
@@ -206,6 +207,15 @@ class CapRecorder(BaseTool):
     input_schema = {
         "type": "object",
         "required": ["operation"],
+        "allOf": [
+            {
+                "if": {
+                    "properties": {"operation": {"const": "pick_latest"}},
+                    "required": ["operation"],
+                },
+                "then": {"required": ["output_dir"]},
+            }
+        ],
         "properties": {
             "operation": {
                 "type": "string",
@@ -220,7 +230,11 @@ class CapRecorder(BaseTool):
             },
             "output_dir": {
                 "type": "string",
-                "description": "For pick_latest: copy the recording here",
+                "description": (
+                    "For pick_latest: required project-scoped destination file or "
+                    "directory under projects/<project-name>/assets/... or "
+                    "projects/<project-name>/renders/..."
+                ),
             },
             "since_minutes": {
                 "type": "integer",
@@ -238,15 +252,61 @@ class CapRecorder(BaseTool):
             "binary_path": {"type": ["string", "null"]},
             "recordings_dir": {"type": ["string", "null"]},
             "recordings": {"type": "array"},
+            "platform": {"type": "string"},
+            "message": {"type": "string"},
+            "count": {"type": "integer"},
             "setup_instructions": {"type": "string"},
+            "setup": {"type": "object"},
+            "next_step": {"type": "string"},
+            "what_you_get": {"type": "array", "items": {"type": "string"}},
+            "source_code": {"type": "string"},
+            "output_dir": {"type": "string"},
+            "output_path": {"type": "string"},
+            "original_path": {"type": "string"},
+            "size_mb": {"type": "number"},
+            "capture_method": {"type": "string"},
         },
+        "anyOf": [
+            {
+                "required": [
+                    "installed",
+                    "running",
+                    "binary_path",
+                    "recordings_dir",
+                    "platform",
+                ],
+            },
+            {"required": ["installed", "running", "message"]},
+            {"required": ["recordings", "message"]},
+            {
+                "required": [
+                    "installed",
+                    "platform",
+                    "setup",
+                    "what_you_get",
+                    "source_code",
+                    "message",
+                ],
+            },
+            {"required": ["installed", "binary_path", "message", "next_step"]},
+            {
+                "required": [
+                    "output_dir",
+                    "output_path",
+                    "original_path",
+                    "size_mb",
+                    "capture_method",
+                ],
+            },
+        ],
     }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=64, vram_mb=0, disk_mb=0, network_required=False,
     )
 
-    side_effects = []
+    idempotency_key_fields = ["operation", "output_dir", "since_minutes"]
+    side_effects = ["copies latest Cap recording to output_dir"]
     fallback_tools = ["screen_recorder"]
 
     def get_status(self):
@@ -268,7 +328,7 @@ class CapRecorder(BaseTool):
             return self._setup_guide()
         elif operation == "pick_latest":
             output_dir = inputs.get("output_dir")
-            return self._pick_latest(output_dir)
+            return self._pick_latest(output_dir, inputs.get("since_minutes", 5))
         else:
             return ToolResult(
                 success=False,
@@ -396,7 +456,16 @@ class CapRecorder(BaseTool):
             },
         )
 
-    def _pick_latest(self, output_dir: str | None) -> ToolResult:
+    def _pick_latest(self, output_dir: str | None, since_minutes: int = 5) -> ToolResult:
+        requested_output, output_error = require_explicit_project_media_destination(
+            {"output_dir": output_dir},
+            "output_dir",
+            self.name,
+            artifact_label="Cap recording copy destination",
+        )
+        if output_error:
+            return output_error
+
         recordings_dir = _find_cap_recordings_dir()
         if not recordings_dir:
             return ToolResult(
@@ -404,7 +473,10 @@ class CapRecorder(BaseTool):
                 error="Cap recordings directory not found.",
             )
 
-        recordings = _get_recent_recordings(recordings_dir, since_seconds=3600)
+        recordings = _get_recent_recordings(
+            recordings_dir,
+            since_seconds=max(1, int(since_minutes)) * 60,
+        )
         if not recordings:
             return ToolResult(
                 success=False,
@@ -414,28 +486,18 @@ class CapRecorder(BaseTool):
         latest = recordings[0]
         source = Path(latest["path"])
 
-        if output_dir:
-            requested = Path(output_dir)
-            dest = requested if requested.suffix else requested / source.name
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, dest)
-            return ToolResult(
-                success=True,
-                data={
-                    "output_path": str(dest),
-                    "original_path": str(source),
-                    "size_mb": latest["size_mb"],
-                    "capture_method": "cap",
-                },
-                artifacts=[str(dest)],
-            )
-
+        assert requested_output is not None
+        dest = requested_output if requested_output.suffix else requested_output / source.name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, dest)
         return ToolResult(
             success=True,
             data={
-                "output_path": str(source),
+                "output_dir": str(requested_output),
+                "output_path": str(dest),
+                "original_path": str(source),
                 "size_mb": latest["size_mb"],
                 "capture_method": "cap",
             },
-            artifacts=[str(source)],
+            artifacts=[str(dest)],
         )

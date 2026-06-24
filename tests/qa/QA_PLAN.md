@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Run every tool with real API keys, inspect outputs (see images, listen to audio, watch video), find gaps, fix them. This is the gate before calling Phase 3.5 "Verified."
+Run every tool with real API keys, inspect outputs with terminal/headless checks, find gaps, fix them. This is the gate before calling Phase 3.5 "Verified."
 
 ## Current QA Scripts
 
@@ -19,9 +19,9 @@ Run every tool with real API keys, inspect outputs (see images, listen to audio,
 ## Inspection Protocol
 
 For each output:
-1. **Audio files**: Use `ffprobe` for format/duration/channels, then LISTEN (play in media player or use Whisper to verify content matches prompt)
-2. **Image files**: Use `ffprobe` for dimensions, then VIEW (open image, check composition, text readability, style match)
-3. **Video files**: Use `ffprobe` for resolution/fps/duration/codec, then WATCH (check A/V sync, transitions, subtitle timing)
+1. **Audio files**: Use `ffprobe` for format/duration/channels, waveform/loudness analysis for clipping and mix balance, and Whisper/transcript checks to verify content matches prompt.
+2. **Image files**: Use `ffprobe` or image metadata for dimensions, OCR where text is expected, and generated thumbnails/contact sheets for composition, text readability, and style match.
+3. **Video files**: Use `ffprobe` for resolution/fps/duration/codec, extracted frame contact sheets for visual checks, subtitle/timestamp comparison for timing, and audio-stream analysis for A/V alignment.
 4. **Design intelligence**: Run against all 3 playbooks, verify contrast ratios match manual calculation, check CVD warnings are accurate
 
 ## Known Risk Areas
@@ -40,22 +40,24 @@ For each output:
 ## Run Order
 
 ```bash
-cd C:/Users/ishan/Documents/Video Production Buddy
+cd /path/to/video-production-buddy
+export VPB_ALLOW_BROWSER_OPEN=0
+export PYTHONDONTWRITEBYTECODE=1
 
 # Phase 1: Composition fixtures and inspectable outputs
-python tests/qa/test_04_audio_mix.py
-python tests/qa/test_05_video_compose.py
-python tests/qa/test_06_video_stitch.py
-python -m pytest tests/qa/test_phase2_comparison.py -v
+VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider tests/qa/test_04_audio_mix.py -v
+VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider tests/qa/test_05_video_compose.py -v
+VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider tests/qa/test_06_video_stitch.py -v
+VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider tests/qa/test_phase2_comparison.py -v
 
 # Phase 2: Intelligence validation (no API calls)
-python tests/qa/test_07_playbook_intelligence.py
+VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider tests/qa/test_07_playbook_intelligence.py -v
 
 # Phase 3: Full pipeline
-python tests/qa/test_08_end_to_end.py
+VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider tests/qa/test_08_end_to_end.py -v
 
 # Optional HyperFrames runtime QA
-HYPERFRAMES_QA=1 python -m pytest tests/qa/test_09_hyperframes_compose.py -v
+HYPERFRAMES_QA=1 VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider tests/qa/test_09_hyperframes_compose.py -v
 ```
 
 ## Success Criteria
@@ -64,7 +66,7 @@ HYPERFRAMES_QA=1 python -m pytest tests/qa/test_09_hyperframes_compose.py -v
 - [ ] Generated image fixtures: match prompt intent, correct dimensions, no watermarks, good composition
 - [ ] Music fixtures: match mood prompt, correct duration (±2s), no abrupt cuts
 - [ ] Audio mix: speech clearly above music, ducking smooth, no clipping
-- [ ] Video compose: A/V sync within 50ms, correct resolution, playable in VLC
+- [ ] Video compose: A/V sync within 50ms, correct resolution, ffprobe-readable output with representative extracted frames
 - [ ] Video stitch: smooth transitions, no frame drops, PIP correctly positioned
 - [ ] Playbook intelligence: all 3 playbooks pass a11y, contrast ratios within 0.1 of manual calc
 - [ ] End-to-end: 60-second explainer renders without errors, all stages checkpoint correctly

@@ -1,6 +1,6 @@
 # Talking Head Generation Usage for Video Production Buddy
 
-> Sources: SadTalker paper (Zhang et al. 2023), MuseTalk documentation, existing Layer 2 skills
+> Sources: SadTalker paper (Zhang et al. 2023), existing Layer 2 skills
 > at `skills/creative/face-restore-usage.md` and `skills/creative/enhancement-strategy.md`
 
 ## Quick Reference Card
@@ -8,6 +8,7 @@
 ```
 DEFAULT MODEL:    sadtalker
 INPUT:            One face photo + one audio file → animated talking video
+OUTPUT_PATH:      Required; write under projects/<project-name>/assets/... or projects/<project-name>/renders/...
 EXPRESSION:       expression_scale=1.0 (0.5 = subtle, 1.5 = expressive)
 STILL MODE:       false (true = mouth-only animation, head stays fixed)
 PREPROCESS:       crop (default — crops face, animates, pastes back)
@@ -47,9 +48,9 @@ KEY RULE:         Generate audio FIRST, then pass to talking_head
 | Model | Strengths | Weaknesses |
 |-------|----------|------------|
 | sadtalker | Natural head motion, good expression range, well-tested | Can struggle with extreme expressions |
-| musetalk | Higher quality lip sync, sharper mouth region | More constrained head motion |
 
-**Default to `sadtalker`** unless lip sync precision is the top priority.
+**Use `sadtalker`.** MuseTalk is not exposed by the `talking_head` schema until
+the implementation is production-ready.
 
 ## Settings Reference
 
@@ -134,4 +135,5 @@ When using the `talking_head` tool:
 5. **Source photo quality directly impacts output quality** — use the best available photo
 6. **Crop mode is the safest default** — only use `resize` or `full` if crop produces bad framing
 7. **Preview a 5-second clip before generating the full video** — catch artifacts early
-8. **Fallback strategy:** if SadTalker is unavailable but Wav2Lip is, record a simple static video from the photo and lip-sync it with the `lip_sync` tool instead
+8. **Pass an explicit `output_path`** such as `projects/<project-name>/assets/video/avatar_sample.mp4`; do not rely on input-adjacent defaults
+9. **Fallback strategy:** if SadTalker is unavailable but Wav2Lip is, record a simple static video from the photo and lip-sync it with the `lip_sync` tool instead

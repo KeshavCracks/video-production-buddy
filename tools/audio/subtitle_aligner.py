@@ -16,10 +16,10 @@ Used by:
 
 Run from CLI:
   python -m tools.audio.subtitle_aligner \
-      --output assets/subtitles.ass \
+      --output projects/demo/assets/subtitles/subtitles.ass \
       --resolution 1080x1920 \
-      --segment "assets/audio/n01.mp3:0.0:Hook narration text..." \
-      --segment "assets/audio/n02.mp3:6.0:Build narration text..."
+      --segment "projects/demo/assets/audio/n01.mp3:0.0:Hook narration text..." \
+      --segment "projects/demo/assets/audio/n02.mp3:6.0:Build narration text..."
 """
 
 from __future__ import annotations
@@ -30,6 +30,9 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from schemas.artifacts import load_strict_json
+from tools.output_paths import require_explicit_project_sidecar_path
 
 
 @dataclass
@@ -57,6 +60,20 @@ class Segment:
 # segment ad reuse one instance instead of paying the load cost N times.
 # Pipeline runs are single-threaded so no lock is needed.
 _MODEL_CACHE: dict[tuple[str, str, str], Any] = {}
+
+
+def _require_project_subtitle_output(output_path: Path) -> Path:
+    validated_path, output_error = require_explicit_project_sidecar_path(
+        {"output_path": str(output_path)},
+        "output_path",
+        "subtitle_aligner",
+        artifact_label="aligned subtitle file",
+    )
+    if output_error is not None:
+        raise ValueError(output_error.error)
+    if validated_path is None:
+        raise ValueError("subtitle_aligner: output_path is required")
+    return validated_path
 
 
 def _clear_model_cache() -> None:
@@ -265,6 +282,8 @@ def align(
 
     Returns a dict with `output_path`, `lines`, `total_words`, `validation_errors`.
     """
+    output_path = _require_project_subtitle_output(output_path)
+
     is_vertical = height > width
     if max_words_per_line is None:
         max_words_per_line = 5 if is_vertical else 9
@@ -346,7 +365,11 @@ def main(argv: list[str]) -> int:
 
     segments: list[Segment] = list(args.segment)
     if args.segments_json:
-        for s in json.loads(args.segments_json.read_text()):
+        loaded_segments = load_strict_json(
+            args.segments_json,
+            context=f"subtitle segments JSON {args.segments_json}",
+        )
+        for s in loaded_segments:
             segments.append(
                 Segment(
                     audio_path=s["audio_path"],
@@ -368,7 +391,7 @@ def main(argv: list[str]) -> int:
         margin_v=args.margin_v,
         model_size=args.model_size,
     )
-    print(json.dumps(report, indent=2))
+    print(json.dumps(report, indent=2, allow_nan=False))
     return 0 if report["ok"] else 1
 
 

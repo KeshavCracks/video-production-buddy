@@ -21,6 +21,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 
 class AudioMixer(BaseTool):
@@ -48,7 +49,7 @@ class AudioMixer(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["operation"],
+        "required": ["operation", "output_path"],
         "properties": {
             "operation": {
                 "type": "string",
@@ -118,7 +119,10 @@ class AudioMixer(BaseTool):
                 "default": -12,
             },
             "input_path": {"type": "string", "description": "Input for extract operation"},
-            "output_path": {"type": "string"},
+            "output_path": {
+                "type": "string",
+                "description": "Project-scoped output path under projects/<project-name>/assets/... or projects/<project-name>/renders/...",
+            },
             "ducking": {
                 "type": "object",
                 "description": (
@@ -212,6 +216,46 @@ class AudioMixer(BaseTool):
             },
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": ["operation", "output", "output_path"],
+        "properties": {
+            "operation": {
+                "type": "string",
+                "enum": ["mix", "duck", "extract", "full_mix", "segmented_music"],
+            },
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "input": {"type": "string"},
+            "track_count": {"type": "integer", "minimum": 0},
+            "normalized": {"type": "boolean"},
+            "speech_track": {"type": "string"},
+            "music_track": {"type": "string"},
+            "mode": {"type": "string"},
+            "schedule_samples": {"type": "integer", "minimum": 0},
+            "speech_tracks": {"type": "integer", "minimum": 0},
+            "music_tracks": {"type": "integer", "minimum": 0},
+            "sfx_tracks": {"type": "integer", "minimum": 0},
+            "ducking_enabled": {"type": "boolean"},
+            "ducking_mode": {"type": "string"},
+            "duration_seconds": {"type": ["number", "null"], "minimum": 0},
+            "video": {"type": "string"},
+            "music": {"type": "string"},
+            "segments": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["start", "end"],
+                    "properties": {
+                        "start": {"type": "number", "minimum": 0},
+                        "end": {"type": "number", "minimum": 0},
+                    },
+                },
+            },
+            "music_volume": {"type": "number", "minimum": 0},
+            "fade_duration": {"type": "number", "minimum": 0},
+        },
+    }
 
     resource_profile = ResourceProfile(cpu_cores=2, ram_mb=1024, vram_mb=0, disk_mb=500)
     idempotency_key_fields = [
@@ -235,7 +279,7 @@ class AudioMixer(BaseTool):
     ]
     side_effects = ["writes mixed audio file to output_path"]
     user_visible_verification = [
-        "Listen to mixed output and verify speech clarity and music ducking",
+        "Inspect loudness, waveform, and ducking envelope metrics for speech clarity and music balance",
     ]
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
@@ -259,6 +303,10 @@ class AudioMixer(BaseTool):
             return ToolResult(success=False, error=str(e))
 
         result.duration_seconds = round(time.time() - start, 2)
+        if result.success and "output_path" not in result.data:
+            output = result.data.get("output")
+            if isinstance(output, str):
+                result.data["output_path"] = output
         return result
 
     def _mix(self, inputs: dict[str, Any]) -> ToolResult:
@@ -267,7 +315,15 @@ class AudioMixer(BaseTool):
         if not tracks:
             return ToolResult(success=False, error="No tracks provided")
 
-        output_path = Path(inputs.get("output_path", "mixed_audio.wav"))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="mixed audio",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         normalize = inputs.get("normalize", True)
         # Configurable LUFS target. Per-platform defaults:
         #   TikTok / Reels / Shorts → -14, YouTube → -13, broadcast → -23.
@@ -386,7 +442,14 @@ class AudioMixer(BaseTool):
             }
         """
         ducking = inputs.get("ducking", {})
-        output_path = Path(inputs.get("output_path", "ducked_audio.wav"))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="ducked audio",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
         schedule = inputs.get("music_volume_schedule") or []
 
         # --- Resolve speech/music paths from either input format ---
@@ -432,6 +495,8 @@ class AudioMixer(BaseTool):
                     "array with role='speech'/'primary' and role='music'/'secondary'."
                 ),
             )
+
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Path B: schedule-driven duck envelope replaces sidechaincompress.
         if schedule:
@@ -551,9 +616,15 @@ class AudioMixer(BaseTool):
         if not input_path.exists():
             return ToolResult(success=False, error=f"Input not found: {input_path}")
 
-        output_path = Path(
-            inputs.get("output_path", str(input_path.with_suffix(".wav")))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="extracted audio",
         )
+        if output_error:
+            return output_error
+        assert output_path is not None
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
         cmd = [
             "ffmpeg", "-y",
@@ -611,14 +682,21 @@ class AudioMixer(BaseTool):
                     "release_ms": 500
                 },
                 "normalize": true,
-                "output_path": "mixed_audio.wav"
+                "output_path": "projects/<project-name>/assets/audio/mixed_audio.wav"
             }
         """
         tracks = inputs.get("tracks", [])
         if not tracks:
             return ToolResult(success=False, error="No tracks provided for full_mix")
 
-        output_path = Path(inputs.get("output_path", "full_mix_output.wav"))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="full mixed audio",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
         output_path.parent.mkdir(parents=True, exist_ok=True)
         normalize = inputs.get("normalize", True)
         ducking = inputs.get("ducking", {"enabled": True})
@@ -957,12 +1035,19 @@ class AudioMixer(BaseTool):
                     {"start": 167.0, "end": 175.0}
                 ],
                 "fade_duration": 0.5,
-                "output_path": "final_with_music.mp4"
+                "output_path": "projects/<project-name>/renders/final_with_music.mp4"
             }
         """
         video_path = inputs.get("video_path")
         music_path = inputs.get("music_path")
-        output_path = Path(inputs.get("output_path", "segmented_music_output.mp4"))
+        output_path, output_error = require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label="segmented music video",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
         segments = inputs.get("segments", [])
         music_volume = inputs.get("music_volume", 0.20)
         fade_dur = inputs.get("fade_duration", 0.5)

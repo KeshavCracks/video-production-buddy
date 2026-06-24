@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import logging
+from os import PathLike, fspath
 import subprocess
 import time
 from pathlib import Path
@@ -40,6 +41,8 @@ from tools.base_tool import (
     ToolStability,
     ToolTier,
 )
+from schemas.artifacts import load_strict_json_object
+from tools.output_paths import require_explicit_output_path
 from tools.validation.runtime_consistency_check import check_runtime_consistency
 
 
@@ -93,7 +96,7 @@ class VideoCompose(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["operation"],
+        "required": ["operation", "output_path"],
         "properties": {
             "operation": {
                 "type": "string",
@@ -109,7 +112,15 @@ class VideoCompose(BaseTool):
                 ),
             },
             "input_path": {"type": "string"},
-            "output_path": {"type": "string"},
+            "output_path": {
+                "type": "string",
+                "description": (
+                    "Explicit project-scoped output path. Final render operations "
+                    "write under projects/<project-name>/renders/...; post-process "
+                    "operations may write generated media under projects/<project-name>/assets/... "
+                    "or projects/<project-name>/renders/..."
+                ),
+            },
             "edit_decisions": {
                 "oneOf": [{"type": "object"}, {"type": "string"}],
                 "description": (
@@ -228,6 +239,57 @@ class VideoCompose(BaseTool):
                     "Applied in render and encode operations."
                 ),
             },
+            "workspace_path": {
+                "type": "string",
+                "description": (
+                    "HyperFrames workspace directory for render_runtime='hyperframes'. "
+                    "Defaults to projects/<project-name>/hyperframes when omitted."
+                ),
+            },
+            "playbook": {
+                "type": "object",
+                "description": (
+                    "Loaded playbook dict passed through to hyperframes_compose for "
+                    "CSS variable/style bridge generation."
+                ),
+            },
+            "playbook_name": {
+                "type": "string",
+                "description": (
+                    "Style playbook name to load for render_runtime='hyperframes' "
+                    "when a full playbook object is not supplied."
+                ),
+            },
+            "quality": {
+                "type": "string",
+                "enum": ["draft", "standard", "high"],
+                "default": "standard",
+                "description": "HyperFrames render quality passed through to hyperframes_compose.",
+            },
+            "fps": {
+                "type": "integer",
+                "enum": [24, 30, 60],
+                "default": 30,
+                "description": "HyperFrames render frame rate passed through to hyperframes_compose.",
+            },
+            "strict": {
+                "type": "boolean",
+                "default": False,
+                "description": (
+                    "For HyperFrames renders, fail on any lint issue instead of "
+                    "continuing after non-strict warnings."
+                ),
+            },
+            "skip_contrast": {
+                "type": "boolean",
+                "default": False,
+                "description": "For HyperFrames validation, skip the contrast audit while iterating.",
+            },
+            "workers": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Parallel Chrome worker count for HyperFrames render.",
+            },
             "options": {
                 "type": "object",
                 "description": "Render options (used by the render operation)",
@@ -239,6 +301,41 @@ class VideoCompose(BaseTool):
             "codec": {"type": "string", "default": "libx264"},
             "crf": {"type": "integer", "default": 23},
             "preset": {"type": "string", "default": "medium"},
+        },
+    }
+    output_schema = {
+        "type": "object",
+        "required": ["operation", "output_path"],
+        "properties": {
+            "operation": {
+                "type": "string",
+                "enum": [
+                    "compose",
+                    "render",
+                    "remotion_render",
+                    "burn_subtitles",
+                    "overlay",
+                    "encode",
+                ],
+            },
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "cut_count": {"type": "integer", "minimum": 0},
+            "has_subtitles": {"type": "boolean"},
+            "has_mixed_audio": {"type": "boolean"},
+            "profile": {"type": ["string", "null"]},
+            "overlay_count": {"type": "integer", "minimum": 0},
+            "codec": {"type": "string"},
+            "crf": {"type": "integer", "minimum": 0},
+            "render_runtime": {"type": "string"},
+            "runtime": {"type": "string"},
+            "workspace_path": {"type": "string"},
+            "final_review": {"type": "object"},
+            "scene_count": {"type": "integer", "minimum": 0},
+            "duration_seconds": {"type": "number", "minimum": 0},
+            "audio_streams": {"type": "integer", "minimum": 0},
+            "video_streams": {"type": "integer", "minimum": 0},
+            "issues": {"type": "array", "items": {"type": "object"}},
         },
     }
 
@@ -282,10 +379,24 @@ class VideoCompose(BaseTool):
         "production_proposal",
         "brief",
         "decision_log",
+        "workspace_path",
+        "playbook",
+        "playbook_name",
+        "quality",
+        "fps",
+        "strict",
+        "skip_contrast",
+        "workers",
+        "script_path",
+        "script_text",
+        "narration_transcript_path",
     ]
-    side_effects = ["writes video file to output_path"]
+    side_effects = [
+        "writes video file to output_path",
+        "writes HyperFrames workspace files to workspace_path when render_runtime is hyperframes",
+    ]
     user_visible_verification = [
-        "Play the composed output and verify cuts, subtitles, and overlays",
+        "Inspect composed output metadata and sampled frames to verify cuts, subtitles, and overlays",
     ]
 
     def _remotion_available(self) -> bool:
@@ -331,10 +442,10 @@ class VideoCompose(BaseTool):
             "hyperframes": hyperframes_ok,
         }
         # Backwards-compat alias — some proposal skills inspect this name.
-        info["render_runtimes"] = info["render_engines"]
+        info["render_runtimes"] = dict(info["render_engines"])
 
         if remotion_ok:
-            info["remotion_components"] = self._REMOTION_COMPONENTS
+            info["remotion_components"] = list(self._REMOTION_COMPONENTS)
             info["remotion_note"] = (
                 "Remotion is available for React-based rendering. Use it for "
                 "image-to-video with spring animations, animated text/stat cards, "
@@ -416,7 +527,33 @@ class VideoCompose(BaseTool):
         operation: str,
     ) -> tuple[Path | None, ToolResult | None]:
         raw_output_path = inputs.get("output_path")
-        if not raw_output_path:
+        if raw_output_path is None:
+            return None, ToolResult(
+                success=False,
+                error=(
+                    f"output_path required for {operation}; render outputs must be "
+                    "explicitly written under projects/<project-name>/renders/."
+                ),
+        )
+
+        try:
+            path_value = (
+                fspath(raw_output_path)
+                if isinstance(raw_output_path, PathLike)
+                else raw_output_path
+            )
+        except TypeError:
+            path_value = raw_output_path
+        if not isinstance(path_value, str):
+            return None, ToolResult(
+                success=False,
+                error=(
+                    f"output_path for {operation} must be a string path under "
+                    "projects/<project-name>/renders/<file>.mp4."
+                ),
+            )
+        path_text = path_value.strip()
+        if not path_text:
             return None, ToolResult(
                 success=False,
                 error=(
@@ -424,8 +561,32 @@ class VideoCompose(BaseTool):
                     "explicitly written under projects/<project-name>/renders/."
                 ),
             )
+        if path_text != path_value:
+            return None, ToolResult(
+                success=False,
+                error=(
+                    f"Refusing to write render output to {path_value}. Render outputs "
+                    "must be under projects/<project-name>/renders/<file>.mp4."
+                ),
+            )
 
-        output_path = Path(raw_output_path)
+        output_path = Path(path_value)
+        if not output_path.suffix:
+            return None, ToolResult(
+                success=False,
+                error=(
+                    f"Refusing to write render output to {output_path}. Render outputs "
+                    "must be under projects/<project-name>/renders/<file>.mp4."
+                ),
+            )
+        if ".." in output_path.parts:
+            return None, ToolResult(
+                success=False,
+                error=(
+                    f"Refusing to write render output to {output_path}. Render outputs "
+                    "must be under projects/<project-name>/renders/<file>.mp4."
+                ),
+            )
         repo_root = Path(__file__).resolve().parent.parent.parent
         resolved = (
             output_path.resolve()
@@ -440,7 +601,13 @@ class VideoCompose(BaseTool):
             try:
                 resolved.relative_to(repo_root)
             except ValueError:
-                return output_path, None
+                return None, ToolResult(
+                    success=False,
+                    error=(
+                        f"Refusing to write render output to {resolved}. Render outputs "
+                        "must be under projects/<project-name>/renders/<file>.mp4."
+                    ),
+                )
 
             return None, ToolResult(
                 success=False,
@@ -460,6 +627,18 @@ class VideoCompose(BaseTool):
             )
 
         return output_path, None
+
+    def _required_postprocess_output_path(
+        self,
+        inputs: dict[str, Any],
+        *,
+        artifact_label: str,
+    ) -> tuple[Path | None, ToolResult | None]:
+        return require_explicit_output_path(
+            inputs,
+            self.name,
+            artifact_label=artifact_label,
+        )
 
     def _render_runtime_governance_block(
         self,
@@ -548,11 +727,7 @@ class VideoCompose(BaseTool):
             return value
         if isinstance(value, (str, Path)):
             path = Path(value)
-            with open(path, encoding="utf-8") as f:
-                data = json.load(f)
-            if not isinstance(data, dict):
-                raise ValueError(f"{field_name} JSON must contain an object: {path}")
-            return data
+            return load_strict_json_object(path, context=f"{field_name} JSON {path}")
         raise TypeError(
             f"{field_name} must be an artifact object or JSON path, got "
             f"{type(value).__name__}"
@@ -607,7 +782,10 @@ class VideoCompose(BaseTool):
             return ToolResult(success=False, error="edit_decisions required for compose")
         edit_decisions = self._coerce_artifact(raw_edit_decisions, "edit_decisions")
 
-        output_path = Path(inputs.get("output_path", "composed_output.mp4"))
+        output_path, output_error = self._required_render_output_path(inputs, "compose")
+        if output_error:
+            return output_error
+        assert output_path is not None
         output_path.parent.mkdir(parents=True, exist_ok=True)
         audio_path = inputs.get("audio_path")
         subtitle_path = inputs.get("subtitle_path")
@@ -853,6 +1031,7 @@ class VideoCompose(BaseTool):
                     "has_mixed_audio": audio_path is not None,
                     "profile": profile_name,
                     "output": str(output_path),
+                    "output_path": str(output_path),
                 },
                 artifacts=[str(output_path)],
             )
@@ -1645,8 +1824,15 @@ class VideoCompose(BaseTool):
         profile_name = inputs.get("profile")
         profile = _media_profile(profile_name)
 
-        # Deep-copy props so we don't mutate the original
-        props = json.loads(json.dumps(composition_data))
+        # Deep-copy props so we don't mutate the original, while enforcing the
+        # same strict JSON contract used for the props file handed to Remotion.
+        try:
+            props = json.loads(json.dumps(composition_data, allow_nan=False))
+        except (TypeError, ValueError) as exc:
+            return ToolResult(
+                success=False,
+                error=f"Remotion props must be strict JSON serializable: {exc}",
+            )
 
         # Resolve asset sources to paths Remotion's local dev server can serve.
         # Strategy (in order of preference):
@@ -1728,8 +1914,15 @@ class VideoCompose(BaseTool):
 
         # Write props to temp file for Remotion CLI
         props_path = output_path.parent / ".remotion_props.json"
+        try:
+            serialized_props = json.dumps(props, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            return ToolResult(
+                success=False,
+                error=f"Remotion props must be strict JSON serializable: {exc}",
+            )
         with open(props_path, "w", encoding="utf-8") as f:
-            json.dump(props, f)
+            f.write(serialized_props)
 
         # remotion-composer lives at project root
         composer_dir = Path(__file__).resolve().parent.parent.parent / "remotion-composer"
@@ -1780,6 +1973,7 @@ class VideoCompose(BaseTool):
             data={
                 "operation": "remotion_render",
                 "output": str(output_path),
+                "output_path": str(output_path),
                 "profile": profile_name,
             },
             artifacts=[str(output_path)],
@@ -1868,7 +2062,10 @@ class VideoCompose(BaseTool):
             return result
 
         try:
-            transcript_data = json.loads(Path(transcript_path).read_text(encoding="utf-8"))
+            transcript_data = load_strict_json_object(
+                transcript_path,
+                context=f"narration transcript JSON {transcript_path}",
+            )
         except Exception as e:
             result["issues"].append(f"transcript_comparison could not parse transcript: {e}")
             return result
@@ -2482,12 +2679,19 @@ class VideoCompose(BaseTool):
         """Burn subtitle file into video."""
         input_path = Path(inputs["input_path"])
         subtitle_path = Path(inputs["subtitle_path"])
-        output_path = Path(inputs.get("output_path", str(input_path.with_stem(f"{input_path.stem}_subtitled"))))
 
         if not input_path.exists():
             return ToolResult(success=False, error=f"Input not found: {input_path}")
         if not subtitle_path.exists():
             return ToolResult(success=False, error=f"Subtitle file not found: {subtitle_path}")
+        output_path, output_error = self._required_postprocess_output_path(
+            inputs,
+            artifact_label="subtitled video",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
         style = inputs.get("subtitle_style", {})
         ass_style = self._build_subtitle_style(style)
@@ -2511,6 +2715,7 @@ class VideoCompose(BaseTool):
             data={
                 "operation": "burn_subtitles",
                 "output": str(output_path),
+                "output_path": str(output_path),
             },
             artifacts=[str(output_path)],
         )
@@ -2519,7 +2724,6 @@ class VideoCompose(BaseTool):
         """Composite overlay images/videos on top of base video."""
         input_path = Path(inputs["input_path"])
         overlays = inputs.get("overlays", [])
-        output_path = Path(inputs.get("output_path", str(input_path.with_stem(f"{input_path.stem}_overlay"))))
         codec = inputs.get("codec", "libx264")
         crf = inputs.get("crf", 23)
 
@@ -2527,6 +2731,14 @@ class VideoCompose(BaseTool):
             return ToolResult(success=False, error=f"Input not found: {input_path}")
         if not overlays:
             return ToolResult(success=False, error="No overlays provided")
+        output_path, output_error = self._required_postprocess_output_path(
+            inputs,
+            artifact_label="overlay video",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Build complex filter for each overlay
         input_args = ["-i", str(input_path)]
@@ -2581,6 +2793,7 @@ class VideoCompose(BaseTool):
                 "operation": "overlay",
                 "overlay_count": len(overlays),
                 "output": str(output_path),
+                "output_path": str(output_path),
             },
             artifacts=[str(output_path)],
         )
@@ -2588,15 +2801,23 @@ class VideoCompose(BaseTool):
     def _encode(self, inputs: dict[str, Any]) -> ToolResult:
         """Re-encode video with a specific profile/codec settings."""
         input_path = Path(inputs["input_path"])
-        output_path = Path(inputs.get("output_path", str(input_path.with_stem(f"{input_path.stem}_encoded"))))
         codec = inputs.get("codec", "libx264")
         crf = inputs.get("crf", 23)
         preset = inputs.get("preset", "medium")
         profile_name = inputs.get("profile")
-        profile = _media_profile(profile_name)
 
         if not input_path.exists():
             return ToolResult(success=False, error=f"Input not found: {input_path}")
+        output_path, output_error = self._required_postprocess_output_path(
+            inputs,
+            artifact_label="encoded video",
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        profile = _media_profile(profile_name)
 
         cmd = [
             "ffmpeg", "-y",
@@ -2621,6 +2842,7 @@ class VideoCompose(BaseTool):
                 "crf": crf,
                 "profile": profile_name,
                 "output": str(output_path),
+                "output_path": str(output_path),
             },
             artifacts=[str(output_path)],
         )

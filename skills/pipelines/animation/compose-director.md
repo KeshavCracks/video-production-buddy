@@ -70,7 +70,7 @@ For `anime_scene` compositions, build a JSON file at `remotion-composer/public/d
       "in_seconds": 0,
       "out_seconds": 5,
       "type": "anime_scene",
-      "images": ["<project>/<image-a>.png", "<project>/<image-b>.png"],
+      "images": ["projects/<project-name>/assets/images/image-a.png", "projects/<project-name>/assets/images/image-b.png"],
       "animation": "<camera-motion>",
       "particles": "<particle-type>",
       "particleColor": "#HEXCOLOR",
@@ -83,7 +83,7 @@ For `anime_scene` compositions, build a JSON file at `remotion-composer/public/d
     }
   ],
   "overlays": [...],
-  "audio": { "music": { "src": "<project>/music.mp3", "volume": 0.15, "fadeInSeconds": 2, "fadeOutSeconds": 3 } }
+  "audio": { "music": { "src": "projects/<project-name>/assets/audio/music.mp3", "volume": 0.15, "fadeInSeconds": 2, "fadeOutSeconds": 3 } }
 }
 ```
 
@@ -116,7 +116,7 @@ Use `tools/audio/pixabay_music.py` to find royalty-free ambient music matching t
 ```python
 from tools.analysis.audio_energy import AudioEnergy
 result = AudioEnergy().execute({
-    "input_path": "path/to/music.mp3",
+    "input_path": "projects/<project-name>/assets/audio/music.mp3",
     "video_duration_seconds": 30,  # your video duration
 })
 data = result.data

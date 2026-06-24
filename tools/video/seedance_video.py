@@ -23,6 +23,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.video._shared import require_generated_video_output_path
 
 
 class SeedanceVideo(BaseTool):
@@ -74,7 +75,7 @@ class SeedanceVideo(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "allOf": [
             {
                 "if": {
@@ -183,6 +184,46 @@ class SeedanceVideo(BaseTool):
             "output_path": {"type": "string"},
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "model",
+            "prompt",
+            "operation",
+            "variant",
+            "aspect_ratio",
+            "resolution",
+            "generate_audio",
+            "seed",
+            "output",
+            "output_path",
+            "format",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "seedance"},
+            "model": {"type": "string"},
+            "prompt": {"type": "string"},
+            "operation": {
+                "type": "string",
+                "enum": ["text_to_video", "image_to_video", "reference_to_video"],
+            },
+            "variant": {"type": "string", "enum": ["standard", "fast"]},
+            "aspect_ratio": {"type": "string"},
+            "resolution": {"type": "string"},
+            "generate_audio": {"type": "boolean"},
+            "seed": {"type": ["integer", "null"]},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+            "format": {"type": "string", "const": "mp4"},
+            "file_size_bytes": {"type": "integer", "minimum": 0},
+            "duration_seconds": {"type": "number", "minimum": 0},
+            "file_size_mb": {"type": "number", "minimum": 0},
+            "video_width": {"type": "integer", "minimum": 0},
+            "video_height": {"type": "integer", "minimum": 0},
+            "video_codec": {"type": "string"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=512, vram_mb=0, disk_mb=500, network_required=True
@@ -208,7 +249,7 @@ class SeedanceVideo(BaseTool):
     ]
     side_effects = ["writes video file to output_path", "calls fal.ai API"]
     user_visible_verification = [
-        "Watch generated clip for motion coherence, audio sync, and visual quality"
+        "Inspect sampled frames and timing metadata for motion coherence, audio sync, and visual quality"
     ]
 
     def _get_api_key(self) -> str | None:
@@ -231,16 +272,6 @@ class SeedanceVideo(BaseTool):
         return 60.0 if variant == "fast" else 120.0
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
-        api_key = self._get_api_key()
-        if not api_key:
-            return ToolResult(
-                success=False,
-                error="FAL_KEY not set. " + self.install_instructions,
-            )
-
-        import requests
-
-        start = time.time()
         operation = inputs.get("operation", "text_to_video")
         variant = inputs.get("model_variant", "standard")
         if operation not in {"text_to_video", "image_to_video", "reference_to_video"}:
@@ -279,6 +310,20 @@ class SeedanceVideo(BaseTool):
                     "reference_image_paths, reference_video_urls, or reference_audio_urls"
                 ),
             )
+        output_path, output_error = require_generated_video_output_path(inputs, self.name)
+        if output_error:
+            return output_error
+
+        api_key = self._get_api_key()
+        if not api_key:
+            return ToolResult(
+                success=False,
+                error="FAL_KEY not set. " + self.install_instructions,
+            )
+
+        import requests
+
+        start = time.time()
         operation_path = operation.replace("_", "-")
 
         if variant == "fast":
@@ -393,7 +438,6 @@ class SeedanceVideo(BaseTool):
             video_response = requests.get(video_url, timeout=120)
             video_response.raise_for_status()
 
-            output_path = Path(inputs.get("output_path", "seedance_output.mp4"))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(video_response.content)
 
