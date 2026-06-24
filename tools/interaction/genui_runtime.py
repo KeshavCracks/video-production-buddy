@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 import socket
 import subprocess
 import sys
@@ -16,8 +18,24 @@ from lib.genui import is_wsl2
 class LocalGenUIServerRuntime:
     """Browser/server helpers shared by localhost GenUI interaction tools."""
 
+    def _write_strict_json_file(self, path: Path, payload: dict[str, Any]) -> None:
+        try:
+            serialized = json.dumps(payload, indent=2, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"GenUI state must be strict JSON serializable: {exc}") from exc
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            f.write(serialized)
+            f.write("\n")
+
     def _try_open_browser(self, url: str) -> bool:
         import webbrowser
+
+        allow_browser_open = os.environ.get("VPB_ALLOW_BROWSER_OPEN")
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            return False
+        if str(allow_browser_open).strip().lower() in {"0", "false", "no", "off"}:
+            return False
 
         if is_wsl2():
             try:

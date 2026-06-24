@@ -99,6 +99,7 @@ class GenUIInteraction(BaseTool):
         "may write projects/<project>/artifacts/ui/<session_id>/view_spec.json",
         "may write projects/<project>/artifacts/ui/interaction_journal.json",
         "may start the localhost-only GenUI browser server in serve mode",
+        "may open a local browser only when open_browser is true",
         "may write compatibility projects/<project>/artifacts/ui/<surface_id>/ files only for explicit compatibility fallback",
     ]
     input_schema = {
@@ -112,6 +113,7 @@ class GenUIInteraction(BaseTool):
             "port": {"type": "integer", "minimum": 0, "maximum": 65535, "default": 0},
             "force_genui": {"type": "boolean", "default": False},
             "compatibility_mode": {"type": "string", "enum": ["standard", "surface"], "default": "standard"},
+            "open_browser": {"type": "boolean", "default": False},
         },
     }
     output_schema = {
@@ -150,9 +152,18 @@ class GenUIInteraction(BaseTool):
         "delegates_to": "genui_session",
         "compatibility_surface": "genui_surface",
     }
-    idempotency_key_fields = ["project_dir", "interaction_request", "mode", "host", "port", "force_genui", "compatibility_mode"]
+    idempotency_key_fields = [
+        "project_dir",
+        "interaction_request",
+        "mode",
+        "host",
+        "port",
+        "force_genui",
+        "compatibility_mode",
+        "open_browser",
+    ]
     user_visible_verification = [
-        "For GenUI mode, open the returned localhost URL and submit the generated interaction.",
+        "For GenUI mode, use the returned localhost URL only when an interactive decision is needed.",
         "For CLI mode, ask the compact question directly and record why linear chat was sufficient.",
     ]
 
@@ -217,6 +228,7 @@ class GenUIInteraction(BaseTool):
                         "host": inputs.get("host", "127.0.0.1"),
                         "port": inputs.get("port", 0),
                         "record_journal": False,
+                        "open_browser": inputs.get("open_browser") is True,
                     }
                 )
                 if not session_result.success:
@@ -258,6 +270,7 @@ class GenUIInteraction(BaseTool):
                     "mode": inputs.get("mode", "serve"),
                     "host": inputs.get("host", "127.0.0.1"),
                     "port": inputs.get("port", 0),
+                    "open_browser": inputs.get("open_browser") is True,
                 }
             )
             if not surface_result.success:

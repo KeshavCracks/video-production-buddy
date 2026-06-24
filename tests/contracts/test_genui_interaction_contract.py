@@ -160,6 +160,19 @@ def test_genui_cli_fallback_is_failure_or_explicit_decline_only():
         assert "localhost url counts as browser path available" in text, path
 
 
+def test_genui_docs_require_browser_launch_opt_in():
+    paths = [
+        ROOT / "AGENT_GUIDE.md",
+        ROOT / "skills/meta/genui-interaction.md",
+    ]
+
+    for path in paths:
+        text = " ".join(path.read_text().lower().replace("`", "").split())
+        assert "returns a localhost url by default" in text, path
+        assert "open_browser: true" in text, path
+        assert "do not launch a local browser window" in text, path
+
+
 def test_agent_guide_describes_genui_as_interaction_layer_not_orchestrator():
     guide = (ROOT / "AGENT_GUIDE.md").read_text().lower()
 

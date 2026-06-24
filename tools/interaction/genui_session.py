@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import secrets
 import time
 from pathlib import Path
@@ -33,6 +32,7 @@ from lib.genui.session import (
     write_session_bundle,
     write_session_view_spec,
 )
+from schemas.artifacts import load_strict_json_object
 from tools.base_tool import BaseTool, ToolResult, ToolRuntime, ToolStability, ToolTier
 from tools.interaction.genui_runtime import LocalGenUIServerRuntime
 
@@ -114,6 +114,7 @@ class GenUISession(LocalGenUIServerRuntime, BaseTool):
         "may write response-only projects/<project>/artifacts/ui/<session_id>/draft.json during browser autosave",
         "writes projects/<project>/artifacts/ui/interaction_journal.json",
         "may start a localhost-only Python HTTP server in serve mode",
+        "may open a local browser only when open_browser is true",
     ]
     input_schema = {
         "type": "object",
@@ -131,6 +132,7 @@ class GenUISession(LocalGenUIServerRuntime, BaseTool):
             "host": {"type": "string", "default": "127.0.0.1"},
             "port": {"type": "integer", "minimum": 0, "maximum": 65535, "default": 0},
             "record_journal": {"type": "boolean", "default": True},
+            "open_browser": {"type": "boolean", "default": False},
         },
     }
     output_schema = {
@@ -199,9 +201,10 @@ class GenUISession(LocalGenUIServerRuntime, BaseTool):
         "mode",
         "host",
         "port",
+        "open_browser",
     ]
     user_visible_verification = [
-        "Open the returned localhost URL and submit the GenUI session when a decision is needed.",
+        "Use the returned localhost URL for the GenUI session when an interactive decision is needed.",
         "Confirm projects/<project>/artifacts/ui/<session_id>/response.json exists before mapping to canonical artifacts.",
         "Validate ui_session_response and review the patch plan before canonical artifacts are updated.",
     ]
@@ -236,15 +239,19 @@ class GenUISession(LocalGenUIServerRuntime, BaseTool):
         paths = self._bundle_paths(project_dir, session_id)
         if not paths["config_path"].exists():
             raise ValueError(f"GenUI session config not found for {session_id!r}")
-        with open(paths["config_path"]) as f:
-            return json.load(f)
+        return load_strict_json_object(
+            paths["config_path"],
+            context=f"GenUI session config {session_id}",
+        )
 
     def _status_data(self, project_dir: Path, session_id: str, config: dict[str, Any]) -> dict[str, Any]:
         paths = self._bundle_paths(project_dir, session_id)
         state: dict[str, Any] = {}
         if paths["state_path"].exists():
-            with open(paths["state_path"]) as f:
-                state = json.load(f)
+            state = load_strict_json_object(
+                paths["state_path"],
+                context=f"GenUI session server state {session_id}",
+            )
         response_exists = paths["response_path"].exists()
         server_state = "submitted" if response_exists else str(state.get("server_state") or "prepared")
         events = read_session_events(paths["events_path"])
@@ -334,8 +341,10 @@ class GenUISession(LocalGenUIServerRuntime, BaseTool):
 
         if not paths["response_path"].exists():
             raise ValueError(f"GenUI response not found at {paths['response_path']}")
-        with open(paths["response_path"]) as f:
-            response = json.load(f)
+        response = load_strict_json_object(
+            paths["response_path"],
+            context=f"GenUI session response {session_id}",
+        )
         validate_session_response(response)
         review = review_session_response(config, response)
         validation = review["validation"]
@@ -540,7 +549,11 @@ class GenUISession(LocalGenUIServerRuntime, BaseTool):
                 time.sleep(0.02)
                 localhost_url = f"http://{host}:{port}/"
                 browser_url = get_browser_url(localhost_url)
-                browser_opened = self._try_open_browser(browser_url)
+                browser_opened = (
+                    self._try_open_browser(browser_url)
+                    if inputs.get("open_browser") is True
+                    else False
+                )
                 data.update(
                     {
                         "server_state": "running",
@@ -552,17 +565,19 @@ class GenUISession(LocalGenUIServerRuntime, BaseTool):
                         "pid": process.pid,
                         "browser_opened": browser_opened,
                         "instructions": (
-                            f"Open {browser_url} in a local browser, review the GenUI session, submit it, "
+                            f"Browser URL available at {browser_url}. Review the GenUI session when needed, submit it, "
                             f"then wait while {bundle.response_path} is validated before any canonical "
                             "artifacts are updated."
-                            + (" (Browser should have opened automatically.)" if browser_opened else "")
+                            + (" (Browser launch requested and completed.)" if browser_opened else "")
                         ),
                     }
                 )
-                bundle.state_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(bundle.state_path, "w") as f:
-                    json.dump(data, f, indent=2)
-                    f.write("\n")
+                try:
+                    self._write_strict_json_file(bundle.state_path, data)
+                except (TypeError, ValueError):
+                    if process.poll() is None:
+                        process.terminate()
+                    raise
                 artifacts.append(str(bundle.state_path))
                 if inputs.get("record_journal", True) is not False:
                     update_interaction_entry(

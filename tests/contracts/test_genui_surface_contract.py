@@ -1,4 +1,5 @@
 import json
+import math
 from pathlib import Path
 
 import jsonschema
@@ -197,6 +198,51 @@ def test_wait_for_response_accepts_surface_response(tmp_path: Path):
     assert response is not None
     assert response["contract"] == "genui_surface_response"
     assert response["surface_id"] == "proposal-workspace"
+
+
+def test_wait_for_response_rejects_non_strict_response_json(
+    tmp_path: Path, monkeypatch
+):
+    from lib import genui
+
+    response_path = tmp_path / "response.json"
+    response_path.write_text(
+        '{"contract":"genui_surface_response","action":"approve","metadata":{"bad":NaN}}\n'
+    )
+    validated: list[dict] = []
+    monkeypatch.setattr(
+        genui,
+        "validate_surface_response",
+        lambda response: validated.append(response),
+    )
+
+    response = genui.wait_for_response(
+        response_path,
+        timeout_seconds=0.02,
+        poll_interval=0.001,
+    )
+
+    assert response is None
+    assert validated == []
+
+
+def test_cleanup_server_rejects_non_strict_server_state_json(
+    tmp_path: Path, monkeypatch
+):
+    from lib import genui
+
+    state_path = tmp_path / "server.json"
+    state_path.write_text('{"pid": NaN}\n')
+    matched_pids: list[object] = []
+    monkeypatch.setattr(
+        genui,
+        "_pid_matches_genui_server",
+        lambda pid, path: matched_pids.append(pid) or False,
+    )
+
+    assert genui.cleanup_server(state_path) is False
+    assert matched_pids == []
+    assert state_path.exists()
 
 
 def test_surface_view_spec_uses_product_workspace_components():
@@ -830,6 +876,100 @@ def test_genui_interaction_uses_surface_tool_for_visual_round(tmp_path: Path):
     assert router.get_info().get("fallback") in (None, "")
 
 
+def test_genui_surface_serve_does_not_open_browser_by_default(tmp_path: Path, monkeypatch):
+    from tools.interaction.genui_surface import GenUISurface
+
+    class FakeProcess:
+        pid = 42002
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            return None
+
+    tool = GenUISurface()
+    opened_urls: list[str] = []
+    monkeypatch.setattr(tool, "_choose_port", lambda host: 8124)
+    monkeypatch.setattr(tool, "_start_server", lambda *args, **kwargs: FakeProcess())
+    monkeypatch.setattr(tool, "_wait_until_ready", lambda *args, **kwargs: None)
+    monkeypatch.setattr(tool, "_try_open_browser", lambda url: opened_urls.append(url) or True)
+
+    result = tool.execute(
+        {
+            "project_dir": str(tmp_path / "projects" / "demo-ad"),
+            "config": _surface_config(),
+            "mode": "serve",
+        }
+    )
+
+    assert result.success, result.error
+    assert result.data["server_state"] == "running"
+    assert result.data["browser_url"]
+    assert result.data["browser_opened"] is False
+    assert opened_urls == []
+    assert not result.data["instructions"].startswith("Open ")
+    assert result.data["browser_url"] in result.data["instructions"]
+
+    opt_in_config = {**_surface_config(), "surface_id": "proposal-workspace-open"}
+    opt_in_config["ag_ui"] = {
+        **opt_in_config["ag_ui"],
+        "run_id": "proposal-workspace-open",
+    }
+    opt_in_result = tool.execute(
+        {
+            "project_dir": str(tmp_path / "projects" / "demo-ad"),
+            "config": opt_in_config,
+            "mode": "serve",
+            "open_browser": True,
+        }
+    )
+
+    assert opt_in_result.success, opt_in_result.error
+    assert opt_in_result.data["browser_opened"] is True
+    assert opened_urls == [opt_in_result.data["browser_url"]]
+
+
+def test_genui_surface_rejects_non_finite_server_state_before_writing(
+    tmp_path: Path, monkeypatch
+):
+    from tools.interaction.genui_surface import GenUISurface
+
+    class FakeProcess:
+        pid = math.nan
+        terminated = False
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            self.terminated = True
+            return None
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    tool = GenUISurface()
+    fake_process = FakeProcess()
+    monkeypatch.setattr(tool, "_choose_port", lambda host: 8124)
+    monkeypatch.setattr(tool, "_start_server", lambda *args, **kwargs: fake_process)
+    monkeypatch.setattr(tool, "_wait_until_ready", lambda *args, **kwargs: None)
+    monkeypatch.setattr(tool, "_try_open_browser", lambda url: True)
+
+    result = tool.execute(
+        {
+            "project_dir": str(project_dir),
+            "config": _surface_config(),
+            "mode": "serve",
+        }
+    )
+
+    assert not result.success
+    assert "strict JSON" in result.error
+    assert fake_process.terminated is True
+    assert not (
+        project_dir / "artifacts" / "ui" / "proposal-workspace" / "server.json"
+    ).exists()
+
+
 def test_project_cockpit_snapshot_is_read_only_and_traceable(tmp_path: Path):
     from lib.genui.project_snapshot import build_project_cockpit_config
 
@@ -935,3 +1075,65 @@ def test_surface_docs_and_manifest_keep_surface_as_compatibility_fallback():
     assert "genui_surface" in combined
     assert "project cockpit" in combined
     assert "genui_form" not in manifest
+
+
+def test_genui_docs_forbid_native_agent_ui_as_genui_substitute():
+    guide = (ROOT / "AGENT_GUIDE.md").read_text(encoding="utf-8")
+    protocol = (ROOT / "skills/meta/genui-interaction.md").read_text(encoding="utf-8")
+    agent_behavior = (ROOT / "project_profile/agent_behavior.md").read_text(
+        encoding="utf-8"
+    )
+
+    combined = f"{guide}\n{protocol}\n{agent_behavior}"
+    normalized = combined.lower()
+
+    assert "agent-native question or form tools are not genui" in normalized
+    assert "claude code `askuserquestion`" in normalized
+    assert "codex `request_user_input`" in normalized
+    assert "genui_interaction" in combined
+    assert "genui_session" in combined
+    assert (
+        "user-declined browser path" in normalized
+        or "user declines the browser path" in normalized
+    )
+
+
+def test_genui_protocol_includes_registry_invocation_template():
+    protocol = (ROOT / "skills/meta/genui-interaction.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Registry Invocation Template" in protocol
+    assert "from tools.tool_registry import registry" in protocol
+    assert 'registry.get("genui_interaction")' in protocol
+    assert '"mode": "serve"' in protocol
+    assert '"open_browser": False' in protocol
+    assert 'result.data["browser_url"]' in protocol
+    assert 'result.data["response_path"]' in protocol
+
+
+def test_genui_docs_include_required_gate_evidence_check():
+    guide = (ROOT / "AGENT_GUIDE.md").read_text(encoding="utf-8")
+    protocol = (ROOT / "skills/meta/genui-interaction.md").read_text(
+        encoding="utf-8"
+    )
+    agent_behavior = (ROOT / "project_profile/agent_behavior.md").read_text(
+        encoding="utf-8"
+    )
+
+    combined = f"{guide}\n{protocol}\n{agent_behavior}"
+    normalized = combined.lower()
+
+    assert "genui_required_gate_evidence_report" in combined
+    assert "genui_evidence_check" in combined
+    assert 'registry.get("genui_evidence_check")' in combined
+    assert "make genui-evidence-check" in combined
+    assert "python -m tools.validation.genui_evidence_check" in combined
+    assert "ui_interaction_journal" in combined
+    assert "ui_session_response" in combined
+    assert "ui_surface_response" in combined
+    assert "schema-valid" in normalized
+    assert "fallback reason" in normalized
+    assert "genui_evidence_required" in combined
+    assert "genui_evidence_gate" in combined
+    assert "completed checkpoint" in normalized

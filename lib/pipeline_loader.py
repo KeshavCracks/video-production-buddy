@@ -313,6 +313,60 @@ def get_stage_review_focus(manifest: dict, stage_name: str) -> list[str]:
     return unit.get("review_focus", []) if unit else []
 
 
+def _genui_gate_from_unit(
+    *,
+    stage_name: str,
+    unit_name: str,
+    unit: dict[str, Any],
+) -> dict[str, str] | None:
+    if unit.get("genui_evidence_required") is not True:
+        return None
+    gate = str(unit.get("genui_evidence_gate") or unit_name)
+    return {"stage": stage_name, "gate": gate}
+
+
+def get_genui_required_gates_for_checkpoint(
+    manifest: dict,
+    checkpoint_stage: str,
+) -> list[dict[str, str]]:
+    """Return GenUI evidence gates required before completing a checkpoint.
+
+    Top-level checkpoint stages collect their own requirement plus any child
+    sub-stage requirements. Dotted checkpoint units collect only the targeted
+    child gate.
+    """
+    unit = _resolve_stage_unit(manifest, checkpoint_stage)
+    if unit is None:
+        return []
+
+    if "." in checkpoint_stage:
+        parent_name, child_name = checkpoint_stage.split(".", 1)
+        gate = _genui_gate_from_unit(
+            stage_name=parent_name,
+            unit_name=child_name,
+            unit=unit,
+        )
+        return [gate] if gate else []
+
+    gates: list[dict[str, str]] = []
+    gate = _genui_gate_from_unit(
+        stage_name=checkpoint_stage,
+        unit_name=checkpoint_stage,
+        unit=unit,
+    )
+    if gate:
+        gates.append(gate)
+    for sub_stage in unit.get("sub_stages", []):
+        sub_gate = _genui_gate_from_unit(
+            stage_name=checkpoint_stage,
+            unit_name=str(sub_stage.get("name") or ""),
+            unit=sub_stage,
+        )
+        if sub_gate:
+            gates.append(sub_gate)
+    return gates
+
+
 # ---------------------------------------------------------------------------
 # Capability-Extension Enforcement
 # ---------------------------------------------------------------------------

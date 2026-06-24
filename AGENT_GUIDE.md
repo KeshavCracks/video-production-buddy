@@ -213,6 +213,15 @@ Use `genui_interaction` when the round needs visual demonstration,
 media review, side-by-side comparison, multi-axis selection, many options,
 or structured revision capture. One-question clarifications and short yes/no
 approvals can stay in CLI.
+Serving a GenUI session returns a localhost URL by default. Do not launch a
+local browser window unless `open_browser: true` was explicitly requested for
+that tool call.
+Agent-native question or form tools are not GenUI and do not satisfy a
+GenUI-required gate. Examples include Claude Code `AskUserQuestion`, Codex
+`request_user_input`, Cursor/Copilot prompt widgets, or any similar assistant
+UI that is not produced by this repo's `genui_interaction` or `genui_session`
+tools. Use those native tools only for one-question clarifications, or after a
+recorded GenUI failure/user-declined browser path as the explicit CLI fallback.
 
 For sample video, generated AIGC clips, audio/music, product references,
 concept images, keyframes, and publish/final-review assets, the browser review
@@ -239,10 +248,22 @@ gates:
    for explicit compatibility surface.
 3. If the user cannot use the browser or the GenUI tool is unavailable, use the
    CLI fallback in the stage director skill or compactly mirror the same fields.
+   Agent-native question/form tools do not count as trying GenUI; record the
+   GenUI execution failure, unavailable tool, or user-declined browser path
+   before using them as fallback.
 4. Read and validate the submitted `ui_session_response` (or
    `ui_surface_response` for explicit compatibility surface).
-5. Summarize the submitted choices to the user.
-6. Only after agent validation, write canonical artifacts such as
+5. Before marking a GenUI-required gate complete, check
+   `ui_interaction_journal` with the registry tool `genui_evidence_check` or
+   `lib.genui.journal.genui_required_gate_evidence_report(...)`. The gate needs
+   either a schema-valid `ui_session_response`/`ui_surface_response` or an
+   explicit GenUI failure/unavailable/user-declined fallback reason. Pipeline
+   manifests may declare this with `genui_evidence_required: true` and
+   `genui_evidence_gate`; completed checkpoints automatically enforce those
+   declared gates. For ad-video assets, use:
+   `make genui-evidence-check PROJECT=projects/<project-id> PIPELINE=ad-video STAGE=assets`.
+6. Summarize the submitted choices to the user.
+7. Only after agent validation, write canonical artifacts such as
    `enriched_brief`, `production_proposal`, `decision_log`, and checkpoints.
 
 The GenUI server must not write canonical artifacts directly. It writes only

@@ -161,8 +161,7 @@ class GenUIRequestHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _load_spec_state(self) -> dict[str, Any]:
-        spec = json.loads(self.view_spec_path.read_text())
-        validate_view_spec(spec)
+        spec = _load_view_spec(self.view_spec_path)
         return spec.get("state") or {}
 
     def _is_session_config(self) -> bool:
@@ -197,11 +196,18 @@ class GenUIRequestHandler(BaseHTTPRequestHandler):
 
         events = build_ag_ui_events(self.config, state)
         if not self.events_path.exists():
+            try:
+                event_lines = [
+                    json.dumps(event, ensure_ascii=False, allow_nan=False) + "\n"
+                    for event in events
+                ]
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"GenUI event log must be strict JSON serializable: {exc}"
+                ) from exc
             self.events_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.events_path, "w") as f:
-                for event in events:
-                    json.dump(event, f, ensure_ascii=False, allow_nan=False)
-                    f.write("\n")
+            with open(self.events_path, "w", encoding="utf-8") as f:
+                f.writelines(event_lines)
         return events
 
     def _session_status_payload(self) -> dict[str, Any]:
@@ -239,8 +245,7 @@ class GenUIRequestHandler(BaseHTTPRequestHandler):
                 self._send(HTTPStatus.FORBIDDEN, "Forbidden origin", "text/plain; charset=utf-8")
                 return
             try:
-                spec = json.loads(self.view_spec_path.read_text())
-                validate_view_spec(spec)
+                spec = _load_view_spec(self.view_spec_path)
                 body = json.dumps(spec, indent=2, allow_nan=False)
             except OSError as exc:
                 self._send(
@@ -489,6 +494,14 @@ def _reject_json_constant(value: str) -> None:
 
 def _loads_strict_json(text: str) -> Any:
     return json.loads(text, parse_constant=_reject_json_constant)
+
+
+def _load_view_spec(path: Path) -> dict[str, Any]:
+    spec = _loads_strict_json(path.read_text())
+    if not isinstance(spec, dict):
+        raise ValueError("GenUI view spec must contain a JSON object")
+    validate_view_spec(spec)
+    return spec
 
 
 def _validate_bundle_config(config: dict[str, Any], config_path: Path) -> None:

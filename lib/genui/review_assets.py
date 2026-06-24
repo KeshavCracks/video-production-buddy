@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from schemas.artifacts import load_strict_json
 
 
 MEDIA_EXTENSIONS = {
@@ -46,9 +47,11 @@ class ReviewAssetEnrichment:
 
 
 def _load_json(path: Path) -> Any:
+    if not path.exists():
+        return None
     try:
-        return json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
+        return load_strict_json(path, context=f"review asset artifact {path.name}")
+    except OSError:
         return None
 
 

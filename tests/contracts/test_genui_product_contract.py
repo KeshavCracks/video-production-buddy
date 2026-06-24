@@ -426,5 +426,12 @@ def test_genui_product_server_draft_endpoint_is_response_only(tmp_path: Path):
 
 def test_genui_product_verify_target_is_documented():
     makefile = (ROOT / "Makefile").read_text()
+    product_contract_lines = [
+        line.strip()
+        for line in makefile.splitlines()
+        if "tests/contracts/test_genui_product_contract.py" in line
+    ]
 
-    assert "pytest -q tests/contracts/test_genui_product_contract.py" in makefile
+    assert product_contract_lines
+    assert all(line.startswith("VPB_ALLOW_BROWSER_OPEN=0 ") for line in product_contract_lines)
+    assert all("python -m pytest" in line for line in product_contract_lines)

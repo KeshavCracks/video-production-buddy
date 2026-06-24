@@ -283,6 +283,111 @@ def test_genui_interaction_tool_prepares_dynamic_round(tmp_path: Path):
     ]
 
 
+def test_genui_interaction_passes_open_browser_opt_in_to_session(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from tools.base_tool import ToolResult
+    from tools.interaction.genui_interaction import GenUIInteraction
+    from tools.interaction.genui_session import GenUISession
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    media_path = project_dir / "media" / "ref-hero.png"
+    media_path.parent.mkdir(parents=True, exist_ok=True)
+    media_path.write_bytes(b"sample")
+    captured: dict = {}
+
+    def fake_execute(self, inputs: dict):  # noqa: ANN001, ARG001
+        captured.update(inputs)
+        return ToolResult(
+            success=True,
+            data={
+                "session_id": "proposal-visual-choice",
+                "session_contract": "genui_session",
+                "server_state": "running",
+                "renderer": "a2ui",
+                "framework": "a2ui",
+                "framework_renderer": "@copilotkit/a2ui-renderer",
+                "protocol": "ag-ui",
+                "config_path": str(project_dir / "artifacts/ui/proposal-visual-choice/config.json"),
+                "view_spec_path": str(project_dir / "artifacts/ui/proposal-visual-choice/view_spec.json"),
+                "response_path": str(project_dir / "artifacts/ui/proposal-visual-choice/response.json"),
+                "events_path": str(project_dir / "artifacts/ui/proposal-visual-choice/events.jsonl"),
+                "browser_url": "http://127.0.0.1:8123/",
+                "url": "http://127.0.0.1:8123/",
+                "instructions": "Browser URL available for manual review when needed.",
+            },
+            artifacts=[],
+        )
+
+    monkeypatch.setattr(GenUISession, "execute", fake_execute)
+
+    tool = GenUIInteraction()
+    result = tool.execute(
+        {
+            "project_dir": str(project_dir),
+            "interaction_request": _dynamic_request(),
+            "mode": "serve",
+            "open_browser": True,
+        }
+    )
+
+    assert "open_browser" in tool.input_schema["properties"]
+    assert "open_browser" in tool.idempotency_key_fields
+    assert result.success, result.error
+    assert captured["open_browser"] is True
+
+
+def test_genui_interaction_passes_open_browser_opt_in_to_surface_fallback(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from tools.base_tool import ToolResult
+    from tools.interaction.genui_interaction import GenUIInteraction
+    from tools.interaction.genui_surface import GenUISurface
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    media_path = project_dir / "media" / "ref-hero.png"
+    media_path.parent.mkdir(parents=True, exist_ok=True)
+    media_path.write_bytes(b"sample")
+    captured: dict = {}
+
+    def fake_execute(self, inputs: dict):  # noqa: ANN001, ARG001
+        captured.update(inputs)
+        return ToolResult(
+            success=True,
+            data={
+                "surface_id": "proposal-visual-choice",
+                "surface_contract": "genui_surface",
+                "server_state": "running",
+                "renderer": "json-render",
+                "protocol": "ag-ui",
+                "config_path": str(project_dir / "artifacts/ui/proposal-visual-choice/config.json"),
+                "view_spec_path": str(project_dir / "artifacts/ui/proposal-visual-choice/view_spec.json"),
+                "response_path": str(project_dir / "artifacts/ui/proposal-visual-choice/response.json"),
+                "browser_url": "http://127.0.0.1:8124/",
+                "url": "http://127.0.0.1:8124/",
+                "instructions": "Browser URL available for manual review when needed.",
+            },
+            artifacts=[],
+        )
+
+    monkeypatch.setattr(GenUISurface, "execute", fake_execute)
+
+    result = GenUIInteraction().execute(
+        {
+            "project_dir": str(project_dir),
+            "interaction_request": _dynamic_request(),
+            "mode": "serve",
+            "compatibility_mode": "surface",
+            "open_browser": True,
+        }
+    )
+
+    assert result.success, result.error
+    assert captured["open_browser"] is True
+
+
 def test_genui_interaction_output_schema_accepts_status_modes(tmp_path: Path):
     from tools.interaction.genui_interaction import GenUIInteraction
 

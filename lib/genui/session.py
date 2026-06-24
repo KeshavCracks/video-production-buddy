@@ -150,10 +150,13 @@ def _reject_non_finite_json(value: Any, *, context: str) -> None:
 
 def _dump_json(path: Path, payload: dict[str, Any]) -> None:
     _reject_non_finite_json(payload, context=str(path))
+    try:
+        serialized = json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"GenUI payload must be strict JSON serializable: {exc}") from exc
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(payload, f, indent=2, ensure_ascii=False, allow_nan=False)
-        f.write("\n")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(serialized)
 
 
 def _resolve_project_path(project_dir: Path | str, path: Path | str) -> Path:
@@ -1007,12 +1010,13 @@ def read_session_events(path: Path | str) -> list[dict[str, Any]]:
 
 def write_session_events(path: Path | str, events: list[dict[str, Any]]) -> Path:
     event_path = Path(path)
+    event_lines: list[str] = []
+    for event in events:
+        _reject_non_finite_json(event, context=f"{event_path}.event")
+        event_lines.append(json.dumps(event, ensure_ascii=False, allow_nan=False) + "\n")
     event_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(event_path, "w") as f:
-        for event in events:
-            _reject_non_finite_json(event, context=f"{event_path}.event")
-            json.dump(event, f, ensure_ascii=False, allow_nan=False)
-            f.write("\n")
+    with open(event_path, "w", encoding="utf-8") as f:
+        f.writelines(event_lines)
     return event_path
 
 
@@ -1021,8 +1025,10 @@ def append_session_event(path: Path | str, config: dict[str, Any], event: dict[s
     event_path.parent.mkdir(parents=True, exist_ok=True)
     events = read_session_events(event_path)
     numbered = number_session_events(config, [event], start_sequence=len(events) + 1)[0]
-    with open(event_path, "a") as f:
-        json.dump(numbered, f, ensure_ascii=False, allow_nan=False)
+    _reject_non_finite_json(numbered, context=f"{event_path}.event")
+    serialized = json.dumps(numbered, ensure_ascii=False, allow_nan=False)
+    with open(event_path, "a", encoding="utf-8") as f:
+        f.write(serialized)
         f.write("\n")
     return numbered
 

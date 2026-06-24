@@ -6,7 +6,6 @@ browser response artifacts, and leaves canonical artifact updates to the agent.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +14,7 @@ from lib.genui.view_spec import (
     VIEW_SPEC_FILENAME,
     render_shell_html,
 )
+from schemas.artifacts import load_strict_json_object
 
 
 SURFACE_DIRNAME = "ui"
@@ -86,9 +86,9 @@ def cleanup_server(state_path: Path | str) -> bool:
 
     if pid is None and path.exists():
         try:
-            state = json.loads(path.read_text())
+            state = load_strict_json_object(path, context=f"GenUI server state {path}")
             pid = state.get("pid")
-        except (json.JSONDecodeError, OSError):
+        except (ValueError, OSError):
             return False
 
     if not pid:
@@ -138,14 +138,14 @@ def wait_for_response(
     while time.monotonic() < deadline:
         if path.exists():
             try:
-                data = json.loads(path.read_text())
+                data = load_strict_json_object(path, context=f"GenUI response {path}")
                 if data.get("contract") == "genui_session_response" or data.get("version") == "3.0":
                     validate_session_response(data)
                 else:
                     validate_surface_response(data)
                 if data.get("action"):
                     return data
-            except (Exception, json.JSONDecodeError, OSError):
+            except Exception:
                 pass
         time.sleep(poll_interval)
     return None

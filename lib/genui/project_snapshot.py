@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
 from typing import Any
 
 from lib.pipeline_loader import get_stage_order, load_pipeline
 from lib.genui.surface import SURFACE_CONTRACT, validate_surface_config
+from schemas.artifacts import load_strict_json
 
 
 MEDIA_EXTENSIONS = {
@@ -47,15 +47,15 @@ def _relative_path(path: Path, project_root: Path) -> str:
 
 def _load_json(path: Path) -> Any:
     try:
-        return json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
+        return load_strict_json(path, context=f"GenUI project snapshot source {path}")
+    except (OSError, ValueError):
         return None
 
 
 def _safe_json_summary(path: Path, project_root: Path) -> dict[str, Any]:
     try:
-        data = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
+        data = load_strict_json(path, context=f"GenUI project snapshot artifact {path}")
+    except (OSError, ValueError):
         return {
             "id": _safe_id(path.stem, fallback="artifact"),
             "artifact": path.stem,

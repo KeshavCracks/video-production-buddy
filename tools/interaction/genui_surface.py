@@ -83,6 +83,7 @@ class GenUISurface(LocalGenUIServerRuntime, BaseTool):
         "writes projects/<project>/artifacts/ui/<surface_id>/form.html",
         "writes projects/<project>/artifacts/ui/<surface_id>/view_spec.json",
         "may start a localhost-only Python HTTP server in serve mode",
+        "may open a local browser only when open_browser is true",
     ]
     input_schema = {
         "type": "object",
@@ -97,6 +98,7 @@ class GenUISurface(LocalGenUIServerRuntime, BaseTool):
             "pipeline_type": {"type": "string"},
             "active_stage": {"type": "string"},
             "surface_mode": {"type": "string", "enum": ["gate_workspace", "project_cockpit"]},
+            "open_browser": {"type": "boolean", "default": False},
         },
     }
     output_schema = {
@@ -134,9 +136,17 @@ class GenUISurface(LocalGenUIServerRuntime, BaseTool):
         "produces": ["ui_surface_config"],
         "expects_response": "ui_surface_response",
     }
-    idempotency_key_fields = ["project_dir", "config", "mode", "host", "port", "surface_mode"]
+    idempotency_key_fields = [
+        "project_dir",
+        "config",
+        "mode",
+        "host",
+        "port",
+        "surface_mode",
+        "open_browser",
+    ]
     user_visible_verification = [
-        "Open the returned localhost URL and submit the GenUI compatibility workspace when a decision is needed.",
+        "Use the returned localhost URL for the GenUI compatibility workspace when an interactive decision is needed.",
         "Confirm projects/<project>/artifacts/ui/<surface_id>/response.json exists before mapping to canonical artifacts.",
         "Use the project cockpit as read-only project observability; it does not advance stages.",
     ]
@@ -221,7 +231,11 @@ class GenUISurface(LocalGenUIServerRuntime, BaseTool):
                 time.sleep(0.02)
                 localhost_url = f"http://{host}:{port}/"
                 browser_url = get_browser_url(localhost_url)
-                browser_opened = self._try_open_browser(browser_url)
+                browser_opened = (
+                    self._try_open_browser(browser_url)
+                    if inputs.get("open_browser") is True
+                    else False
+                )
                 data.update(
                     {
                         "server_state": "running",
@@ -230,17 +244,19 @@ class GenUISurface(LocalGenUIServerRuntime, BaseTool):
                         "pid": process.pid,
                         "browser_opened": browser_opened,
                         "instructions": (
-                            f"Open {browser_url} in a local browser, review the GenUI compatibility surface, submit it, "
+                            f"Browser URL available at {browser_url}. Review the GenUI compatibility surface when needed, submit it, "
                             f"then wait while {bundle.response_path} is validated before any canonical "
                             "artifacts are updated."
-                            + (" (Browser should have opened automatically.)" if browser_opened else "")
+                            + (" (Browser launch requested and completed.)" if browser_opened else "")
                         ),
                     }
                 )
-                bundle.state_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(bundle.state_path, "w") as f:
-                    json.dump(data, f, indent=2)
-                    f.write("\n")
+                try:
+                    self._write_strict_json_file(bundle.state_path, data)
+                except (TypeError, ValueError):
+                    if process.poll() is None:
+                        process.terminate()
+                    raise
                 artifacts.append(str(bundle.state_path))
 
             return ToolResult(success=True, data=data, artifacts=artifacts)

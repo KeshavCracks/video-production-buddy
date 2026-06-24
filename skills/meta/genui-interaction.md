@@ -26,6 +26,17 @@ identity reference choices, runtime selection, derivative variants,
 subtitle/dubbing choices, budget approval, media/sample/asset/music review,
 and voice/style sample approval.
 
+Serving a GenUI session returns a localhost URL by default. Do not launch a
+local browser window unless `open_browser: true` was explicitly requested for
+that tool call.
+
+Agent-native question or form tools are not GenUI and do not satisfy a
+GenUI-required gate. Examples include Claude Code `AskUserQuestion`, Codex
+`request_user_input`, Cursor/Copilot prompt widgets, or any similar assistant UI
+that is not produced by this repo's `genui_interaction` or `genui_session`
+tools. Use native tools only for one-question clarifications, or after a
+recorded GenUI failure/user-declined browser path as the explicit CLI fallback.
+
 Skip GenUI for one-question clarifications, source inspection, or short yes/no
 approval gates where the CLI is clearer.
 
@@ -70,7 +81,9 @@ write boundary applies.
    `genui_session` execution fails and the `genui_surface` fallback is not
    viable, or when the user explicitly declines the browser path. A returned
    localhost URL counts as browser path available; paste that URL and wait for
-   `response_path` validation instead of switching to CLI.
+   `response_path` validation instead of switching to CLI. Agent-native
+   question/form tools do not count as trying GenUI; record the failed/unavailable
+   GenUI path or user decline before using them as fallback.
 5. After submission, read
    `projects/<project>/artifacts/ui/<session_id>/response.json`.
 6. Validate it as `ui_session_response` and review the generated patch plan.
@@ -79,6 +92,93 @@ write boundary applies.
    `ui_surface_response`.
 7. Summarize the user's selected values, issue IDs, annotations, and revisions.
 8. Only then write canonical artifacts, decision logs, and checkpoints.
+
+## Registry Invocation Template
+
+When your agent shell does not expose `genui_interaction` as a native tool, call
+the project tool through the registry. Keep `open_browser` false unless the user
+explicitly asked you to launch a browser; paste the returned `browser_url` for
+the user instead.
+
+```python
+from tools.tool_registry import registry
+
+registry.discover()
+tool = registry.get("genui_interaction")
+if tool is None:
+    raise RuntimeError("genui_interaction is unavailable")
+
+result = tool.execute({
+    "project_dir": "projects/<project-id>",
+    "mode": "serve",
+    "open_browser": False,
+    "interaction_request": {
+        "request_id": "<gate-id>",
+        "project_id": "<project-id>",
+        "pipeline_type": "<pipeline>",
+        "stage": "<stage>",
+        "gate": "<gate>",
+        "title": "<user-facing title>",
+        "prompt": "<what the user should review or decide>",
+        "interaction_kind": "gate_workspace",
+        "capabilities_needed": [
+            "multi_axis_selection",
+            "structured_revision_capture",
+        ],
+        "fields": [],
+        "choices": [],
+        "media_items": [],
+    },
+})
+if not result.success:
+    raise RuntimeError(result.error)
+print(result.data["browser_url"])
+print(result.data["response_path"])
+```
+
+## Required Gate Evidence Check
+
+Before marking a GenUI-required gate complete, check the journal for response or
+fallback evidence:
+
+```python
+from tools.tool_registry import registry
+
+registry.discover()
+tool = registry.get("genui_evidence_check")
+result = tool.execute({
+    "project_dir": "projects/<project-id>",
+    "project_id": "<project-id>",
+    "pipeline_type": "<pipeline>",
+    "checkpoint_stage": "<stage>",
+})
+if not result.success:
+    raise RuntimeError(result.error)
+```
+
+For the common ad-video assets checkpoint, the short local command is:
+
+```bash
+make genui-evidence-check PROJECT=projects/<project-id> PIPELINE=ad-video STAGE=assets
+```
+
+Equivalent direct CLI:
+
+```bash
+python -m tools.validation.genui_evidence_check projects/<project-id> ad-video assets
+```
+
+Passing evidence means either a schema-valid `ui_session_response` /
+`ui_surface_response` exists for the gate, or the journal records an explicit
+GenUI route failure, unavailable browser path, or user-declined browser path.
+Agent-native question/form tools do not satisfy this check by themselves.
+The underlying helper is
+`lib.genui.journal.genui_required_gate_evidence_report(...)` for code paths that
+already have the required gate list in memory.
+When a pipeline manifest marks a stage or child gate with
+`genui_evidence_required: true`, completed checkpoint writes enforce this
+evidence automatically. Use `genui_evidence_gate` when the journal gate name
+differs from the manifest unit name, such as `sample` -> `sample_review`.
 
 ## User-Facing Pattern
 

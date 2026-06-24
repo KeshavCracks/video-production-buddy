@@ -1,5 +1,7 @@
 import json
+import math
 from pathlib import Path
+import subprocess
 
 import jsonschema
 import pytest
@@ -596,6 +598,214 @@ def test_genui_session_tool_materializes_session(tmp_path: Path):
     assert registry.get("genui_session") is not None
 
 
+def test_genui_session_serve_does_not_open_browser_by_default(tmp_path: Path, monkeypatch):
+    from tools.interaction.genui_session import GenUISession
+
+    class FakeProcess:
+        pid = 42001
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            return None
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    _write_sample_clip(project_dir)
+    tool = GenUISession()
+    opened_urls: list[str] = []
+    monkeypatch.setattr(tool, "_choose_port", lambda host: 8123)
+    monkeypatch.setattr(tool, "_start_server", lambda *args, **kwargs: FakeProcess())
+    monkeypatch.setattr(tool, "_wait_until_ready", lambda *args, **kwargs: None)
+    monkeypatch.setattr(tool, "_try_open_browser", lambda url: opened_urls.append(url) or True)
+
+    result = tool.execute(
+        {
+            "project_dir": str(project_dir),
+            "config": _session_config(),
+            "mode": "serve",
+            "record_journal": False,
+        }
+    )
+
+    assert result.success, result.error
+    assert result.data["server_state"] == "running"
+    assert result.data["browser_url"]
+    assert result.data["browser_opened"] is False
+    assert opened_urls == []
+    assert not result.data["instructions"].startswith("Open ")
+    assert result.data["browser_url"] in result.data["instructions"]
+
+    opt_in_result = tool.execute(
+        {
+            "project_dir": str(project_dir),
+            "config": {**_session_config(), "session_id": "asset-sample-review-open"},
+            "mode": "serve",
+            "record_journal": False,
+            "open_browser": True,
+        }
+    )
+
+    assert opt_in_result.success, opt_in_result.error
+    assert opt_in_result.data["browser_opened"] is True
+    assert opened_urls == [opt_in_result.data["browser_url"]]
+
+
+def test_genui_browser_open_is_suppressed_during_pytest(monkeypatch):
+    import webbrowser
+
+    from tools.interaction import genui_runtime
+    from tools.interaction.genui_runtime import LocalGenUIServerRuntime
+
+    opened_urls: list[str] = []
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "test blocks visible browser open")
+    monkeypatch.delenv("VPB_ALLOW_BROWSER_OPEN", raising=False)
+    monkeypatch.setattr(genui_runtime, "is_wsl2", lambda: False)
+    monkeypatch.setattr(webbrowser, "open", lambda url: opened_urls.append(url) or True)
+
+    opened = LocalGenUIServerRuntime()._try_open_browser("http://127.0.0.1:8123/")
+
+    assert opened is False
+    assert opened_urls == []
+
+
+def test_genui_browser_open_is_suppressed_during_pytest_even_when_env_allows(
+    monkeypatch,
+):
+    import webbrowser
+
+    from tools.interaction import genui_runtime
+    from tools.interaction.genui_runtime import LocalGenUIServerRuntime
+
+    opened_urls: list[str] = []
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "test blocks explicit browser open")
+    monkeypatch.setenv("VPB_ALLOW_BROWSER_OPEN", "1")
+    monkeypatch.setattr(genui_runtime, "is_wsl2", lambda: False)
+    monkeypatch.setattr(webbrowser, "open", lambda url: opened_urls.append(url) or True)
+
+    opened = LocalGenUIServerRuntime()._try_open_browser("http://127.0.0.1:8123/")
+
+    assert opened is False
+    assert opened_urls == []
+
+
+def test_genui_browser_open_respects_environment_opt_out(monkeypatch):
+    import webbrowser
+
+    from tools.interaction import genui_runtime
+    from tools.interaction.genui_runtime import LocalGenUIServerRuntime
+
+    opened_urls: list[str] = []
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.setenv("VPB_ALLOW_BROWSER_OPEN", "0")
+    monkeypatch.setattr(genui_runtime, "is_wsl2", lambda: False)
+    monkeypatch.setattr(webbrowser, "open", lambda url: opened_urls.append(url) or True)
+
+    opened = LocalGenUIServerRuntime()._try_open_browser("http://127.0.0.1:8123/")
+
+    assert opened is False
+    assert opened_urls == []
+
+
+def test_genui_browser_open_strips_environment_opt_out(monkeypatch):
+    import webbrowser
+
+    from tools.interaction import genui_runtime
+    from tools.interaction.genui_runtime import LocalGenUIServerRuntime
+
+    opened_urls: list[str] = []
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.setenv("VPB_ALLOW_BROWSER_OPEN", " 0 ")
+    monkeypatch.setattr(genui_runtime, "is_wsl2", lambda: False)
+    monkeypatch.setattr(webbrowser, "open", lambda url: opened_urls.append(url) or True)
+
+    opened = LocalGenUIServerRuntime()._try_open_browser("http://127.0.0.1:8123/")
+
+    assert opened is False
+    assert opened_urls == []
+
+
+def test_genui_browser_open_respects_environment_off_opt_out(monkeypatch):
+    import webbrowser
+
+    from tools.interaction import genui_runtime
+    from tools.interaction.genui_runtime import LocalGenUIServerRuntime
+
+    opened_urls: list[str] = []
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    monkeypatch.setenv("VPB_ALLOW_BROWSER_OPEN", " off ")
+    monkeypatch.setattr(genui_runtime, "is_wsl2", lambda: False)
+    monkeypatch.setattr(webbrowser, "open", lambda url: opened_urls.append(url) or True)
+
+    opened = LocalGenUIServerRuntime()._try_open_browser("http://127.0.0.1:8123/")
+
+    assert opened is False
+    assert opened_urls == []
+
+
+def test_genui_wsl_browser_start_is_suppressed_during_pytest(monkeypatch):
+    from tools.interaction import genui_runtime
+    from tools.interaction.genui_runtime import LocalGenUIServerRuntime
+
+    start_calls: list[list[str]] = []
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "test blocks visible wsl browser start")
+    monkeypatch.delenv("VPB_ALLOW_BROWSER_OPEN", raising=False)
+    monkeypatch.setattr(genui_runtime, "is_wsl2", lambda: True)
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda cmd, **kwargs: start_calls.append(cmd)
+        or subprocess.CompletedProcess(cmd, 0),
+    )
+
+    opened = LocalGenUIServerRuntime()._try_open_browser("http://127.0.0.1:8123/")
+
+    assert opened is False
+    assert start_calls == []
+
+
+def test_genui_session_rejects_non_finite_server_state_before_writing(
+    tmp_path: Path, monkeypatch
+):
+    from tools.interaction.genui_session import GenUISession
+
+    class FakeProcess:
+        pid = math.nan
+        terminated = False
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            self.terminated = True
+            return None
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    _write_sample_clip(project_dir)
+    tool = GenUISession()
+    fake_process = FakeProcess()
+    monkeypatch.setattr(tool, "_choose_port", lambda host: 8123)
+    monkeypatch.setattr(tool, "_start_server", lambda *args, **kwargs: fake_process)
+    monkeypatch.setattr(tool, "_wait_until_ready", lambda *args, **kwargs: None)
+    monkeypatch.setattr(tool, "_try_open_browser", lambda url: True)
+
+    result = tool.execute(
+        {
+            "project_dir": str(project_dir),
+            "config": _session_config(),
+            "mode": "serve",
+            "record_journal": False,
+        }
+    )
+
+    assert not result.success
+    assert "strict JSON" in result.error
+    assert fake_process.terminated is True
+    assert not (
+        project_dir / "artifacts" / "ui" / "asset-sample-review" / "server.json"
+    ).exists()
+
+
 def test_genui_interaction_defaults_to_session_and_preserves_surface_fallback(tmp_path: Path):
     from tools.interaction.genui_interaction import GenUIInteraction
 
@@ -888,6 +1098,40 @@ def test_ui_interaction_journal_schema_tracks_cli_and_genui_decisions():
     assert [entry["status"] for entry in journal["interactions"]] == ["cli_recommended", "prepared"]
 
 
+def test_ui_interaction_journal_reader_rejects_non_strict_json(tmp_path: Path):
+    from lib.genui.journal import interaction_journal_path, read_interaction_journal
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    path = interaction_journal_path(project_dir)
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        """
+{
+  "contract": "genui_interaction_journal",
+  "project_id": "demo-ad",
+  "pipeline_type": "ad-video",
+  "created_at": "2026-06-14T00:00:00+00:00",
+  "updated_at": "2026-06-14T00:00:00+00:00",
+  "interactions": [],
+  "metadata": {
+    "genui_contract": "genui",
+    "canonical_writes": false,
+    "browser_writes": ["ui_session_response"],
+    "x_non_finite_sentinel": NaN
+  }
+}
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="strict JSON"):
+        read_interaction_journal(
+            project_dir,
+            project_id="demo-ad",
+            pipeline_type="ad-video",
+        )
+
+
 def test_genui_session_modes_status_validate_summarize_and_replay(tmp_path: Path):
     from tools.interaction.genui_session import GenUISession
     from lib.genui.session import session_response_payload_from_submission, write_session_response
@@ -962,6 +1206,118 @@ def test_genui_session_modes_status_validate_summarize_and_replay(tmp_path: Path
     assert replay.success, replay.error
     assert replay.data["server_state"] == "replay_prepared"
     assert replay.data["replay_path"] == prepared.data["html_path"]
+
+
+def test_genui_session_status_rejects_non_strict_config_json(tmp_path: Path):
+    from tools.interaction.genui_session import GenUISession
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    session_dir = project_dir / "artifacts" / "ui" / "asset-sample-review"
+    session_dir.mkdir(parents=True)
+    (session_dir / "config.json").write_text(
+        """
+{
+  "session_id": "asset-sample-review",
+  "project_id": "demo-ad",
+  "pipeline_type": "ad-video",
+  "x-non-finite-sentinel": NaN
+}
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    result = GenUISession().execute(
+        {
+            "project_dir": str(project_dir),
+            "session_id": "asset-sample-review",
+            "mode": "status",
+            "record_journal": False,
+        }
+    )
+
+    assert result.success is False
+    assert "strict JSON" in (result.error or "")
+
+
+def test_genui_session_status_rejects_non_strict_server_state_json(tmp_path: Path):
+    from tools.interaction.genui_session import GenUISession
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    session_dir = project_dir / "artifacts" / "ui" / "asset-sample-review"
+    session_dir.mkdir(parents=True)
+    (session_dir / "config.json").write_text(
+        """
+{
+  "session_id": "asset-sample-review",
+  "project_id": "demo-ad",
+  "pipeline_type": "ad-video"
+}
+""".lstrip(),
+        encoding="utf-8",
+    )
+    (session_dir / "server.json").write_text(
+        """
+{
+  "server_state": "running",
+  "url": "http://127.0.0.1:8123/",
+  "pid": NaN
+}
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    result = GenUISession().execute(
+        {
+            "project_dir": str(project_dir),
+            "session_id": "asset-sample-review",
+            "mode": "status",
+            "record_journal": False,
+        }
+    )
+
+    assert result.success is False
+    assert "strict JSON" in (result.error or "")
+
+
+def test_genui_session_validate_response_rejects_non_strict_response_json(tmp_path: Path):
+    from tools.interaction.genui_session import GenUISession
+    from lib.genui.session import session_response_payload_from_submission
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    _write_sample_clip(project_dir)
+    tool = GenUISession()
+    prepared = tool.execute(
+        {
+            "project_dir": str(project_dir),
+            "interaction_request": _media_review_request(),
+            "mode": "prepare",
+        }
+    )
+    assert prepared.success, prepared.error
+
+    config = json.loads(Path(prepared.data["config_path"]).read_text())
+    response = session_response_payload_from_submission(
+        config,
+        _session_submission(),
+        response_id="resp-asset-sample-review",
+    )
+    response["metadata"]["x_non_finite_sentinel"] = float("nan")
+    Path(prepared.data["response_path"]).write_text(
+        json.dumps(response),
+        encoding="utf-8",
+    )
+
+    result = tool.execute(
+        {
+            "project_dir": str(project_dir),
+            "session_id": "asset-sample-review",
+            "mode": "validate_response",
+            "record_journal": False,
+        }
+    )
+
+    assert result.success is False
+    assert "strict JSON" in (result.error or "")
 
 
 def test_genui_session_normalizes_project_relative_review_media_paths(tmp_path: Path):
@@ -1142,6 +1498,46 @@ def test_genui_session_auto_populates_media_review_assets_from_project_artifacts
         "/media/outputs/final.mp4",
     }.issubset(media_paths)
     assert config["metadata"]["review_assets_auto_populated"] is True
+
+
+def test_genui_session_auto_population_rejects_non_strict_asset_manifest_json(
+    tmp_path: Path,
+) -> None:
+    from tools.interaction.genui_session import GenUISession
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    sample_path = project_dir / "renders" / "sample_preview.mp4"
+    sample_path.parent.mkdir(parents=True)
+    sample_path.write_bytes(b"sample")
+    artifacts_dir = project_dir / "artifacts"
+    artifacts_dir.mkdir(parents=True)
+    (artifacts_dir / "asset_manifest.json").write_text(
+        """
+{
+  "version": "1.0",
+  "assets": [],
+  "sample_clip": "renders/sample_preview.mp4",
+  "metadata": {
+    "x_non_finite_sentinel": NaN
+  }
+}
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    request = _media_review_request()
+    request["media_items"] = []
+
+    result = GenUISession().execute(
+        {
+            "project_dir": str(project_dir),
+            "interaction_request": request,
+            "mode": "prepare",
+        }
+    )
+
+    assert result.success is False
+    assert "strict JSON" in (result.error or "")
 
 
 def test_genui_session_auto_populates_product_reference_candidates(tmp_path: Path):

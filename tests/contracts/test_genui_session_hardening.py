@@ -1,4 +1,6 @@
 import json
+import math
+import os
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -82,6 +84,36 @@ def _write_project_state(project_dir: Path) -> None:
     (artifact_dir / "ui" / "pending-session").mkdir(parents=True)
     (artifact_dir / "ui" / "pending-session" / "config.json").write_text(
         '{"session_id":"pending-session","project_id":"demo-ad","pipeline_type":"ad-video"}\n'
+    )
+
+
+def _write_valid_session_response(response_path: Path) -> None:
+    response_path.parent.mkdir(parents=True, exist_ok=True)
+    response_path.write_text(
+        json.dumps(
+            {
+                "contract": "genui_session_response",
+                "response_id": "resp-asset-sample-review",
+                "session_id": "asset-sample-review",
+                "project_id": "demo-ad",
+                "pipeline_type": "ad-video",
+                "stage": "assets",
+                "gate": "sample_review",
+                "submitted_at": "2026-06-18T00:00:00+00:00",
+                "action": "approve",
+                "values": {"approved": True},
+                "issues": [],
+                "interaction_evidence": {
+                    "media_opened": ["sample_clip"],
+                    "timeline_inspected": ["sample_clip"],
+                    "seconds_watched": 3.5,
+                },
+                "validation": {"status": "valid", "errors": []},
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
     )
 
 
@@ -189,6 +221,29 @@ def test_session_project_cockpit_uses_rich_project_snapshot(tmp_path: Path):
     assert props["staleSessions"][0]["session_id"] == "stale-session"
 
 
+def test_project_cockpit_snapshot_marks_non_strict_artifacts_unreadable(tmp_path: Path):
+    from lib.genui.project_snapshot import build_project_cockpit_snapshot
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    artifact_dir = project_dir / "artifacts"
+    artifact_dir.mkdir(parents=True)
+    (artifact_dir / "production_proposal.json").write_text(
+        '{"render_runtime":"remotion","budget":{"approved_budget_usd":NaN}}\n'
+    )
+
+    snapshot = build_project_cockpit_snapshot(
+        project_dir,
+        pipeline_type="ad-video",
+        active_stage="proposal",
+    )
+
+    proposal_item = next(
+        item for item in snapshot["artifact_items"] if item["artifact"] == "production_proposal"
+    )
+    assert proposal_item["status"] == "unreadable"
+    assert snapshot["budget_cost_items"] == []
+
+
 def test_session_ag_ui_events_include_operation_lifecycle_cards():
     from lib.genui.session import (
         build_dynamic_session_config,
@@ -250,13 +305,65 @@ def test_genui_verify_target_documents_product_workflow():
     makefile = (ROOT / "Makefile").read_text()
 
     assert "genui-verify:" in makefile
-    assert "pytest -q tests/contracts/test_genui_session_contract.py" in makefile
-    assert "pytest -q tests/contracts/test_genui_session_hardening.py" in makefile
-    assert "pytest -q tests/tools/test_genui_surface_browser.py" in makefile
+    assert "tests/contracts/test_genui_session_contract.py" in makefile
+    assert "tests/contracts/test_genui_session_hardening.py" in makefile
+    assert "tests/tools/test_genui_surface_browser.py" in makefile
     assert "pnpm --dir genui-renderer test" in makefile
     assert "pnpm --dir genui-renderer typecheck" in makefile
     assert "pnpm --dir genui-renderer build" in makefile
     assert "git diff --exit-code -- lib/genui/static/renderer" in makefile
+
+
+def test_genui_evidence_check_target_documents_agent_command():
+    makefile = (ROOT / "Makefile").read_text()
+
+    assert "genui-evidence-check:" in makefile
+    assert "PROJECT=projects/<project-id>" in makefile
+    assert "PIPELINE=ad-video" in makefile
+    assert "STAGE=assets" in makefile
+    assert "python -m tools.validation.genui_evidence_check" in makefile
+    assert "PYTHONDONTWRITEBYTECODE=1" in makefile
+
+
+def test_makefile_pytest_targets_disable_browser_opening():
+    makefile = (ROOT / "Makefile").read_text()
+    pytest_lines = [
+        line.strip()
+        for line in makefile.splitlines()
+        if "python -m pytest" in line
+    ]
+
+    assert pytest_lines
+    assert all(line.startswith("VPB_ALLOW_BROWSER_OPEN=0 ") for line in pytest_lines)
+
+
+def test_makefile_genui_renderer_tests_disable_browser_opening():
+    makefile = (ROOT / "Makefile").read_text()
+    renderer_test_lines = [
+        line.strip()
+        for line in makefile.splitlines()
+        if "pnpm --dir genui-renderer test" in line
+    ]
+
+    assert renderer_test_lines
+    assert all(line.startswith("VPB_ALLOW_BROWSER_OPEN=0 ") for line in renderer_test_lines)
+
+
+def test_makefile_pytest_targets_keep_test_artifacts_out_of_checkout():
+    makefile = (ROOT / "Makefile").read_text()
+    pytest_lines = [
+        line.strip()
+        for line in makefile.splitlines()
+        if "python -m pytest" in line
+    ]
+
+    assert pytest_lines
+    assert all("PYTHONDONTWRITEBYTECODE=1 " in line for line in pytest_lines)
+    assert all(" -p no:cacheprovider " in f" {line} " for line in pytest_lines)
+
+
+def test_direct_pytest_runs_default_to_browser_open_disabled():
+    assert os.environ.get("VPB_ALLOW_BROWSER_OPEN") == "0"
 
 
 def _sse_events(text: str) -> list[dict]:
@@ -319,6 +426,284 @@ def test_session_session_events_are_persisted_cursorable_and_status_addressable(
     finally:
         cleanup_server(state_path)
         assert not response_path.exists()
+
+
+def test_session_event_append_rejects_non_finite_event_before_mutating_log(tmp_path: Path):
+    from lib.genui.session import (
+        append_session_event,
+        build_dynamic_session_config,
+        write_session_events,
+    )
+
+    config = build_dynamic_session_config(_approval_request())
+    events_path = tmp_path / "events.jsonl"
+    write_session_events(
+        events_path,
+        [{"type": "RUN_STARTED", "sequence": 1, "cursor": "proposal-lock-session:000001"}],
+    )
+    before = events_path.read_text(encoding="utf-8")
+
+    with pytest.raises(ValueError, match="non-finite JSON number"):
+        append_session_event(
+            events_path,
+            config,
+            {"type": "STATE_DELTA", "delta": {"non_finite": math.nan}},
+        )
+
+    assert events_path.read_text(encoding="utf-8") == before
+
+
+def test_session_event_batch_write_rejects_non_finite_event_before_creating_log(tmp_path: Path):
+    from lib.genui.session import write_session_events
+
+    events_path = tmp_path / "events.jsonl"
+
+    with pytest.raises(ValueError, match="non-finite JSON number"):
+        write_session_events(
+            events_path,
+            [
+                {"type": "RUN_STARTED", "sequence": 1, "cursor": "review:000001"},
+                {"type": "STATE_DELTA", "delta": {"non_finite": math.nan}},
+            ],
+        )
+
+    assert not events_path.exists()
+
+
+def test_interaction_journal_write_rejects_unserializable_metadata_before_mutating_file(tmp_path: Path):
+    from lib.genui.journal import build_interaction_journal, write_interaction_journal
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    journal = build_interaction_journal(project_id="demo-ad", pipeline_type="ad-video")
+    journal_path = write_interaction_journal(project_dir, journal)
+    before = journal_path.read_text(encoding="utf-8")
+
+    journal["metadata"]["not_json"] = tmp_path / "unserializable-path"
+    with pytest.raises(ValueError, match="strict JSON serializable"):
+        write_interaction_journal(project_dir, journal)
+
+    assert journal_path.read_text(encoding="utf-8") == before
+
+
+def test_required_gate_evidence_report_accepts_schema_valid_session_response(tmp_path: Path):
+    from lib.genui.journal import (
+        build_interaction_journal,
+        entry_from_request_decision,
+        genui_required_gate_evidence_report,
+        write_interaction_journal,
+    )
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    response_path = (
+        project_dir / "artifacts" / "ui" / "asset-sample-review" / "response.json"
+    )
+    _write_valid_session_response(response_path)
+    request = _media_review_request()
+    decision = {
+        "recommended_mode": "media_review_room",
+        "recommended_tool": "genui_session",
+        "linear_chat_sufficient": False,
+        "interaction_kind": "media_review",
+        "reasons": ["media_review"],
+    }
+    entry = entry_from_request_decision(
+        request,
+        decision,
+        status="submitted",
+        session_data={
+            "session_id": "asset-sample-review",
+            "session_contract": "genui_session",
+            "response_path": str(response_path),
+        },
+    )
+    journal = build_interaction_journal(
+        project_id="demo-ad",
+        pipeline_type="ad-video",
+        entries=[entry],
+    )
+    write_interaction_journal(project_dir, journal)
+
+    report = genui_required_gate_evidence_report(
+        project_dir,
+        project_id="demo-ad",
+        pipeline_type="ad-video",
+        required_gates=[{"stage": "assets", "gate": "sample_review"}],
+    )
+
+    assert report["ok"] is True
+    assert report["issues"] == []
+    assert report["evidence"][0]["evidence_type"] == "genui_response"
+    assert report["evidence"][0]["response_contract"] == "genui_session_response"
+
+
+def test_required_gate_evidence_report_accepts_explicit_genui_fallback(tmp_path: Path):
+    from lib.genui.journal import (
+        build_interaction_journal,
+        entry_from_request_decision,
+        genui_required_gate_evidence_report,
+        write_interaction_journal,
+    )
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    request = _media_review_request()
+    decision = {
+        "recommended_mode": "media_review_room",
+        "recommended_tool": "genui_session",
+        "linear_chat_sufficient": False,
+        "interaction_kind": "media_review",
+        "reasons": ["media_review"],
+    }
+    entry = entry_from_request_decision(
+        request,
+        decision,
+        status="fallback",
+        fallback_reason="genui_session serve failed; user_declined_browser_path",
+    )
+    journal = build_interaction_journal(
+        project_id="demo-ad",
+        pipeline_type="ad-video",
+        entries=[entry],
+    )
+    write_interaction_journal(project_dir, journal)
+
+    report = genui_required_gate_evidence_report(
+        project_dir,
+        project_id="demo-ad",
+        pipeline_type="ad-video",
+        required_gates=["assets:sample_review"],
+    )
+
+    assert report["ok"] is True
+    assert report["evidence"][0]["evidence_type"] == "genui_fallback"
+    assert "genui_session" in report["evidence"][0]["fallback_reason"]
+
+
+def test_required_gate_evidence_report_rejects_agent_native_ui_bypass(tmp_path: Path):
+    from lib.genui.journal import (
+        build_interaction_journal,
+        entry_from_request_decision,
+        genui_required_gate_evidence_report,
+        write_interaction_journal,
+    )
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    request = _media_review_request()
+    decision = {
+        "recommended_mode": "media_review_room",
+        "recommended_tool": "genui_session",
+        "linear_chat_sufficient": False,
+        "interaction_kind": "media_review",
+        "reasons": ["media_review"],
+    }
+    entry = entry_from_request_decision(
+        request,
+        decision,
+        status="fallback",
+        fallback_reason="AskUserQuestion captured media review",
+    )
+    journal = build_interaction_journal(
+        project_id="demo-ad",
+        pipeline_type="ad-video",
+        entries=[entry],
+    )
+    write_interaction_journal(project_dir, journal)
+
+    report = genui_required_gate_evidence_report(
+        project_dir,
+        project_id="demo-ad",
+        pipeline_type="ad-video",
+        required_gates=[{"stage": "assets", "gate": "sample_review"}],
+    )
+
+    assert report["ok"] is False
+    issue = report["issues"][0]
+    assert issue["code"] == "missing_genui_gate_evidence"
+    assert issue["entry_evaluations"][0]["ok"] is False
+    assert any(
+        "fallback_reason does not document" in error
+        for error in issue["entry_evaluations"][0]["errors"]
+    )
+
+
+def test_session_bundle_write_rejects_unserializable_metadata_before_mutating_config(tmp_path: Path):
+    from lib.genui.session import build_dynamic_session_config, write_session_bundle
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    config = build_dynamic_session_config(_approval_request())
+    bundle = write_session_bundle(project_dir, config)
+    before = bundle.config_path.read_text(encoding="utf-8")
+
+    config["metadata"]["not_json"] = tmp_path / "unserializable-path"
+    with pytest.raises(ValueError, match="strict JSON serializable"):
+        write_session_bundle(project_dir, config)
+
+    assert bundle.config_path.read_text(encoding="utf-8") == before
+
+
+def test_surface_bundle_write_rejects_unserializable_metadata_before_mutating_config(tmp_path: Path):
+    from lib.genui.surface import build_dynamic_surface_config, write_surface_bundle
+
+    project_dir = tmp_path / "projects" / "demo-ad"
+    config = build_dynamic_surface_config(_approval_request())
+    bundle = write_surface_bundle(project_dir, config)
+    before = bundle.config_path.read_text(encoding="utf-8")
+
+    config["metadata"]["not_json"] = tmp_path / "unserializable-path"
+    with pytest.raises(ValueError, match="strict JSON serializable"):
+        write_surface_bundle(project_dir, config)
+
+    assert bundle.config_path.read_text(encoding="utf-8") == before
+
+
+def test_surface_event_snapshot_rejects_non_finite_event_before_creating_log(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from lib.genui import surface as surface_module
+    from lib.genui.server import GenUIRequestHandler
+
+    events_path = tmp_path / "events.jsonl"
+
+    class SurfaceOnlyHandler:
+        config = {"surface_id": "surface-review", "version": "2.0"}
+        response_path = tmp_path / "response.json"
+        draft_path = tmp_path / "draft.json"
+        view_spec_path = tmp_path / "view_spec.json"
+        submit_nonce = "nonce"
+
+        def _load_spec_state(self):
+            return {"values": {}}
+
+        def _is_session_config(self):
+            return False
+
+    handler = SurfaceOnlyHandler()
+    handler.events_path = events_path
+    monkeypatch.setattr(
+        surface_module,
+        "build_ag_ui_events",
+        lambda config, state: [{"type": "STATE_SNAPSHOT", "value": math.nan}],
+    )
+
+    with pytest.raises(ValueError, match="strict JSON"):
+        GenUIRequestHandler._session_events(handler)
+
+    assert not events_path.exists()
+
+
+def test_genui_server_view_spec_state_loader_rejects_non_strict_json(tmp_path: Path):
+    from lib.genui.server import GenUIRequestHandler
+    from lib.genui.session import build_dynamic_session_config, compile_session_view_spec
+
+    spec = compile_session_view_spec(build_dynamic_session_config(_approval_request()))
+    spec["metadata"]["non_strict_probe"] = "replace-with-nan"
+    spec_text = json.dumps(spec, allow_nan=False).replace('"replace-with-nan"', "NaN")
+    view_spec_path = tmp_path / "view_spec.json"
+    view_spec_path.write_text(spec_text + "\n")
+
+    handler = type("ViewSpecOnlyHandler", (), {"view_spec_path": view_spec_path})()
+    with pytest.raises(ValueError, match="Invalid non-standard JSON constant 'NaN'"):
+        GenUIRequestHandler._load_spec_state(handler)
 
 
 def test_session_session_rejects_foreign_submit_origin(tmp_path: Path):

@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from schemas.artifacts import validate_artifact
+from schemas.artifacts import load_strict_json_object, validate_artifact
 
 
 GENUI_CONTRACT = "genui"
@@ -23,6 +23,30 @@ LEGACY_PRODUCT_VERSION_KEY = "genui" + "_product" + "_version"
 LEGACY_SESSION_VERSION_KEY = "session" + "_version"
 LEGACY_SURFACE_VERSION_KEY = "surface" + "_version"
 JOURNAL_FILENAME = "interaction_journal.json"
+GENUI_RESPONSE_ARTIFACTS = {
+    "genui_session_response": "ui_session_response",
+    "genui_surface_response": "ui_surface_response",
+}
+_GENUI_FALLBACK_REASON_TOKENS = (
+    "genui_interaction",
+    "genui_session",
+    "genui_surface",
+    "browser",
+    "localhost",
+    "serve",
+    "server",
+    "unavailable",
+    "failed",
+    "failure",
+    "declined",
+)
+_NATIVE_AGENT_UI_TOKENS = (
+    "askuserquestion",
+    "request_user_input",
+    "native question",
+    "native form",
+    "agent-native",
+)
 
 _VISUAL_PRIMITIVES_BY_REASON = {
     "media_review": ["media_player", "keyframe_strip", "timecoded_annotation", "issue_tracker"],
@@ -132,8 +156,7 @@ def read_interaction_journal(project_dir: Path | str, *, project_id: str, pipeli
     path = interaction_journal_path(project_dir)
     if not path.exists():
         return build_interaction_journal(project_id=project_id, pipeline_type=pipeline_type)
-    with open(path) as f:
-        journal = json.load(f)
+    journal = load_strict_json_object(path, context="GenUI interaction journal")
     journal = _normalize_journal_contract(journal)
     validate_interaction_journal(journal)
     if journal["project_id"] != project_id or journal["pipeline_type"] != pipeline_type:
@@ -141,14 +164,206 @@ def read_interaction_journal(project_dir: Path | str, *, project_id: str, pipeli
     return journal
 
 
+def genui_required_gate_evidence_report(
+    project_dir: Path | str,
+    *,
+    project_id: str,
+    pipeline_type: str,
+    required_gates: list[dict[str, Any] | str],
+) -> dict[str, Any]:
+    """Report whether GenUI-required gates have response or fallback evidence.
+
+    A required gate is satisfied only when the interaction journal has a
+    matching entry with a schema-valid GenUI response artifact, or an explicit
+    fallback reason documenting a GenUI route failure/unavailable browser path
+    or user-declined browser path. Agent-native question widgets alone are not
+    accepted as evidence.
+    """
+    gates = [_normalize_required_gate_spec(gate) for gate in required_gates]
+    journal = read_interaction_journal(
+        project_dir,
+        project_id=project_id,
+        pipeline_type=pipeline_type,
+    )
+    interactions = journal.get("interactions") or []
+    issues: list[dict[str, Any]] = []
+    evidence: list[dict[str, Any]] = []
+
+    for gate in gates:
+        matches = [
+            entry
+            for entry in interactions
+            if entry.get("stage") == gate["stage"] and entry.get("gate") == gate["gate"]
+        ]
+        if not matches:
+            issues.append(
+                {
+                    **gate,
+                    "code": "missing_journal_entry",
+                    "message": (
+                        "GenUI-required gate has no matching ui_interaction_journal entry."
+                    ),
+                }
+            )
+            continue
+
+        evaluations = [
+            _evaluate_required_gate_entry(project_dir, entry)
+            for entry in reversed(matches)
+        ]
+        accepted = next((item for item in evaluations if item["ok"]), None)
+        if accepted is not None:
+            evidence.append({**gate, **accepted})
+            continue
+
+        issues.append(
+            {
+                **gate,
+                "code": "missing_genui_gate_evidence",
+                "message": (
+                    "GenUI-required gate must have a valid ui_session_response/"
+                    "ui_surface_response or an explicit GenUI fallback reason."
+                ),
+                "entry_evaluations": evaluations,
+            }
+        )
+
+    return {
+        "ok": not issues,
+        "project_id": project_id,
+        "pipeline_type": pipeline_type,
+        "required_gates": gates,
+        "evidence": evidence,
+        "issues": issues,
+    }
+
+
+def _normalize_required_gate_spec(gate: dict[str, Any] | str) -> dict[str, str]:
+    if isinstance(gate, str):
+        separator = ":" if ":" in gate else "."
+        parts = gate.split(separator, 1)
+        if len(parts) != 2 or not all(part.strip() for part in parts):
+            raise ValueError("GenUI required gate strings must use 'stage:gate' or 'stage.gate'")
+        return {"stage": parts[0].strip(), "gate": parts[1].strip()}
+    stage = str(gate.get("stage") or "").strip()
+    gate_name = str(gate.get("gate") or "").strip()
+    if not stage or not gate_name:
+        raise ValueError("GenUI required gate specs must include stage and gate")
+    return {"stage": stage, "gate": gate_name}
+
+
+def _evaluate_required_gate_entry(project_dir: Path | str, entry: dict[str, Any]) -> dict[str, Any]:
+    base = {
+        "interaction_id": entry.get("interaction_id"),
+        "status": entry.get("status"),
+        "mode": entry.get("mode"),
+        "recommended_tool": entry.get("recommended_tool"),
+        "response_path": entry.get("response_path"),
+    }
+    response = _response_evidence(project_dir, entry)
+    if response["ok"]:
+        return {
+            **base,
+            "ok": True,
+            "evidence_type": "genui_response",
+            "response_contract": response["contract"],
+            "resolved_response_path": response["path"],
+        }
+
+    fallback_reason = str(entry.get("fallback_reason") or "").strip()
+    if _fallback_reason_documents_genui_attempt(fallback_reason):
+        return {
+            **base,
+            "ok": True,
+            "evidence_type": "genui_fallback",
+            "fallback_reason": fallback_reason,
+            "response_error": response["error"],
+        }
+
+    errors = [response["error"]]
+    if fallback_reason:
+        errors.append(
+            "fallback_reason does not document a GenUI route failure, "
+            "unavailable browser path, or user-declined browser path."
+        )
+    else:
+        errors.append("missing fallback_reason")
+    return {**base, "ok": False, "errors": errors}
+
+
+def _response_evidence(project_dir: Path | str, entry: dict[str, Any]) -> dict[str, Any]:
+    response_path = entry.get("response_path")
+    if not isinstance(response_path, str) or not response_path.strip():
+        return {"ok": False, "error": "missing response_path"}
+
+    resolved = _resolve_existing_response_path(project_dir, response_path)
+    if resolved is None:
+        return {"ok": False, "error": f"response_path does not exist: {response_path}"}
+
+    try:
+        response = load_strict_json_object(resolved, context=f"GenUI response {resolved}")
+    except ValueError as exc:
+        return {"ok": False, "error": str(exc)}
+
+    contract = response.get("contract")
+    artifact_name = GENUI_RESPONSE_ARTIFACTS.get(str(contract))
+    if artifact_name is None:
+        return {"ok": False, "error": f"unsupported GenUI response contract: {contract!r}"}
+    try:
+        validate_artifact(artifact_name, response)
+    except Exception as exc:
+        return {"ok": False, "error": f"{artifact_name} validation failed: {exc}"}
+
+    for field in ("project_id", "pipeline_type", "stage", "gate"):
+        if response.get(field) != entry.get(field):
+            return {
+                "ok": False,
+                "error": (
+                    f"response {field} {response.get(field)!r} does not match "
+                    f"journal entry {entry.get(field)!r}"
+                ),
+            }
+    return {"ok": True, "contract": contract, "path": str(resolved)}
+
+
+def _resolve_existing_response_path(
+    project_dir: Path | str,
+    response_path: str,
+) -> Path | None:
+    path = Path(response_path)
+    candidates = (
+        [path]
+        if path.is_absolute()
+        else [Path(project_dir).resolve() / path, Path.cwd() / path]
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+    return None
+
+
+def _fallback_reason_documents_genui_attempt(reason: str) -> bool:
+    normalized = reason.strip().lower()
+    if not normalized:
+        return False
+    if any(token in normalized for token in _NATIVE_AGENT_UI_TOKENS):
+        return False
+    return any(token in normalized for token in _GENUI_FALLBACK_REASON_TOKENS)
+
+
 def write_interaction_journal(project_dir: Path | str, journal: dict[str, Any]) -> Path:
     journal = _normalize_journal_contract(journal)
     validate_interaction_journal(journal)
+    try:
+        serialized = json.dumps(journal, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"GenUI interaction journal must be strict JSON serializable: {exc}"
+        ) from exc
     path = interaction_journal_path(project_dir)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(journal, f, indent=2, ensure_ascii=False, allow_nan=False)
-        f.write("\n")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(serialized)
     return path
 
 

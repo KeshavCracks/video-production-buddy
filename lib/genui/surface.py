@@ -83,10 +83,13 @@ def _now_iso() -> str:
 
 def _dump_json(path: Path, payload: dict[str, Any]) -> None:
     _reject_non_finite_json(payload, context=str(path))
+    try:
+        serialized = json.dumps(payload, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"GenUI compatibility payload must be strict JSON serializable: {exc}") from exc
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(payload, f, indent=2, ensure_ascii=False, allow_nan=False)
-        f.write("\n")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(serialized)
 
 
 def _reject_non_finite_json(value: Any, *, context: str) -> None:
