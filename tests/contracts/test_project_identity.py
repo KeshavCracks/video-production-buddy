@@ -22,6 +22,14 @@ FORBIDDEN_PATTERNS = (
 ALLOWED_LINE_PATTERNS = {
     "README.md": (
         re.compile(r"built from and adapted from \[" + LEGACY_PROPER + r"\]"),
+        re.compile(
+            r"Our code is based off the excellent \["
+            + LEGACY_PROPER
+            + r" codebase\]"
+        ),
+    ),
+    "README.zh-CN.md": (
+        re.compile(r"我们的代码基于优秀的 \[" + LEGACY_PROPER + r" codebase\]"),
     ),
     "tests/contracts/test_project_identity.py": (
         re.compile(r"LEGACY_"),
