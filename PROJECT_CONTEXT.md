@@ -1,6 +1,10 @@
 # Video Production Buddy - Shared Project Context
 
-This is the single source of truth for project architecture and conventions. All platform-specific agent files (CLAUDE.md, CODEX.md, CURSOR.md, COPILOT.md) should point here instead of duplicating this content.
+This is the single source of truth for project architecture and development
+conventions. Durable cross-agent production conventions and current
+project-local findings live in `project_profile/`. Platform-specific agent files
+(AGENTS.md, CLAUDE.md, CURSOR.md, COPILOT.md) should point here and to
+`AGENT_GUIDE.md` instead of duplicating this content.
 
 ## Identity
 
@@ -21,6 +25,7 @@ Agent reads pipeline manifest (YAML) → reads stage director skill (MD)
 ## Source of Truth
 
 - **Agent guide & contract:** `AGENT_GUIDE.md` (tool inventory, pipeline selection, stage agents, protocols)
+- **Project profile:** `project_profile/` (repo-side cross-agent conventions, brand facts, provider/account findings, voice/subtitle findings; wins over agent-side private memory)
 - **Skill index:** `skills/INDEX.md`
 - **Tool registry:** `tools/tool_registry.py`
 - **Pipeline manifests:** `pipeline_defs/`
@@ -56,7 +61,7 @@ snapshots, or components whose upstream path has not been verified yet.
 - **Instruction-driven stages:** Each stage has a director skill (MD) that teaches the agent HOW
 - **Pipeline manifests:** Declarative YAML defining stages, skills, tools, review focus, approval gates
 - **Capability-first tool design:** Each major family should expose a selector tool plus explicit provider tools
-  - Example: `tts_selector` + `elevenlabs_tts` / `google_tts` / `openai_tts` / `piper_tts`
+  - Example: `tts_selector` + `cosyvoice_tts` / `doubao_tts` / `elevenlabs_tts` / `google_tts` / `minimax_tts` / `openai_tts` / `piper_tts`
   - Example: `video_selector` + `heygen_video` / `wan_video` / `hunyuan_video` / `ltx_video_local` / `ltx_video_modal` / `cogvideo_video`
 - **Style playbooks:** YAML defining visual language, typography, motion, audio, asset generation constraints
 - **Artifacts are canonical:** `user_request`, `intake_brief`, `enriched_brief`, `intelligence_brief`, `production_bible`, `idea_options`, `production_proposal`, `script`, `scene_plan`, `asset_manifest`, `edit_decisions`, `render_report`, `publish_log`
@@ -71,6 +76,17 @@ snapshots, or components whose upstream path has not been verified yet.
 
 | File | Purpose |
 |------|---------|
+| `project_profile/README.md` | Authority and update rules for repo-side cross-agent production profile |
+| `project_profile/conventions.md` | Profile index, memory mechanism, and profile changelog |
+| `project_profile/agent_behavior.md` | Cross-agent explanation, verification, local UI, and closeout preferences |
+| `project_profile/developer_workflow.md` | Repo-side audit, fix, git, generated-artifact, and identity-cleanup workflow rules |
+| `project_profile/brand.md` | Active product identity, visual identity, and forbidden brand/IP usage |
+| `project_profile/provider_findings.md` | Dated provider/account availability findings and verification commands |
+| `project_profile/voice_and_subtitles.md` | Mandarin male voice routing and CJK subtitle rendering requirements |
+| `project_profile/model_defaults.md` | Dated model/default observations and re-check commands |
+| `project_profile/hyperframes.md` | HyperFrames CJK font packaging and video-heavy render findings |
+| `project_profile/update_checklist.md` | Checklist for safe project-profile updates |
+| `project_profile/migration_audit.md` | Record of migrated agent-side guidance and intentionally non-migrated local history |
 | `config.yaml` | Global configuration |
 | `lib/config_model.py` | Runtime config loader (Pydantic) |
 | `lib/checkpoint.py` | Checkpoint writer/reader |
@@ -135,7 +151,11 @@ snapshots, or components whose upstream path has not been verified yet.
 ## When Building New Tools
 
 1. Inherit from `tools/base_tool.py` `BaseTool`
-2. Put the tool in the correct capability package (`tools/audio/`, `tools/video/`, `tools/enhancement/`, `tools/analysis/`, `tools/graphics/`, `tools/avatar/`, `tools/subtitle/`)
+2. Put the tool in the correct capability package (`tools/analysis/`,
+   `tools/audio/`, `tools/avatar/`, `tools/capture/`, `tools/character/`,
+   `tools/compliance/`, `tools/enhancement/`, `tools/graphics/`,
+   `tools/interaction/`, `tools/publishers/`, `tools/subtitle/`,
+   `tools/text/`, `tools/validation/`, `tools/video/`)
 3. Prefer the selector-plus-provider pattern:
    - one capability router tool for agent convenience
    - one concrete tool per real provider/runtime path

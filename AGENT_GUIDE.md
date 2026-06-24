@@ -2,7 +2,13 @@
 
 Start here. This is the complete operating guide and agent contract for Video Production Buddy.
 
-For architecture, key files, and conventions see [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md).
+For architecture and key files see [`PROJECT_CONTEXT.md`](PROJECT_CONTEXT.md).
+For repo-side cross-agent conventions and current project-local findings, read
+[`project_profile/README.md`](project_profile/README.md) and
+[`project_profile/conventions.md`](project_profile/conventions.md) before making
+creative, provider, runtime, voice, subtitle, brand, or environment-specific
+production decisions. If project profile files conflict with agent-side private
+memory, the project profile wins.
 
 ## First Interaction — Onboarding
 

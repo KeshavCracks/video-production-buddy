@@ -2,7 +2,7 @@
 
 Start by classifying the user's intent. This file is the router for Codex
 agents; the deeper contracts live in `AGENT_GUIDE.md`, `PROJECT_CONTEXT.md`,
-and `docs/ARCHITECTURE.md`.
+`docs/ARCHITECTURE.md`, and `project_profile/`.
 
 ## Route 1: Video Production User
 
@@ -11,7 +11,10 @@ publish video/media artifacts, including ads, trailers, explainers, clips,
 screen demos, avatar videos, animations, reference-video requests, source-footage
 edits, music, voiceover, subtitles, or final deliverables.
 
-**First action:** read `AGENT_GUIDE.md`, then follow it exactly.
+**First action:** read `AGENT_GUIDE.md`, then follow it exactly. For creative,
+provider, runtime, voice, subtitle, brand, or environment-specific decisions,
+also read `project_profile/README.md` and `project_profile/conventions.md`
+before acting.
 
 Production work must go through the pipeline system. Do not bypass pipeline
 manifests, stage director skills, preflight, checkpoints, provider/runtime
@@ -47,7 +50,7 @@ Developer workflow:
   operation. Destructive actions such as reset, amend, force-push, or history
   rewrite still need explicit user instruction.
 - When editing agent instruction wrappers, inspect the sibling wrappers
-  (`CLAUDE.md`, `CODEX.md`, `CURSOR.md`, `COPILOT.md`, `AGENTS.md`) and the
+  (`CLAUDE.md`, `CURSOR.md`, `COPILOT.md`, `AGENTS.md`) and the
   platform-wrapper contract test before deciding the full update surface.
 - Read `AGENT_GUIDE.md` as contract context, not as production-run instructions,
   when a development change affects production governance: pipeline manifests,
