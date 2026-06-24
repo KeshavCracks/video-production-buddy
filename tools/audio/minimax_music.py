@@ -29,6 +29,7 @@ from tools.base_tool import (
     ToolStatus,
     ToolTier,
 )
+from tools.output_paths import require_explicit_output_path
 
 _API_URL = "https://api.minimaxi.com/v1/music_generation"
 
@@ -119,7 +120,7 @@ class MinimaxMusic(BaseTool):
 
     input_schema = {
         "type": "object",
-        "required": ["prompt"],
+        "required": ["prompt", "output_path"],
         "properties": {
             "prompt": {
                 "type": "string",
@@ -179,6 +180,33 @@ class MinimaxMusic(BaseTool):
             "output_path": {"type": "string"},
         },
     }
+    output_schema = {
+        "type": "object",
+        "required": [
+            "provider",
+            "model",
+            "model_name",
+            "prompt",
+            "is_instrumental",
+            "music_duration_ms",
+            "music_duration_s",
+            "format",
+            "output",
+            "output_path",
+        ],
+        "properties": {
+            "provider": {"type": "string", "const": "minimax"},
+            "model": {"type": "string", "enum": list(_MODELS.keys())},
+            "model_name": {"type": "string"},
+            "prompt": {"type": "string"},
+            "is_instrumental": {"type": "boolean"},
+            "music_duration_ms": {"type": ["number", "null"]},
+            "music_duration_s": {"type": ["number", "null"]},
+            "format": {"type": "string", "enum": ["mp3", "wav", "pcm"]},
+            "output": {"type": "string"},
+            "output_path": {"type": "string"},
+        },
+    }
 
     resource_profile = ResourceProfile(
         cpu_cores=1, ram_mb=256, vram_mb=0, disk_mb=100, network_required=True
@@ -198,7 +226,7 @@ class MinimaxMusic(BaseTool):
         "output_path",
     ]
     side_effects = ["writes audio file to output_path", "calls MiniMax API"]
-    user_visible_verification = ["Listen to generated music for mood, style, and quality"]
+    user_visible_verification = ["Inspect audio metadata, duration, tags, and waveform metrics for mood, style, and quality fit"]
 
     def _get_api_key(self) -> str | None:
         return os.environ.get("MINIMAX_API_KEY")
@@ -213,6 +241,19 @@ class MinimaxMusic(BaseTool):
         return _MODELS.get(model, _MODELS["music-2.6"])["cost_per_generation"]
 
     def execute(self, inputs: dict[str, Any]) -> ToolResult:
+        model = inputs.get("model", "music-2.6")
+        if model not in _MODELS:
+            return ToolResult(success=False, error=f"Unsupported model {model!r}.")
+        model_meta = _MODELS[model]
+        fmt = inputs.get("format", "mp3")
+
+        output_path, output_error = require_explicit_output_path(
+            inputs, self.name, artifact_label="generated music audio"
+        )
+        if output_error:
+            return output_error
+        assert output_path is not None
+
         api_key = self._get_api_key()
         if not api_key:
             return ToolResult(
@@ -220,14 +261,9 @@ class MinimaxMusic(BaseTool):
                 error="MINIMAX_API_KEY not set. " + self.install_instructions,
             )
 
-        import requests
-
         start = time.time()
-        model = inputs.get("model", "music-2.6")
-        if model not in _MODELS:
-            return ToolResult(success=False, error=f"Unsupported model {model!r}.")
-        model_meta = _MODELS[model]
-        fmt = inputs.get("format", "mp3")
+
+        import requests
 
         payload: dict[str, Any] = {
             "model": model,
@@ -305,7 +341,6 @@ class MinimaxMusic(BaseTool):
         except Exception as exc:
             return ToolResult(success=False, error=f"Failed to retrieve audio: {exc}")
 
-        output_path = Path(inputs.get("output_path", f"minimax_music.{fmt}"))
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(audio_bytes)
 
@@ -323,6 +358,7 @@ class MinimaxMusic(BaseTool):
                 "music_duration_s": round(dur_ms / 1000, 2) if dur_ms else None,
                 "format": fmt,
                 "output": str(output_path),
+                "output_path": str(output_path),
             },
             artifacts=[str(output_path)],
             cost_usd=self.estimate_cost(inputs),

@@ -98,7 +98,7 @@ For most cases, use `image_selector` and let it route:
 result = image_selector.execute({
     "prompt": "aerial view of a modern data center",
     "preferred_provider": "auto",  # or "flux", "pexels", etc.
-    "output_path": "assets/images/scene-3.png"
+    "output_path": "projects/<project-name>/assets/images/scene-3.png"
 })
 ```
 
@@ -110,7 +110,7 @@ Use `allowed_providers` to restrict to free or local options:
 result = image_selector.execute({
     "prompt": "server room interior",
     "allowed_providers": ["pexels", "pixabay", "local_diffusion"],
-    "output_path": "assets/images/scene-3.jpg"
+    "output_path": "projects/<project-name>/assets/images/scene-3.jpg"
 })
 ```
 

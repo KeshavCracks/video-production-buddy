@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import jsonschema
 import pytest
 
 from tools.base_tool import ToolResult
@@ -20,6 +21,7 @@ from tools.video.wan_video_api import WanVideoAPI
 
 def _configure_provider_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("FAL_KEY", "test-fal-key")
+    monkeypatch.setenv("MINIMAX_API_KEY", "test-minimax-key")
     monkeypatch.setenv("RUNWAY_API_KEY", "test-runway-key")
     monkeypatch.setenv("HIGGSFIELD_KEY", "test-higgs-key:test-higgs-secret")
     monkeypatch.setenv("REPLICATE_API_TOKEN", "test-replicate-token")
@@ -89,10 +91,147 @@ def test_cloud_video_rejects_unknown_operation_before_network(
     assert "Unknown operation" in (result.error or "")
 
 
+def test_minimax_fast_rejects_text_to_video_before_network(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _configure_provider_env(monkeypatch)
+    monkeypatch.setattr("requests.post", _fail_network)
+
+    result = MiniMaxVideo().execute(
+        {
+            "prompt": "A product hero shot",
+            "operation": "text_to_video",
+            "model_variant": "MiniMax-Hailuo-2.3-Fast",
+            "output_path": "projects/demo/assets/video/minimax-fast.mp4",
+        }
+    )
+
+    assert isinstance(result, ToolResult)
+    assert not result.success
+    assert "does not support text_to_video" in (result.error or "")
+    assert "MiniMax-Hailuo-2.3" in (result.error or "")
+
+
+@pytest.mark.parametrize(
+    "tool",
+    [
+        KlingVideo(),
+        MiniMaxVideo(),
+        RunwayVideo(),
+        HiggsFieldVideo(),
+        SeedanceReplicate(),
+        SeedanceVideo(),
+        VeoVideo(),
+        GrokVideo(),
+        HeyGenVideo(),
+        LTXVideoModal(),
+        WanVideoAPI(),
+    ],
+)
+@pytest.mark.parametrize(
+    "output_path",
+    [
+        None,
+        "provider-output.mp4",
+        "/tmp/provider-output.mp4",
+    ],
+)
+def test_cloud_video_requires_project_output_path_before_network(
+    monkeypatch: pytest.MonkeyPatch,
+    tool,
+    output_path: str | None,
+) -> None:
+    _configure_provider_env(monkeypatch)
+    calls: list[object] = []
+
+    def fake_post(*args, **kwargs):
+        calls.append((args, kwargs))
+        raise AssertionError("network called before output_path validation")
+
+    monkeypatch.setattr("requests.post", fake_post)
+
+    inputs = {"prompt": "A product hero shot"}
+    if output_path is not None:
+        inputs["output_path"] = output_path
+
+    result = tool.execute(inputs)
+
+    assert isinstance(result, ToolResult)
+    assert not result.success
+    assert "output_path" in (result.error or "")
+    assert "projects/<project-name>/" in (result.error or "")
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("tool", "env_vars"),
+    [
+        (GrokVideo(), ("XAI_API_KEY",)),
+        (HeyGenVideo(), ("HEYGEN_API_KEY",)),
+        (KlingVideo(), ("FAL_KEY", "FAL_AI_API_KEY")),
+        (MiniMaxVideo(), ("MINIMAX_API_KEY",)),
+        (HiggsFieldVideo(), ("HIGGSFIELD_KEY", "HIGGSFIELD_API_KEY", "HIGGSFIELD_API_SECRET")),
+        (PexelsVideo(), ("PEXELS_API_KEY",)),
+        (PixabayVideo(), ("PIXABAY_API_KEY",)),
+        (RunwayVideo(), ("RUNWAY_API_KEY", "RUNWAYML_API_SECRET")),
+        (SeedanceReplicate(), ("REPLICATE_API_TOKEN",)),
+        (SeedanceVideo(), ("FAL_KEY", "FAL_AI_API_KEY")),
+        (VeoVideo(), ("FAL_KEY", "FAL_AI_API_KEY")),
+        (LTXVideoModal(), ("MODAL_LTX2_ENDPOINT_URL",)),
+        (WanVideoAPI(), ("DASHSCOPE_API_KEY",)),
+    ],
+)
+def test_cloud_video_rejects_non_project_output_path_before_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+    tool,
+    env_vars: tuple[str, ...],
+) -> None:
+    for env_var in env_vars:
+        monkeypatch.delenv(env_var, raising=False)
+
+    result = tool.execute(
+        {"prompt": "A product hero shot", "output_path": "provider-output.mp4"}
+    )
+
+    assert isinstance(result, ToolResult)
+    assert not result.success
+    assert "output_path" in (result.error or "")
+    assert "projects/<project-name>/" in (result.error or "")
+
+
+@pytest.mark.parametrize(
+    ("tool", "minimal_inputs"),
+    [
+        (GrokVideo(), {"prompt": "A product hero shot"}),
+        (HeyGenVideo(), {"prompt": "A product hero shot"}),
+        (HiggsFieldVideo(), {"prompt": "A product hero shot"}),
+        (KlingVideo(), {"prompt": "A product hero shot"}),
+        (MiniMaxVideo(), {"prompt": "A product hero shot"}),
+        (PexelsVideo(), {"query": "product b-roll"}),
+        (PixabayVideo(), {"query": "product b-roll"}),
+        (RunwayVideo(), {"prompt": "A product hero shot"}),
+        (SeedanceReplicate(), {"prompt": "A product hero shot"}),
+        (SeedanceVideo(), {"prompt": "A product hero shot"}),
+        (VeoVideo(), {"prompt": "A product hero shot"}),
+        (LTXVideoModal(), {"prompt": "A product hero shot"}),
+        (WanVideoAPI(), {"prompt": "A product hero shot"}),
+    ],
+)
+def test_cloud_video_schemas_require_output_path(tool, minimal_inputs: dict[str, object]) -> None:
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(instance=minimal_inputs, schema=tool.input_schema)
+
+
 class _FakeResponse:
-    def __init__(self, payload: dict | None = None, content: bytes = b"fake mp4") -> None:
+    def __init__(
+        self,
+        payload: dict | None = None,
+        content: bytes = b"fake mp4",
+        headers: dict[str, str] | None = None,
+    ) -> None:
         self._payload = payload or {}
         self.content = content
+        self.headers = headers or {}
         self.ok = True
         self.status_code = 200
         self.text = ""
@@ -104,16 +243,36 @@ class _FakeResponse:
         return self._payload
 
 
-@pytest.mark.parametrize("tool", [MiniMaxVideo(), VeoVideo()])
+def _assert_output_schema_matches_payload(
+    tool,
+    payload: dict[str, object],
+    expected_properties: set[str],
+) -> None:
+    output_properties = tool.output_schema["properties"]
+    assert expected_properties <= set(output_properties)
+    jsonschema.validate(instance=payload, schema=tool.output_schema)
+
+
+@pytest.mark.parametrize("tool", [MiniMaxVideo(), VeoVideo(), LTXVideoModal(), HeyGenVideo()])
 def test_cloud_video_success_payload_includes_output_path_and_format(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path,
     tool,
 ) -> None:
     _configure_provider_env(monkeypatch)
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("time.sleep", lambda _seconds: None)
 
     def fake_post(*_args, **_kwargs):
+        if isinstance(tool, HeyGenVideo):
+            return _FakeResponse({"data": {"execution_id": "execution-1"}})
+        if isinstance(tool, LTXVideoModal):
+            return _FakeResponse(content=b"fake mp4", headers={"content-type": "video/mp4"})
+        if isinstance(tool, MiniMaxVideo):
+            # Native MiniMax create-task contract: {task_id, base_resp}.
+            return _FakeResponse(
+                {"task_id": "task-1", "base_resp": {"status_code": 0, "status_msg": "success"}}
+            )
         return _FakeResponse(
             {
                 "status_url": "https://queue.example.test/status",
@@ -122,6 +281,26 @@ def test_cloud_video_success_payload_includes_output_path_and_format(
         )
 
     def fake_get(url, *_args, **_kwargs):
+        if isinstance(tool, MiniMaxVideo):
+            if "/query/video_generation" in url:
+                return _FakeResponse(
+                    {
+                        "task_id": "task-1",
+                        "status": "Success",
+                        "file_id": "file-1",
+                        "base_resp": {"status_code": 0, "status_msg": "success"},
+                    }
+                )
+            if "/files/retrieve" in url:
+                return _FakeResponse(
+                    {
+                        "file": {"download_url": "https://cdn.example.test/out.mp4"},
+                        "base_resp": {"status_code": 0, "status_msg": "success"},
+                    }
+                )
+            if url == "https://cdn.example.test/out.mp4":
+                return _FakeResponse(content=b"fake mp4")
+            raise AssertionError(f"unexpected GET {url}")
         if url == "https://queue.example.test/status":
             return _FakeResponse({"status": "COMPLETED"})
         if url == "https://queue.example.test/response":
@@ -130,15 +309,49 @@ def test_cloud_video_success_payload_includes_output_path_and_format(
             return _FakeResponse(content=b"fake mp4")
         raise AssertionError(f"unexpected GET {url}")
 
+    monkeypatch.setattr(
+        "tools.video._shared.poll_heygen",
+        lambda _execution_id, _api_key, timeout=600: "https://cdn.example.test/out.mp4",
+    )
     monkeypatch.setattr("requests.post", fake_post)
     monkeypatch.setattr("requests.get", fake_get)
 
-    output_path = tmp_path / f"{tool.name}.mp4"
+    output_path = f"projects/demo/assets/video/{tool.name}.mp4"
     result = tool.execute({"prompt": "A product hero shot", "output_path": str(output_path)})
 
     assert result.success
-    assert result.data["output_path"] == str(output_path)
+    assert result.data["output_path"] == output_path
     assert result.data["format"] == "mp4"
+    expected_properties = {"provider", "prompt", "operation", "output", "output_path", "format"}
+    if isinstance(tool, MiniMaxVideo):
+        expected_properties |= {
+            "model",
+            "model_name",
+            "duration",
+            "resolution",
+            "file_size_bytes",
+        }
+    elif isinstance(tool, VeoVideo):
+        expected_properties |= {"model", "has_audio", "file_size_bytes"}
+    elif isinstance(tool, LTXVideoModal):
+        expected_properties |= {
+            "provider_name",
+            "mode",
+            "width",
+            "height",
+            "num_frames",
+            "fps",
+            "duration_seconds",
+        }
+    else:
+        expected_properties |= {
+            "provider_variant",
+            "provider_name",
+            "mode",
+            "aspect_ratio",
+            "execution_id",
+        }
+    _assert_output_schema_matches_payload(tool, result.data, expected_properties)
 
 
 def test_seedance_replicate_success_payload_includes_operation(
@@ -146,6 +359,7 @@ def test_seedance_replicate_success_payload_includes_operation(
     tmp_path,
 ) -> None:
     _configure_provider_env(monkeypatch)
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("time.sleep", lambda _seconds: None)
 
     def fake_post(*_args, **_kwargs):
@@ -165,15 +379,101 @@ def test_seedance_replicate_success_payload_includes_operation(
     monkeypatch.setattr("requests.post", fake_post)
     monkeypatch.setattr("requests.get", fake_get)
 
-    output_path = tmp_path / "seedance-replicate.mp4"
+    output_path = "projects/demo/assets/video/seedance-replicate.mp4"
     result = SeedanceReplicate().execute(
-        {"prompt": "A product hero shot", "output_path": str(output_path)}
+        {"prompt": "A product hero shot", "output_path": output_path}
     )
 
     assert result.success
-    assert result.data["output_path"] == str(output_path)
+    assert result.data["output_path"] == output_path
     assert result.data["format"] == "mp4"
     assert result.data["operation"] == "text_to_video"
+    _assert_output_schema_matches_payload(
+        SeedanceReplicate(),
+        result.data,
+        {
+            "provider",
+            "gateway",
+            "model",
+            "prompt",
+            "operation",
+            "variant",
+            "aspect_ratio",
+            "resolution",
+            "generate_audio",
+            "seed",
+            "output",
+            "output_path",
+            "format",
+            "file_size_bytes",
+        },
+    )
+
+
+@pytest.mark.parametrize("tool", [KlingVideo(), RunwayVideo(), HiggsFieldVideo(), GrokVideo()])
+def test_direct_cloud_video_success_payload_matches_output_schema(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+    tool,
+) -> None:
+    _configure_provider_env(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("time.sleep", lambda _seconds: None)
+
+    download_url = f"https://cdn.example.test/{tool.name}.mp4"
+    status_url = f"https://queue.example.test/{tool.name}/status"
+    response_url = f"https://queue.example.test/{tool.name}/response"
+
+    def fake_post(*_args, **_kwargs):
+        if isinstance(tool, RunwayVideo):
+            return _FakeResponse({"id": "task-1"})
+        if isinstance(tool, HiggsFieldVideo):
+            return _FakeResponse({"id": "generation-1", "status_url": status_url})
+        if isinstance(tool, GrokVideo):
+            return _FakeResponse({"request_id": "request-1"})
+        return _FakeResponse({"status_url": status_url, "response_url": response_url})
+
+    def fake_get(url, *_args, **_kwargs):
+        if url == status_url:
+            return _FakeResponse({"status": "COMPLETED", "output_url": download_url})
+        if url == response_url:
+            return _FakeResponse({"video": {"url": download_url}})
+        if url == "https://api.dev.runwayml.com/v1/tasks/task-1":
+            return _FakeResponse({"status": "SUCCEEDED", "output": [download_url]})
+        if url == "https://api.x.ai/v1/videos/request-1":
+            return _FakeResponse({"status": "done", "video": {"url": download_url}})
+        if url == download_url:
+            return _FakeResponse(content=b"fake direct cloud mp4")
+        raise AssertionError(f"unexpected GET {url}")
+
+    monkeypatch.setattr("requests.post", fake_post)
+    monkeypatch.setattr("requests.get", fake_get)
+
+    output_path = f"projects/demo/assets/video/{tool.name}.mp4"
+    result = tool.execute({"prompt": "A product hero shot", "output_path": output_path})
+
+    assert result.success, result.error
+    assert result.data["output_path"] == output_path
+    assert result.data["format"] == "mp4"
+    assert (tmp_path / output_path).read_bytes() == b"fake direct cloud mp4"
+
+    expected_properties = {
+        "provider",
+        "model",
+        "prompt",
+        "operation",
+        "output",
+        "output_path",
+        "format",
+        "file_size_bytes",
+    }
+    if isinstance(tool, (KlingVideo, HiggsFieldVideo)):
+        expected_properties |= {"aspect_ratio"}
+    elif isinstance(tool, RunwayVideo):
+        expected_properties |= {"ratio", "task_id"}
+    else:
+        expected_properties |= {"request_id"}
+    _assert_output_schema_matches_payload(tool, result.data, expected_properties)
 
 
 @pytest.mark.parametrize(
@@ -226,6 +526,209 @@ def test_stock_video_provider_idempotency_key_includes_output_path(tool, base) -
     assert tool.idempotency_key({**base, "output_path": "stock-a.mp4"}) != tool.idempotency_key(
         {**base, "output_path": "stock-b.mp4"}
     )
+
+
+@pytest.mark.parametrize(
+    ("tool", "env_var", "base"),
+    [
+        (
+            PexelsVideo(),
+            "PEXELS_API_KEY",
+            {"query": "city b-roll", "orientation": "landscape", "size": "large"},
+        ),
+        (
+            PixabayVideo(),
+            "PIXABAY_API_KEY",
+            {"query": "city b-roll", "video_type": "film", "category": "business"},
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    "output_path",
+    [
+        None,
+        "stock-video.mp4",
+        "/tmp/stock-video.mp4",
+    ],
+)
+def test_stock_video_requires_project_output_path_before_network(
+    monkeypatch: pytest.MonkeyPatch,
+    tool,
+    env_var: str,
+    base: dict[str, object],
+    output_path: str | None,
+) -> None:
+    monkeypatch.setenv(env_var, "test-key")
+    calls: list[object] = []
+
+    def fake_get(*args, **kwargs):
+        calls.append((args, kwargs))
+        raise AssertionError("network called before stock output_path validation")
+
+    monkeypatch.setattr("requests.get", fake_get)
+
+    inputs = dict(base)
+    if output_path is not None:
+        inputs["output_path"] = output_path
+
+    result = tool.execute(inputs)
+
+    assert isinstance(result, ToolResult)
+    assert not result.success
+    assert "output_path" in (result.error or "")
+    assert "projects/<project-name>/" in (result.error or "")
+    assert calls == []
+
+
+@pytest.mark.parametrize(
+    ("tool", "env_var", "search_payload", "download_url"),
+    [
+        (
+            PexelsVideo(),
+            "PEXELS_API_KEY",
+            {
+                "total_results": 1,
+                "videos": [
+                    {
+                        "id": 123,
+                        "duration": 5,
+                        "url": "https://www.pexels.com/video/123/",
+                        "user": {"name": "Pexels Creator"},
+                        "video_files": [
+                            {
+                                "quality": "hd",
+                                "width": 1920,
+                                "height": 1080,
+                                "fps": 30,
+                                "link": "https://cdn.example.test/pexels.mp4",
+                            }
+                        ],
+                    }
+                ],
+            },
+            "https://cdn.example.test/pexels.mp4",
+        ),
+        (
+            PixabayVideo(),
+            "PIXABAY_API_KEY",
+            {
+                "total": 1,
+                "hits": [
+                    {
+                        "id": 456,
+                        "duration": 5,
+                        "pageURL": "https://pixabay.com/videos/456/",
+                        "tags": "city,b-roll",
+                        "user": "Pixabay Creator",
+                        "videos": {
+                            "large": {
+                                "url": "https://cdn.example.test/pixabay.mp4",
+                                "width": 1920,
+                                "height": 1080,
+                            }
+                        },
+                    }
+                ],
+            },
+            "https://cdn.example.test/pixabay.mp4",
+        ),
+    ],
+)
+def test_stock_video_success_payload_includes_output_path(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+    tool,
+    env_var: str,
+    search_payload: dict[str, object],
+    download_url: str,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(env_var, "test-key")
+
+    def fake_get(url, *_args, **_kwargs):
+        if url == download_url:
+            return _FakeResponse(content=b"fake stock video")
+        return _FakeResponse(search_payload)
+
+    monkeypatch.setattr("requests.get", fake_get)
+
+    output_path = f"projects/demo/assets/video/{tool.name}.mp4"
+    result = tool.execute({"query": "city b-roll", "output_path": output_path})
+
+    assert result.success is True
+    assert result.data["output"] == output_path
+    assert result.data["output_path"] == output_path
+    assert result.artifacts == [output_path]
+    assert (tmp_path / output_path).read_bytes() == b"fake stock video"
+    output_properties = tool.output_schema["properties"]
+    expected_properties = {
+        "provider",
+        "video_id",
+        "user",
+        "duration_seconds",
+        "width",
+        "height",
+        "query",
+        "output",
+        "output_path",
+        "total_results",
+        "results_returned",
+        "license",
+    }
+    if tool.name == "pexels_video":
+        expected_properties |= {"fps", "quality", "pexels_url"}
+    else:
+        expected_properties |= {"tags", "page_url"}
+    assert expected_properties <= set(output_properties)
+    jsonschema.validate(instance=result.data, schema=tool.output_schema)
+
+
+@pytest.mark.parametrize(
+    ("tool", "base", "variants"),
+    [
+        (
+            PexelsVideo(),
+            {
+                "query": "city b-roll",
+                "orientation": "landscape",
+                "size": "large",
+                "page": 1,
+                "output_path": "stock.mp4",
+            },
+            [
+                {"min_duration": 4},
+                {"max_duration": 12},
+                {"preferred_quality": "sd"},
+            ],
+        ),
+        (
+            PixabayVideo(),
+            {
+                "query": "city b-roll",
+                "video_type": "film",
+                "category": "business",
+                "page": 1,
+                "output_path": "stock.mp4",
+            },
+            [
+                {"min_duration": 4},
+                {"max_duration": 12},
+                {"preferred_quality": "medium"},
+                {"editors_choice": True},
+                {"safesearch": False},
+            ],
+        ),
+    ],
+)
+def test_stock_video_idempotency_key_includes_search_result_shaping_inputs(
+    tool,
+    base,
+    variants,
+) -> None:
+    base_key = tool.idempotency_key(base)
+
+    for variant in variants:
+        assert tool.idempotency_key({**base, **variant}) != base_key
 
 
 def test_wan_video_api_idempotency_key_includes_output_path() -> None:

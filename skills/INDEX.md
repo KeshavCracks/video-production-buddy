@@ -64,9 +64,21 @@ Key capability families to look for in the output:
 | `enhancement` | — | Mixed providers |
 | `analysis` | — | Mixed providers |
 | `character_animation` | — | Local character specs, SVG rigs, pose libraries, action timelines, previews, and QA |
+| `clip_acquisition` | — | Fast stock clip/image download through shared source adapters (`direct_clip_search`) |
+| `clip_retrieval` | — | Local corpus retrieval and ranking (`clip_search`) |
+| `compliance` | — | Deterministic compliance checks for checkpoint/governance artifacts |
+| `corpus_population` | — | Stock-source fanout, download, thumbnailing, embedding, and corpus indexing |
 | `graphics` | — | Local rendering tools |
+| `interaction` | — | GenUI routing/session/surface tools; local UI is opt-in and response-only |
+| `knowledge_retrieval` | — | Local curated knowledge retrieval for planning and review |
 | `music_generation` | — | Registry-discovered providers (`minimax_music`, `music_gen`, `suno_music`, etc.) |
+| `music_search` | — | Royalty-free/background music search providers (`pixabay_music`, `freesound_music`) |
+| `screen_capture` | `screen_capture_selector` | FFmpeg/Cap screen recording providers for screen-demo pipelines |
+| `source_ingest` | — | Source URL download/metadata ingestion (`video_downloader`) |
 | `transcription` | — | Speech-to-text providers such as `qwen_asr`; check supports before using for subtitles |
+| `text_generation` | `text-generation` | LLM chat providers (`qwen_chat`, `minimax_chat`); standalone ad-hoc text tools, not auto-wired into pipeline stages |
+| `validation` | — | Cross-artifact planning, runtime, provider, identity, fidelity, and GenUI evidence validators |
+| `vision_understanding` | — | Image/video understanding (`qwen_vl`); for reference analysis, frame QA, hallucination review |
 | `subtitle` | — | Pure Python |
 | `avatar` | — | Local GPU models |
 | `video_post` | — | FFmpeg-based local tools |
@@ -88,11 +100,16 @@ Layer 2 skills still need to know their user-facing strengths and constraints:
 
 | Tool | Capability | Provider | Layer 2 Notes |
 |------|------------|----------|---------------|
-| `cosyvoice_tts` | `tts` | Bailian / DashScope | Qwen3 and CosyVoice narration; use `qwen3-tts-instruct-flash` when script delivery instructions must be honored |
+| `cosyvoice_tts` | `tts` | Bailian / DashScope | Qwen3 + CosyVoice narration (latest `cosyvoice-v3.5-plus/flash`); use `qwen3-tts-instruct-flash` when script delivery instructions must be honored |
+| `minimax_tts` | `tts` | MiniMax | Studio-grade narration via `speech-2.8-hd`/`turbo`; second TTS provider on `MINIMAX_API_KEY`, no per-section delivery-instruction contract |
 | `qwen_asr` | `transcription` | Bailian / DashScope | Fast Chinese/multilingual transcript text; not a subtitle source when word timestamps are required |
-| `wanx_image` | `image_generation` | Bailian / DashScope | Wanxiang image generation and editing; read `.agents/skills/wanx-best-practices/` before prompting |
-| `wan_video_api` | `video_generation` | Bailian / DashScope | Wan 2.7 i2v/r2v/video-edit and Wan 2.6 t2v via API; always pass `aspect_ratio` for non-landscape output |
-| `minimax_music` | `music_generation` | MiniMax | Instrumental background tracks, structured songs, and cover generation |
+| `wanx_image` | `image_generation` | Bailian / DashScope | Wanxiang image generation and editing (latest `wan2.7-image-pro`/`wan2.7-image`); read `.agents/skills/wanx-best-practices/` before prompting |
+| `wan_video_api` | `video_generation` | Bailian / DashScope | HappyHorse 1.0 flagship (native audio+video) + Wan 2.7 t2v/i2v/r2v/edit; pass `aspect_ratio` (mapped to `ratio` on 2.7/HappyHorse) for non-landscape output |
+| `minimax_video` | `video_generation` | MiniMax | Native MiniMax Hailuo 2.3 / 2.3-Fast / 02 via `MINIMAX_API_KEY`; camera control via `[command]` prompt syntax |
+| `minimax_music` | `music_generation` | MiniMax | Instrumental background tracks, structured songs, and cover generation (`music-2.6`) |
+| `qwen_chat` | `text_generation` | Bailian / DashScope | Qwen3.7-max/plus/flash chat — standalone ad-hoc text tool; read `.agents/skills/text-generation/` before billed LLM calls |
+| `minimax_chat` | `text_generation` | MiniMax | MiniMax-M3/M2.7 chat — standalone ad-hoc text tool; read `.agents/skills/text-generation/` before billed LLM calls |
+| `qwen_vl` | `vision_understanding` | Bailian / DashScope | Image/video understanding via qwen3-vl-plus / qwen3.7-plus; reference analysis, frame QA, hallucination review |
 | `subtitle_aligner` | local CLI subtitle utility | local faster-whisper | Not registry-discovered; run with `python -m tools.audio.subtitle_aligner` to forced-align generated TTS segments into ASS subtitles with real word timing and PlayRes-safe layout |
 
 ## Core Skills
@@ -128,7 +145,7 @@ Layer 2 skills still need to know their user-facing strengths and constraints:
 | Image Gen Usage | `creative/image-gen-usage.md` | Prompt consistency, hero reference, batch strategy | `flux-best-practices`, `bfl-api` |
 | Image Provider Usage | `creative/image-provider-usage.md` | Provider selection (FLUX/Grok/OpenAI/Recraft/Wanx/stock), cost-quality tradeoffs | `flux-best-practices`, `bfl-api`, `grok-media`, `wanx-best-practices` |
 | B-Roll Planning | `creative/broll-planning.md` | Stock vs. generated decision, query construction, footage evaluation | — |
-| Stock Sourcing Usage | `creative/stock-sourcing-usage.md` | Pexels/Pixabay usage, parameters, licensing, integration | — |
+| Stock Sourcing Usage | `creative/stock-sourcing-usage.md` | Pexels/Pixabay usage, parameters, licensing, integration | `stock-sourcing` |
 | Scene Detect Usage | `creative/scene-detect-usage.md` | Threshold tuning, algorithm selection, content presets | - |
 | Diagram Gen Usage | `creative/diagram-gen-usage.md` | Complexity limits, progressive building, themes | `beautiful-mermaid` |
 | Music Gen Usage | `creative/music-gen-usage.md` | BPM selection, prompt engineering, provider-specific duration/lyrics controls | `music`, `elevenlabs` |
@@ -403,6 +420,8 @@ Claude Code compatibility paths are generated in `.claude/skills/`.
 | **Video Processing** | `ffmpeg`, `video_toolkit` | `digitalsamba/claude-code-video-toolkit` |
 | **TTS & Audio** | `text-to-speech`, `speech-to-text`, `music`, `sound-effects`, `elevenlabs`, `agents`, `setup-api-key` | `elevenlabs/skills`, `digitalsamba/claude-code-video-toolkit` |
 | **Image Generation** | `flux-best-practices`, `bfl-api`, `grok-media` | `black-forest-labs/skills`, local Video Production Buddy skill |
+| **Stock Media** | `stock-sourcing` | Local Video Production Buddy skill |
+| **Text Generation** | `text-generation` | Local Video Production Buddy skill |
 | **Math Animation** | `manimce-best-practices`, `manimgl-best-practices`, `manim-composer` | `adithya-s-k/manim_skill` |
 | **3D Graphics** | `threejs-animation`, `threejs-fundamentals`, `threejs-geometry`, `threejs-interaction`, `threejs-lighting`, `threejs-loaders`, `threejs-materials`, `threejs-postprocessing`, `threejs-shaders`, `threejs-textures` | `cloudai-x/threejs-skills` |
 | **Diagrams** | `beautiful-mermaid`, `d3-viz` | `intellectronica/agent-skills`, `davila7/claude-code-templates` |

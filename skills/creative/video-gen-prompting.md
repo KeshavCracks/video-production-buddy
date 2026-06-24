@@ -22,7 +22,8 @@ For model-specific tips, see the linked guides below.
 | **HunyuanVideo 1.5** | [Tencent Prompt Handbook](https://github.com/Tencent-Hunyuan/HunyuanVideo-1.5/blob/main/assets/HunyuanVideo_1_5_Prompt_Handbook_EN.md) | Formula: Subject + Motion + Scene + [Shot] + [Camera] + [Lighting] + [Style] + [Atmosphere]. |
 | **Runway Gen-4** | [Runway Prompting Guide](https://help.runwayml.com/hc/en-us/articles/39789879462419-Gen-4-Video-Prompting-Guide) | "Focus on motion, not appearance." One scene per clip. Simplicity wins. |
 | **Kling 2.6** | [Kling Prompt Guide](https://fal.ai/learn/devs/kling-2-6-pro-prompt-guide) | 4-part structure. Supports `++emphasis++` syntax for key elements. |
-| **Wan 2.7 / Wan 2.6 API** | `wan_video_api` + Layer 3 `.agents/skills/ai-video-gen/` | Bailian/DashScope path for t2v, i2v, reference-to-video, and video editing. Use 5-aspect prompts; pass `aspect_ratio` instead of landscape `resolution` for vertical/square output. |
+| **HappyHorse 1.0 / Wan 2.7 API** | `wan_video_api` + Layer 3 `.agents/skills/ai-video-gen/` | Bailian/DashScope path for t2v, i2v, reference-to-video, and video editing. **HappyHorse 1.0 is the current flagship** (native joint audio+video generation; default for all four operations), with Wan 2.7 as the proven fallback — both emit a synced audio track automatically or from `audio_url`. Use 5-aspect prompts; pass `aspect_ratio` (mapped to the API `ratio` on 2.7/HappyHorse) instead of landscape `resolution` for vertical/square output. |
+| **MiniMax Hailuo 2.3** | `minimax_video` + Layer 3 `.agents/skills/ai-video-gen/` | Native MiniMax path via `MINIMAX_API_KEY`. Best body motion / physical realism; control camera with `[command]` prompt syntax (e.g. `[Push in]`, `[Tracking shot]`). |
 | **Wan 2.1 local / CogVideoX** | Use this generic guide | Standard cinematographic vocabulary works well; keep local model limits in mind. |
 
 ## Order Matters

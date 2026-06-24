@@ -23,6 +23,7 @@ def test_wanx_schema_requires_ref_images_for_multi_image_reference():
             "operation": "multi_image_reference",
             "model": "wan2.7-image-pro",
             "ref_images": ["https://example.test/product.png"],
+            "output_path": "projects/demo/assets/images/wanx.png",
         },
         schema=WanxImage.input_schema,
     )
@@ -30,6 +31,7 @@ def test_wanx_schema_requires_ref_images_for_multi_image_reference():
 
 def test_wanx_multi_image_reference_uses_wan27_message_images(monkeypatch, tmp_path):
     monkeypatch.setenv("DASHSCOPE_API_KEY", "test-key")
+    monkeypatch.chdir(tmp_path)
     captured: dict[str, object] = {}
 
     class FakeResponse:
@@ -59,9 +61,10 @@ def test_wanx_multi_image_reference_uses_wan27_message_images(monkeypatch, tmp_p
     monkeypatch.setattr(
         WanxImage,
         "_download_images",
-        lambda self, results, output_path_hint, model: [str(tmp_path / "out.png")],
+        lambda self, results, output_path_hint, model: [output_path_hint],
     )
 
+    output_path = "projects/demo/assets/images/out.png"
     result = WanxImage().execute(
         {
             "prompt": "Create a consistent product hero image",
@@ -71,7 +74,7 @@ def test_wanx_multi_image_reference_uses_wan27_message_images(monkeypatch, tmp_p
                 "https://example.test/product.png",
                 "https://example.test/style.png",
             ],
-            "output_path": str(tmp_path / "out.png"),
+            "output_path": output_path,
         }
     )
 

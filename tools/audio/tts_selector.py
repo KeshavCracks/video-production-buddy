@@ -163,6 +163,7 @@ class TTSSelector(BaseTool):
                     "selected_tool",
                     "selected_provider",
                     "selection_reason",
+                    "output_path",
                     "alternatives_considered",
                 ],
             },

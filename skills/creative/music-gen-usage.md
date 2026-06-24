@@ -88,7 +88,7 @@ bass, contemplative and focused, background music for technical explanation
 result = music_gen.execute({
     "prompt": "Gentle ambient, 90 BPM, background underscore",
     "duration_seconds": 150,  # Match video length
-    "output_path": "assets/music/background.mp3"
+    "output_path": "projects/<project-name>/assets/music/background.mp3"
 })
 ```
 
@@ -100,7 +100,7 @@ result = minimax_music.execute({
     "prompt": "Gentle ambient electronic, 90 BPM, background underscore",
     "is_instrumental": True,
     "model": "music-2.6",
-    "output_path": "assets/music/background.mp3"
+    "output_path": "projects/<project-name>/assets/music/background.mp3"
 })
 ```
 

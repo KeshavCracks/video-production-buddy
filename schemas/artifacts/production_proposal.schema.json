@@ -36,12 +36,19 @@
     },
     "style_mode": {
       "type": "string",
-      "enum": ["animated", "cinematic"],
+      "enum": [
+        "animated",
+        "cinematic"
+      ],
       "description": "Visual production mode locked at proposal. EP_STATE and downstream stages read this field; production_bible.visual.style_mode remains upstream audit context."
     },
     "render_runtime": {
       "type": "string",
-      "enum": ["remotion", "hyperframes", "ffmpeg"],
+      "enum": [
+        "remotion",
+        "hyperframes",
+        "ffmpeg"
+      ],
       "description": "Composition engine locked at proposal. Animated→remotion, cinematic→ffmpeg by default; HyperFrames opt-in. Carried unchanged into edit_decisions.render_runtime."
     },
     "product_reference_strategy": {
@@ -56,12 +63,17 @@
     },
     "subtitles": {
       "type": "object",
-      "required": ["mode"],
+      "required": [
+        "mode"
+      ],
       "additionalProperties": false,
       "properties": {
         "mode": {
           "type": "string",
-          "enum": ["off", "burnt-in"],
+          "enum": [
+            "off",
+            "burnt-in"
+          ],
           "description": "off = no subtitles; burnt-in = ASS burned via ffmpeg subtitles filter."
         },
         "language": {
@@ -79,7 +91,9 @@
       "description": "Localization dub tracks the user opted into. Empty when no dubs requested.",
       "items": {
         "type": "object",
-        "required": ["language"],
+        "required": [
+          "language"
+        ],
         "additionalProperties": false,
         "properties": {
           "language": {
@@ -95,7 +109,15 @@
     },
     "derivatives_added": {
       "type": "array",
-      "items": { "type": "string", "enum": ["9:16", "1:1", "15s", "15s_short"] },
+      "items": {
+        "type": "string",
+        "enum": [
+          "9:16",
+          "1:1",
+          "15s",
+          "15s_short"
+        ]
+      },
       "description": "Variant ids the user opted into (e.g. '9:16', '1:1', '15s_short'). Empty when only the primary aspect ratio is rendered."
     },
     "budget_confirmed": {
@@ -109,7 +131,12 @@
     },
     "music_strategy": {
       "type": "string",
-      "enum": ["generative_loose", "library_locked", "search_align", "none"],
+      "enum": [
+        "generative_loose",
+        "library_locked",
+        "search_align",
+        "none"
+      ],
       "description": "How the asset stage acquires the music track. generative_loose = MiniMax/Suno text-to-music; arc-shaped output, NOT bar-precise (bass drops drift ±2-5s). Use for atmospheric ads where bar-locked drops are unnecessary. library_locked = require a track from music_library/ with a sidecar <track>.timing.json declaring known structural moments (drop_seconds, downbeats[]). REQUIRED when production_bible.narrative.tension_peak_at_seconds is set AND ±0.5s sync is needed. search_align = search a stock-music provider, use lib.beat_detector to align the drop to tension_peak_at_seconds via trim/pad. none = no background music."
     },
     "audio_contract": {
@@ -131,30 +158,48 @@
       "allOf": [
         {
           "if": {
-            "required": ["voice_provider"],
+            "required": [
+              "voice_provider"
+            ],
             "properties": {
-              "voice_provider": { "const": "qwen3" }
+              "voice_provider": {
+                "const": "qwen3"
+              }
             }
           },
           "then": {
             "properties": {
-              "voice_model": { "const": "qwen3-tts-instruct-flash" },
+              "voice_model": {
+                "const": "qwen3-tts-instruct-flash"
+              },
               "voice_id": {
-                "enum": ["Cherry", "Ethan", "Serena", "Dylan", "Kai"]
+                "enum": [
+                  "Cherry",
+                  "Ethan",
+                  "Serena",
+                  "Dylan",
+                  "Kai"
+                ]
               }
             }
           }
         },
         {
           "if": {
-            "required": ["voice_provider"],
+            "required": [
+              "voice_provider"
+            ],
             "properties": {
-              "voice_provider": { "const": "openai" }
+              "voice_provider": {
+                "const": "openai"
+              }
             }
           },
           "then": {
             "properties": {
-              "voice_model": { "const": "gpt-4o-mini-tts" },
+              "voice_model": {
+                "const": "gpt-4o-mini-tts"
+              },
               "voice_id": {
                 "enum": [
                   "alloy",
@@ -175,29 +220,85 @@
         },
         {
           "if": {
-            "required": ["voice_provider", "voice_id"],
+            "required": [
+              "voice_provider",
+              "voice_id"
+            ],
             "properties": {
-              "voice_provider": { "const": "qwen3" },
-              "voice_id": { "enum": ["Ethan", "Dylan", "Kai"] }
+              "voice_provider": {
+                "const": "qwen3"
+              },
+              "voice_id": {
+                "enum": [
+                  "Ethan",
+                  "Dylan",
+                  "Kai"
+                ]
+              }
             }
           },
           "then": {
             "properties": {
-              "voice_gender": { "const": "male" }
+              "voice_gender": {
+                "const": "male"
+              }
             }
           }
         },
         {
           "if": {
-            "required": ["voice_provider", "voice_id"],
+            "required": [
+              "voice_provider",
+              "voice_id"
+            ],
             "properties": {
-              "voice_provider": { "const": "qwen3" },
-              "voice_id": { "enum": ["Cherry", "Serena"] }
+              "voice_provider": {
+                "const": "qwen3"
+              },
+              "voice_id": {
+                "enum": [
+                  "Cherry",
+                  "Serena"
+                ]
+              }
             }
           },
           "then": {
             "properties": {
-              "voice_gender": { "const": "female" }
+              "voice_gender": {
+                "const": "female"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "voice_provider"
+            ],
+            "properties": {
+              "voice_provider": {
+                "const": "minimax"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "voice_model": {
+                "const": "speech-2.8-hd"
+              },
+              "voice_id": {
+                "enum": [
+                  "male-qn-badao",
+                  "presenter_male",
+                  "male-qn-jingying",
+                  "male-qn-daxuesheng",
+                  "male-qn-qingse"
+                ]
+              },
+              "voice_gender": {
+                "const": "male"
+              }
             }
           }
         }
@@ -205,8 +306,12 @@
       "properties": {
         "voice_provider": {
           "type": "string",
-          "enum": ["qwen3", "openai"],
-          "description": "Instruction-capable TTS provider the asset stage must use for ALL narration sections. qwen3 routes through cosyvoice_tts/DashScope; openai routes through openai_tts. CosyVoice-family and ElevenLabs models are excluded until their tools can consume locked delivery instructions."
+          "enum": [
+            "qwen3",
+            "openai",
+            "minimax"
+          ],
+          "description": "Instruction-capable TTS provider the asset stage must use for ALL narration sections. qwen3 routes through cosyvoice_tts/DashScope; openai routes through openai_tts. CosyVoice-family and ElevenLabs models are excluded until their tools can consume locked delivery instructions. minimax routes through minimax_tts (speech-2.8-hd) when qwen3 male voices render feminine and OpenAI is unavailable; user-approved per decision_log voice_selection."
         },
         "voice_id": {
           "type": "string",
@@ -214,12 +319,22 @@
         },
         "voice_model": {
           "type": "string",
-          "enum": ["qwen3-tts-instruct-flash", "gpt-4o-mini-tts"],
+          "enum": [
+            "qwen3-tts-instruct-flash",
+            "gpt-4o-mini-tts",
+            "speech-2.8-hd"
+          ],
           "description": "Provider-specific instruction-capable TTS model. qwen3 requires qwen3-tts-instruct-flash; openai requires gpt-4o-mini-tts. Do not use qwen3-tts-flash, qwen3-tts-instruct, or CosyVoice-family models when speaker_directions or voice_performance must reach the model."
         },
         "voice_gender": {
           "type": "string",
-          "enum": ["female", "male", "neutral", "mixed", "unspecified"],
+          "enum": [
+            "female",
+            "male",
+            "neutral",
+            "mixed",
+            "unspecified"
+          ],
           "description": "User-approved perceived voice gender/register. Must match the selected voice and production_bible.audio.voice_character."
         },
         "voice_persona": {
@@ -328,7 +443,10 @@
         },
         "typography_pairing": {
           "type": "object",
-          "required": ["display", "body"],
+          "required": [
+            "display",
+            "body"
+          ],
           "additionalProperties": false,
           "properties": {
             "display": {
@@ -343,25 +461,35 @@
         },
         "color_rhythm": {
           "type": "string",
-          "enum": ["intentional-rotation", "held-accent", "gradient-shift"],
+          "enum": [
+            "intentional-rotation",
+            "held-accent",
+            "gradient-shift"
+          ],
           "description": "How color is paced across beats."
         },
         "atmosphere": {
           "type": "object",
-          "required": ["default_layers"],
+          "required": [
+            "default_layers"
+          ],
           "additionalProperties": false,
           "properties": {
             "default_layers": {
               "type": "array",
               "description": "Style layers applied to every scene unless overridden.",
-              "items": { "type": "object" }
+              "items": {
+                "type": "object"
+              }
             },
             "per_beat_overrides": {
               "type": "object",
               "description": "Map of beat-id (B1, B2, ...) to layer overrides for that beat.",
               "additionalProperties": {
                 "type": "array",
-                "items": { "type": "object" }
+                "items": {
+                  "type": "object"
+                }
               }
             }
           }
@@ -369,7 +497,9 @@
         "anti_template_checklist": {
           "type": "array",
           "minItems": 1,
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Concrete anti-template assertions the scene/asset/compose stages must satisfy."
         },
         "visual_asset_provider_locks": {
@@ -378,12 +508,19 @@
           "description": "User-visible image/video generation provider locks approved at proposal time. provider_consistency_check compares visual asset source_tool/model against these locks before compose.",
           "items": {
             "type": "object",
-            "required": ["asset_type", "source_tool"],
+            "required": [
+              "asset_type",
+              "source_tool"
+            ],
             "additionalProperties": false,
             "properties": {
               "asset_type": {
                 "type": "string",
-                "enum": ["image", "video", "animation"],
+                "enum": [
+                  "image",
+                  "video",
+                  "animation"
+                ],
                 "description": "Asset manifest type this provider lock covers."
               },
               "source_tool": {
