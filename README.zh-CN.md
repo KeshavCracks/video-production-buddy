@@ -18,7 +18,8 @@
   <a href="#能力">🧩 能力</a> &nbsp;·&nbsp;
   <a href="#社区与讨论">💬 讨论</a> &nbsp;·&nbsp;
   <a href="#参与贡献">🤝 贡献</a> &nbsp;·&nbsp;
-  <a href="#引用">📚 引用</a>
+  <a href="#引用">📚 引用</a> &nbsp;·&nbsp;
+  <a href="#致谢">🙏 致谢</a>
 </p>
 
 <p align="center">

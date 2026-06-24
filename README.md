@@ -18,7 +18,8 @@
   <a href="#capabilities">🧩 Capabilities</a> &nbsp;·&nbsp;
   <a href="#community-and-discussion">💬 Community</a> &nbsp;·&nbsp;
   <a href="#contributing">🤝 Contribute</a> &nbsp;·&nbsp;
-  <a href="#citation">📚 Citation</a>
+  <a href="#citation">📚 Citation</a> &nbsp;·&nbsp;
+  <a href="#acknowledgements">🙏 Acknowledgements</a>
 </p>
 
 <p align="center">
