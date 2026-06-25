@@ -18,6 +18,7 @@
   <a href="#capabilities">🧩 Capabilities</a> &nbsp;·&nbsp;
   <a href="#community-and-discussion">💬 Community</a> &nbsp;·&nbsp;
   <a href="#contributing">🤝 Contribute</a> &nbsp;·&nbsp;
+  <a href="docs/PR_REVIEW_GUIDE.md">🔎 Review Guide</a> &nbsp;·&nbsp;
   <a href="#citation">📚 Citation</a> &nbsp;·&nbsp;
   <a href="#acknowledgements">🙏 Acknowledgements</a>
 </p>
@@ -320,7 +321,8 @@ Pull request checklist:
 3. Add or update focused tests for code, schema, manifest, or tool-contract changes.
 4. Run `git diff --check -- README.md README.zh-CN.md` for README-only changes.
 5. Run `make test-contracts` for manifest, schema, tool registry, pipeline, or agent-instruction changes.
-6. In the PR, summarize the user-facing impact, list verification commands, and include screenshots or demo links for visual README changes.
+6. Use [`docs/PR_REVIEW_GUIDE.md`](docs/PR_REVIEW_GUIDE.md) to check architecture, provider, security, dependency, and docs risks before requesting review.
+7. In the PR, summarize the user-facing impact, list verification commands, and include screenshots or demo links for visual README changes.
 
 ## Architecture
 
@@ -328,6 +330,7 @@ Pull request checklist:
 |------|---------|
 | `AGENT_GUIDE.md` | Operating contract for production agents. |
 | `PROJECT_CONTEXT.md` | Shared architecture and development overview. |
+| `docs/PR_REVIEW_GUIDE.md` | Review framework for pull requests, provider changes, runtime changes, and documentation claims. |
 | `pipeline_defs/` | Declarative video production pipelines. |
 | `skills/` | Stage directors, creative guidance, review protocols, and workflow rules. |
 | `tools/` | Provider tools, analysis tools, media processing, composition, validation, and cost tracking. |
@@ -393,8 +396,19 @@ If you find Video Production Buddy useful, please star and cite our project, tha
 }
 ```
 
+Video Production Buddy is built on the open-source [OpenMontage](https://github.com/calesthio/OpenMontage) project. When citing or building on this repository, please also acknowledge OpenMontage:
+
+```bibtex
+@software{calesthio2026openmontage,
+  title = {OpenMontage},
+  author = {{Calesthio}},
+  year = {2026},
+  url = {https://github.com/calesthio/OpenMontage}
+}
+```
+
 ## Acknowledgements
 
 Video Production Buddy is developed by the [AI4GC Lab](https://ai4gc.org/) at Zhejiang University.
 
-Our code is based off the excellent [OpenMontage codebase](https://github.com/calesthio/OpenMontage).
+The codebase builds on the excellent [OpenMontage](https://github.com/calesthio/OpenMontage) project; we are grateful for its open-source architecture and implementation foundation.

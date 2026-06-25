@@ -21,15 +21,20 @@ FORBIDDEN_PATTERNS = (
 
 ALLOWED_LINE_PATTERNS = {
     "README.md": (
-        re.compile(r"built from and adapted from \[" + LEGACY_PROPER + r"\]"),
-        re.compile(
-            r"Our code is based off the excellent \["
-            + LEGACY_PROPER
-            + r" codebase\]"
-        ),
+        re.compile(r"built on the open-source \[" + LEGACY_PROPER + r"\]"),
+        re.compile(r"please also acknowledge " + LEGACY_PROPER),
+        re.compile(r"@software\{calesthio2026" + LEGACY_LOWER + r","),
+        re.compile(r"title = \{" + LEGACY_PROPER + r"\},"),
+        re.compile(r"github\.com/calesthio/" + LEGACY_PROPER),
+        re.compile(r"builds on the excellent \[" + LEGACY_PROPER + r"\]"),
     ),
     "README.zh-CN.md": (
-        re.compile(r"我们的代码基于优秀的 \[" + LEGACY_PROPER + r" codebase\]"),
+        re.compile(r"织影基于开源项目 \[" + LEGACY_PROPER + r"\]"),
+        re.compile(r"同时致谢 " + LEGACY_PROPER),
+        re.compile(r"@software\{calesthio2026" + LEGACY_LOWER + r","),
+        re.compile(r"title = \{" + LEGACY_PROPER + r"\},"),
+        re.compile(r"github\.com/calesthio/" + LEGACY_PROPER),
+        re.compile(r"本代码库基于优秀的 \[" + LEGACY_PROPER + r"\]"),
     ),
     "tests/contracts/test_project_identity.py": (
         re.compile(r"LEGACY_"),

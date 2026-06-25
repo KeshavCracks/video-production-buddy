@@ -87,6 +87,7 @@ snapshots, or components whose upstream path has not been verified yet.
 | `project_profile/hyperframes.md` | HyperFrames CJK font packaging and video-heavy render findings |
 | `project_profile/update_checklist.md` | Checklist for safe project-profile updates |
 | `project_profile/migration_audit.md` | Record of migrated agent-side guidance and intentionally non-migrated local history |
+| `docs/PR_REVIEW_GUIDE.md` | Review framework for PR architecture, provider, runtime, dependency, security, and docs risks |
 | `config.yaml` | Global configuration |
 | `lib/config_model.py` | Runtime config loader (Pydantic) |
 | `lib/checkpoint.py` | Checkpoint writer/reader |

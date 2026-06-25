@@ -18,6 +18,7 @@
   <a href="#能力">🧩 能力</a> &nbsp;·&nbsp;
   <a href="#社区与讨论">💬 讨论</a> &nbsp;·&nbsp;
   <a href="#参与贡献">🤝 贡献</a> &nbsp;·&nbsp;
+  <a href="docs/PR_REVIEW_GUIDE.md">🔎 Review 指南</a> &nbsp;·&nbsp;
   <a href="#引用">📚 引用</a> &nbsp;·&nbsp;
   <a href="#致谢">🙏 致谢</a>
 </p>
@@ -319,7 +320,8 @@ Pull request checklist：
 3. 对代码、schema、manifest 或 tool-contract 改动添加或更新聚焦测试。
 4. 仅修改 README 时运行 `git diff --check -- README.md README.zh-CN.md`。
 5. 修改 manifest、schema、tool registry、pipeline 或 agent instructions 时运行 `make test-contracts`。
-6. 在 PR 中说明用户可见影响、列出验证命令；视觉类 README 改动请附截图或 demo 链接。
+6. 请求 review 前，用 [`docs/PR_REVIEW_GUIDE.md`](docs/PR_REVIEW_GUIDE.md) 检查架构、provider、安全、依赖和文档声明风险。
+7. 在 PR 中说明用户可见影响、列出验证命令；视觉类 README 改动请附截图或 demo 链接。
 
 ## 架构
 
@@ -327,6 +329,7 @@ Pull request checklist：
 |------|------|
 | `AGENT_GUIDE.md` | 生产 agent 的操作契约。 |
 | `PROJECT_CONTEXT.md` | 共享架构和开发概览。 |
+| `docs/PR_REVIEW_GUIDE.md` | PR、provider 变更、runtime 变更和文档声明的 review 框架。 |
 | `pipeline_defs/` | 声明式视频制作 pipelines。 |
 | `skills/` | 阶段导演、创意指导、复核协议和 workflow 规则。 |
 | `tools/` | Provider 工具、分析工具、媒体处理、合成、校验和成本记录。 |
@@ -392,8 +395,19 @@ make test
 }
 ```
 
+织影基于开源项目 [OpenMontage](https://github.com/calesthio/OpenMontage) 开发。如果引用或基于本项目继续开发，也请同时致谢 OpenMontage：
+
+```bibtex
+@software{calesthio2026openmontage,
+  title = {OpenMontage},
+  author = {{Calesthio}},
+  year = {2026},
+  url = {https://github.com/calesthio/OpenMontage}
+}
+```
+
 ## 致谢
 
 织影由浙江大学 [AI4GC Lab](https://ai4gc.org/) 开发。
 
-我们的代码基于优秀的 [OpenMontage codebase](https://github.com/calesthio/OpenMontage)。
+本代码库基于优秀的 [OpenMontage](https://github.com/calesthio/OpenMontage) 项目构建；感谢其开源架构与实现基础。
