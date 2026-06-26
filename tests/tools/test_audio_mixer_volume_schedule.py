@@ -2,18 +2,14 @@
 volume envelope on the music track in place of static sidechain ducking.
 
 These tests intercept ``run_command`` so they do not require a working FFmpeg
-binary or any sample audio. The full FFmpeg roundtrip is exercised by the
-end-to-end integration test in test_audio_mixer_volume_schedule_e2e.py.
+binary or any sample audio. Real FFmpeg coverage lives in
+tests/integration/test_ffmpeg_media_smoke.py.
 """
 
-import sys
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
 
 from tools.audio.audio_mixer import AudioMixer
 

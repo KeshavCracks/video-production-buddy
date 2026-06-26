@@ -1,6 +1,8 @@
 PYTHON ?= python3
 
-.PHONY: setup install install-dev install-gpu install-remotion test test-contracts genui-verify genui-evidence-check lint clean preflight preflight-full demo demo-list hyperframes-doctor hyperframes-warm
+.PHONY: setup install install-dev install-gpu install-remotion test test-contracts test-integration test-qa genui-verify genui-evidence-check lint clean preflight preflight-full demo demo-list hyperframes-doctor hyperframes-warm
+
+DEFAULT_TEST_MARKERS := not integration and not qa and not browser and not ffmpeg and not node and not hyperframes and not slow and not live_provider
 
 # ---- One-command setup ----
 
@@ -57,16 +59,22 @@ install-remotion:
 # ---- Testing ----
 
 test:
-	VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -p no:cacheprovider tests/ -v
+	VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -p no:cacheprovider -m "$(DEFAULT_TEST_MARKERS)" tests/ -v
 
 test-contracts:
-	VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -p no:cacheprovider tests/contracts/ -v
+	VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -p no:cacheprovider -m "$(DEFAULT_TEST_MARKERS)" tests/contracts/ -v
+
+test-integration:
+	VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -p no:cacheprovider -m "integration" tests/ -v
+
+test-qa:
+	VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -p no:cacheprovider -m "qa" tests/ -v
 
 genui-verify:
 	VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -p no:cacheprovider -q tests/contracts/test_genui_session_contract.py tests/contracts/test_genui_dynamic_interaction.py tests/contracts/test_genui_interaction_contract.py tests/contracts/test_genui_surface_contract.py
 	VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -p no:cacheprovider -q tests/contracts/test_genui_session_hardening.py
 	VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -p no:cacheprovider -q tests/contracts/test_genui_product_contract.py
-	VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -p no:cacheprovider -q tests/tools/test_genui_surface_browser.py
+	VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 $(PYTHON) -m pytest -p no:cacheprovider -m "browser" -q tests/integration/test_genui_browser_smoke.py
 	VPB_ALLOW_BROWSER_OPEN=0 pnpm --dir genui-renderer test
 	pnpm --dir genui-renderer typecheck
 	@before=$$(mktemp); after=$$(mktemp); \

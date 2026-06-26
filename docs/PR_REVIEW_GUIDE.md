@@ -514,10 +514,10 @@ small doc fix, but do require evidence for changed behavior.
 Common checks:
 
 ```bash
-python -m pytest tests/contracts -q
-python -m pytest tests/tools -q
-python -m pytest tests/qa -q
-python -m py_compile path/to/changed_file.py
+VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider tests/contracts -q
+VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider tests/tools -q
+VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider -m "integration" tests -q
+PYTHONDONTWRITEBYTECODE=1 python -m py_compile path/to/changed_file.py
 ```
 
 For provider PRs, focused mocked tests are often better than expensive live API

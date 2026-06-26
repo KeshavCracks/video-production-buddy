@@ -304,7 +304,7 @@ def _trend_threaded_scene_plan(source_ref: str = "trend_alignment:trend-tiktok-l
 
 def test_ad_video_planning_chain_check_rejects_unthreaded_selected_trends() -> None:
     """The pre-asset gate must fail when selected trends stop at the bible."""
-    from tests.contracts.test_artifact_chain import PRODUCTION_BIBLE_VALID
+    from tests.contracts.test_ad_video_chain_integrity import PRODUCTION_BIBLE_VALID
     from tools.validation.ad_video_planning_chain_check import AdVideoPlanningChainCheck
 
     bible = deepcopy(PRODUCTION_BIBLE_VALID)
@@ -350,7 +350,7 @@ def test_ad_video_planning_chain_check_rejects_unthreaded_selected_trends() -> N
 
 def test_ad_video_planning_chain_check_rejects_unthreaded_selected_knowledge() -> None:
     """The pre-asset gate must fail when selected producer knowledge stops at the bible."""
-    from tests.contracts.test_artifact_chain import PRODUCTION_BIBLE_VALID
+    from tests.contracts.test_ad_video_chain_integrity import PRODUCTION_BIBLE_VALID
     from tools.validation.ad_video_planning_chain_check import AdVideoPlanningChainCheck
 
     bible = deepcopy(PRODUCTION_BIBLE_VALID)
@@ -456,7 +456,7 @@ def test_ad_video_planning_chain_check_rejects_knowledge_card_load_failure(monke
 
 def test_ad_video_planning_chain_check_accepts_fresh_threaded_chain() -> None:
     """A fresh planning chain with selected trends in bible, script, and scene plan passes."""
-    from tests.contracts.test_artifact_chain import PRODUCTION_BIBLE_VALID
+    from tests.contracts.test_ad_video_chain_integrity import PRODUCTION_BIBLE_VALID
     from tools.validation.ad_video_planning_chain_check import AdVideoPlanningChainCheck
 
     result = AdVideoPlanningChainCheck().execute({

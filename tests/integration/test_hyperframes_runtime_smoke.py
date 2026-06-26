@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""QA Test 09: HyperFrames end-to-end — scaffold + lint + validate + render.
+"""HyperFrames opt-in runtime smoke: scaffold + lint + validate + render.
 
 This test hits the real HyperFrames CLI via `npx hyperframes`. On first
 run, npm fetches the published `hyperframes` package (slow — ~30-90s)
@@ -20,13 +20,20 @@ from __future__ import annotations
 
 import os
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.qa,
+    pytest.mark.hyperframes,
+    pytest.mark.node,
+    pytest.mark.ffmpeg,
+    pytest.mark.browser,
+    pytest.mark.slow,
+]
 
 
 from tools.video.hyperframes_compose import HyperFramesCompose

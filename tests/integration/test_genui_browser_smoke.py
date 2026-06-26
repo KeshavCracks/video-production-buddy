@@ -6,6 +6,9 @@ from pathlib import Path
 import pytest
 
 
+pytestmark = [pytest.mark.integration, pytest.mark.browser]
+
+
 LOCAL_SERVER_TIMEOUT_SECONDS = 5.0
 
 

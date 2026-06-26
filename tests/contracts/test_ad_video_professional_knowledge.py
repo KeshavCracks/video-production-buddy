@@ -89,7 +89,7 @@ def test_ad_video_knowledge_card_loader_rejects_non_strict_json(tmp_path) -> Non
 
 def test_bm25_retrieval_returns_relevant_cards_with_stable_source_refs() -> None:
     from lib.ad_knowledge import retrieve_ad_knowledge
-    from tests.contracts.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
+    from tests.contracts.test_ad_video_chain_integrity import INTELLIGENCE_BRIEF_VALID
 
     result = retrieve_ad_knowledge(
         {
@@ -195,7 +195,7 @@ def test_knowledge_retriever_tool_reports_invalid_top_k_as_failed_result() -> No
 
 
 def test_intelligence_brief_schema_requires_professional_knowledge_block() -> None:
-    from tests.contracts.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
+    from tests.contracts.test_ad_video_chain_integrity import INTELLIGENCE_BRIEF_VALID
 
     validate_artifact("intelligence_brief", deepcopy(INTELLIGENCE_BRIEF_VALID))
 
@@ -211,7 +211,7 @@ def test_intelligence_brief_schema_requires_professional_knowledge_block() -> No
 
 
 def test_intelligence_brief_rejects_duplicate_professional_knowledge_card_ids() -> None:
-    from tests.contracts.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
+    from tests.contracts.test_ad_video_chain_integrity import INTELLIGENCE_BRIEF_VALID
 
     brief = deepcopy(INTELLIGENCE_BRIEF_VALID)
     duplicate = deepcopy(brief["professional_knowledge"]["cards_used"][0])
@@ -223,7 +223,7 @@ def test_intelligence_brief_rejects_duplicate_professional_knowledge_card_ids() 
 
 
 def test_intelligence_brief_rejects_professional_knowledge_source_ref_mismatch() -> None:
-    from tests.contracts.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
+    from tests.contracts.test_ad_video_chain_integrity import INTELLIGENCE_BRIEF_VALID
 
     brief = deepcopy(INTELLIGENCE_BRIEF_VALID)
     brief["professional_knowledge"]["cards_used"][0][
@@ -235,7 +235,7 @@ def test_intelligence_brief_rejects_professional_knowledge_source_ref_mismatch()
 
 
 def test_intelligence_brief_rejects_recommendations_for_unknown_cards() -> None:
-    from tests.contracts.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
+    from tests.contracts.test_ad_video_chain_integrity import INTELLIGENCE_BRIEF_VALID
 
     brief = deepcopy(INTELLIGENCE_BRIEF_VALID)
     brief["professional_knowledge"]["application_recommendations"][0][
@@ -247,7 +247,7 @@ def test_intelligence_brief_rejects_recommendations_for_unknown_cards() -> None:
 
 
 def test_intelligence_brief_rejects_contraindications_for_unknown_cards() -> None:
-    from tests.contracts.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
+    from tests.contracts.test_ad_video_chain_integrity import INTELLIGENCE_BRIEF_VALID
 
     brief = deepcopy(INTELLIGENCE_BRIEF_VALID)
     brief["professional_knowledge"]["contraindications"][0][
@@ -259,7 +259,7 @@ def test_intelligence_brief_rejects_contraindications_for_unknown_cards() -> Non
 
 
 def test_intelligence_brief_rejects_duplicate_trend_ids_when_present() -> None:
-    from tests.contracts.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
+    from tests.contracts.test_ad_video_chain_integrity import INTELLIGENCE_BRIEF_VALID
 
     brief = deepcopy(INTELLIGENCE_BRIEF_VALID)
     brief["platform_trends"][0]["trend_id"] = "trend-fast-hook"
@@ -270,7 +270,7 @@ def test_intelligence_brief_rejects_duplicate_trend_ids_when_present() -> None:
 
 
 def test_ad_video_intelligence_rejects_research_grounded_contradiction_without_challenge_evidence() -> None:
-    from tests.contracts.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
+    from tests.contracts.test_ad_video_chain_integrity import INTELLIGENCE_BRIEF_VALID
 
     brief = deepcopy(INTELLIGENCE_BRIEF_VALID)
     brief["dimension_verdicts"] = [
@@ -296,7 +296,7 @@ def test_ad_video_intelligence_rejects_research_grounded_contradiction_without_c
 def test_ad_video_intelligence_rejects_generic_research_grounded_challenge_evidence(
     challenge_evidence: str,
 ) -> None:
-    from tests.contracts.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
+    from tests.contracts.test_ad_video_chain_integrity import INTELLIGENCE_BRIEF_VALID
 
     brief = deepcopy(INTELLIGENCE_BRIEF_VALID)
     brief["dimension_verdicts"] = [
@@ -323,7 +323,7 @@ def test_ad_video_intelligence_rejects_generic_research_grounded_challenge_evide
 def test_ad_video_intelligence_accepts_specific_research_grounded_challenge_evidence(
     challenge_evidence: str,
 ) -> None:
-    from tests.contracts.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
+    from tests.contracts.test_ad_video_chain_integrity import INTELLIGENCE_BRIEF_VALID
 
     brief = deepcopy(INTELLIGENCE_BRIEF_VALID)
     brief["dimension_verdicts"] = [
@@ -339,7 +339,7 @@ def test_ad_video_intelligence_accepts_specific_research_grounded_challenge_evid
 
 
 def test_ad_video_intelligence_rejects_default_heuristic_contradiction() -> None:
-    from tests.contracts.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
+    from tests.contracts.test_ad_video_chain_integrity import INTELLIGENCE_BRIEF_VALID
 
     brief = deepcopy(INTELLIGENCE_BRIEF_VALID)
     brief["dimension_verdicts"] = [
@@ -355,8 +355,8 @@ def test_ad_video_intelligence_rejects_default_heuristic_contradiction() -> None
 
 
 def test_ad_video_intelligence_verdicts_cover_enriched_brief_hypotheses() -> None:
-    from tests.contracts.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
-    from tests.contracts.test_schemas_preproduction import _minimal_enriched_brief
+    from tests.contracts.test_ad_video_chain_integrity import INTELLIGENCE_BRIEF_VALID
+    from tests.contracts.test_ad_video_schema_contracts import _minimal_enriched_brief
 
     enriched = _minimal_enriched_brief()
     enriched["user_approved"] = True
@@ -396,8 +396,8 @@ def test_ad_video_intelligence_verdicts_cover_enriched_brief_hypotheses() -> Non
 
 
 def test_ad_video_intelligence_verdicts_do_not_challenge_from_brief_dimensions() -> None:
-    from tests.contracts.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
-    from tests.contracts.test_schemas_preproduction import _minimal_enriched_brief
+    from tests.contracts.test_ad_video_chain_integrity import INTELLIGENCE_BRIEF_VALID
+    from tests.contracts.test_ad_video_schema_contracts import _minimal_enriched_brief
 
     enriched = _minimal_enriched_brief()
     enriched["user_approved"] = True
@@ -436,8 +436,8 @@ def test_ad_video_intelligence_verdicts_do_not_challenge_from_brief_dimensions()
 
 
 def test_ad_video_intelligence_rejects_from_brief_verdicts_even_without_hypotheses() -> None:
-    from tests.contracts.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
-    from tests.contracts.test_schemas_preproduction import _minimal_enriched_brief
+    from tests.contracts.test_ad_video_chain_integrity import INTELLIGENCE_BRIEF_VALID
+    from tests.contracts.test_ad_video_schema_contracts import _minimal_enriched_brief
 
     enriched = _minimal_enriched_brief()
     enriched["user_approved"] = True
@@ -462,7 +462,7 @@ def test_ad_video_intelligence_rejects_from_brief_verdicts_even_without_hypothes
 
 
 def test_production_bible_schema_requires_knowledge_alignment_block() -> None:
-    from tests.contracts.test_artifact_chain import PRODUCTION_BIBLE_VALID
+    from tests.contracts.test_ad_video_chain_integrity import PRODUCTION_BIBLE_VALID
 
     validate_artifact("production_bible", deepcopy(PRODUCTION_BIBLE_VALID))
 
@@ -478,7 +478,7 @@ def test_production_bible_schema_requires_knowledge_alignment_block() -> None:
 
 
 def test_production_bible_schema_accepts_knowledge_cross_domain_notes() -> None:
-    from tests.contracts.test_artifact_chain import PRODUCTION_BIBLE_VALID
+    from tests.contracts.test_ad_video_chain_integrity import PRODUCTION_BIBLE_VALID
 
     bible = deepcopy(PRODUCTION_BIBLE_VALID)
     bible["intelligence"]["knowledge_alignment"]["alignments"][0][
@@ -854,7 +854,7 @@ def test_retrieval_exposes_deep_card_guidance_for_bible_director() -> None:
 
 
 def test_intelligence_brief_schema_accepts_card_cross_domain_notes() -> None:
-    from tests.contracts.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
+    from tests.contracts.test_ad_video_chain_integrity import INTELLIGENCE_BRIEF_VALID
 
     brief = deepcopy(INTELLIGENCE_BRIEF_VALID)
     brief["professional_knowledge"]["cards_used"][0]["cross_domain_notes"] = [
@@ -868,7 +868,7 @@ def test_intelligence_brief_schema_accepts_card_cross_domain_notes() -> None:
 
 
 def test_intelligence_brief_schema_accepts_card_deep_guidance() -> None:
-    from tests.contracts.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
+    from tests.contracts.test_ad_video_chain_integrity import INTELLIGENCE_BRIEF_VALID
 
     brief = deepcopy(INTELLIGENCE_BRIEF_VALID)
 
@@ -880,7 +880,7 @@ def test_intelligence_brief_schema_accepts_card_deep_guidance() -> None:
     ["principles", "avoid_when", "failure_patterns", "execution_techniques"],
 )
 def test_intelligence_brief_schema_requires_card_deep_guidance(field: str) -> None:
-    from tests.contracts.test_artifact_chain import INTELLIGENCE_BRIEF_VALID
+    from tests.contracts.test_ad_video_chain_integrity import INTELLIGENCE_BRIEF_VALID
 
     brief = deepcopy(INTELLIGENCE_BRIEF_VALID)
     del brief["professional_knowledge"]["cards_used"][0][field]
@@ -891,7 +891,7 @@ def test_intelligence_brief_schema_requires_card_deep_guidance(field: str) -> No
 
 def test_production_bible_accepts_all_knowledge_downstream_targets() -> None:
     from lib.ad_knowledge import load_ad_knowledge_cards
-    from tests.contracts.test_artifact_chain import PRODUCTION_BIBLE_VALID
+    from tests.contracts.test_ad_video_chain_integrity import PRODUCTION_BIBLE_VALID
 
     cards = load_ad_knowledge_cards()
     all_downstream_targets = sorted(

@@ -307,7 +307,7 @@ def test_genui_verify_target_documents_product_workflow():
     assert "genui-verify:" in makefile
     assert "tests/contracts/test_genui_session_contract.py" in makefile
     assert "tests/contracts/test_genui_session_hardening.py" in makefile
-    assert "tests/tools/test_genui_surface_browser.py" in makefile
+    assert "tests/integration/test_genui_browser_smoke.py" in makefile
     assert "pnpm --dir genui-renderer test" in makefile
     assert "pnpm --dir genui-renderer typecheck" in makefile
     assert "pnpm --dir genui-renderer build" in makefile

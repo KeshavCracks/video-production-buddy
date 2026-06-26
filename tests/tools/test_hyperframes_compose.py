@@ -3,7 +3,7 @@
 These tests do NOT invoke the HyperFrames CLI — they verify schema
 acceptance, tool contract wiring, governance routing in video_compose, the
 style bridge, and workspace scaffolding. Subprocess-based smoke tests live
-in tests/qa/test_09_hyperframes_compose.py and are opt-in.
+under tests/integration/ and are opt-in.
 """
 
 from __future__ import annotations
@@ -454,6 +454,10 @@ def test_hyperframes_doctor_cli_payload_matches_output_schema(
         jsonschema.validate(instance=malformed_payload, schema=tool.output_schema)
 
 
+@pytest.mark.integration
+@pytest.mark.node
+@pytest.mark.ffmpeg
+@pytest.mark.hyperframes
 def test_runtime_check_succeeds_when_npm_resolves(monkeypatch):
     monkeypatch.setattr(
         HyperFramesCompose, "_npm_resolve_cache", None, raising=False
@@ -467,6 +471,8 @@ def test_runtime_check_succeeds_when_npm_resolves(monkeypatch):
     # Local binaries must still pass for this to go green.
     if rc["node_major"] is None or not rc["ffmpeg_available"] or not rc["npx_available"]:
         pytest.skip("Local runtime floor not met on this machine")
+    if not rc["runtime_available"]:
+        pytest.skip("HyperFrames runtime is not available on this machine")
     assert rc["runtime_available"] is True
     assert rc["npm_package_version"] == "0.4.5"
     assert rc["reasons"] == []
@@ -2853,6 +2859,8 @@ def test_video_compose_idempotency_key_includes_hyperframes_render_options():
     } <= fields
 
 
+@pytest.mark.integration
+@pytest.mark.ffmpeg
 def test_runtime_swap_detected_flips_when_proposal_packet_disagrees(tmp_path):
     """Regression: runtime_swap_detected was previously dead code because the
     check read a metadata field no one writes. The fix accepts
@@ -2898,6 +2906,8 @@ def test_runtime_swap_detected_flips_when_proposal_packet_disagrees(tmp_path):
     assert review["recommended_action"] != "present_to_user"
 
 
+@pytest.mark.integration
+@pytest.mark.ffmpeg
 def test_runtime_swap_detected_flips_when_production_proposal_disagrees(tmp_path):
     import subprocess
 
@@ -2932,6 +2942,8 @@ def test_runtime_swap_detected_flips_when_production_proposal_disagrees(tmp_path
     assert "production_proposal.render_runtime" in pp["runtime_swap_check"]
 
 
+@pytest.mark.integration
+@pytest.mark.ffmpeg
 def test_final_review_honors_approved_runtime_decision_log_swap(tmp_path):
     import subprocess
 
@@ -2997,6 +3009,8 @@ def test_final_review_honors_approved_runtime_decision_log_swap(tmp_path):
     assert review["status"] == "pass"
 
 
+@pytest.mark.integration
+@pytest.mark.ffmpeg
 def test_runtime_swap_detected_flips_when_brief_metadata_disagrees(tmp_path):
     import subprocess
 
@@ -3027,6 +3041,8 @@ def test_runtime_swap_detected_flips_when_brief_metadata_disagrees(tmp_path):
     assert "brief.metadata.render_runtime" in pp["runtime_swap_check"]
 
 
+@pytest.mark.integration
+@pytest.mark.ffmpeg
 def test_brief_runtime_lock_prefers_direct_metadata_over_legacy_nested_plan(tmp_path):
     import subprocess
 
@@ -3065,6 +3081,8 @@ def test_brief_runtime_lock_prefers_direct_metadata_over_legacy_nested_plan(tmp_
     assert "brief.metadata.production_plan.render_runtime" not in pp["runtime_swap_check"]
 
 
+@pytest.mark.integration
+@pytest.mark.ffmpeg
 def test_final_review_revises_when_brief_runtime_lock_missing(tmp_path):
     import subprocess
 
@@ -3098,6 +3116,8 @@ def test_final_review_revises_when_brief_runtime_lock_missing(tmp_path):
     assert review["status"] == "revise"
 
 
+@pytest.mark.integration
+@pytest.mark.ffmpeg
 def test_runtime_swap_detected_stays_false_when_proposal_matches(tmp_path):
     import subprocess
 
@@ -3413,6 +3433,8 @@ def test_transcript_comparison_graceful_when_inputs_missing(tmp_path):
     assert any("not provided" in i for i in result["issues"])
 
 
+@pytest.mark.integration
+@pytest.mark.ffmpeg
 def test_run_final_review_includes_transcript_comparison_section(tmp_path):
     """Regression: the `transcript_comparison` section must ALWAYS appear in
     the final_review output — even when the caller doesn't provide a
@@ -3452,6 +3474,8 @@ def test_run_final_review_includes_transcript_comparison_section(tmp_path):
     validate_artifact("final_review", review)
 
 
+@pytest.mark.integration
+@pytest.mark.ffmpeg
 def test_run_final_review_payload_validates_for_ad_video_context(tmp_path):
     import subprocess
     from schemas.artifacts import validate_artifact
@@ -3522,6 +3546,8 @@ def test_run_final_review_payload_validates_for_ad_video_context(tmp_path):
     )
 
 
+@pytest.mark.integration
+@pytest.mark.ffmpeg
 def test_run_final_review_does_not_mark_narration_as_music_when_strategy_none(tmp_path):
     import subprocess
 
@@ -3561,6 +3587,8 @@ def test_run_final_review_does_not_mark_narration_as_music_when_strategy_none(tm
     assert review["checks"]["audio_spotcheck"]["music_present"] is False
 
 
+@pytest.mark.integration
+@pytest.mark.ffmpeg
 def test_run_final_review_validates_without_delivery_promise_metadata(tmp_path):
     import subprocess
     from schemas.artifacts import validate_artifact
@@ -3601,6 +3629,8 @@ def test_run_final_review_validates_without_delivery_promise_metadata(tmp_path):
     validate_artifact("final_review", review, pipeline_type="ad-video")
 
 
+@pytest.mark.integration
+@pytest.mark.ffmpeg
 def test_final_review_flags_audio_truncation_as_rerender_issue(tmp_path):
     import subprocess
 

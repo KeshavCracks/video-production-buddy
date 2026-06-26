@@ -16,18 +16,10 @@ Run: VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:c
 """
 
 import json
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-
+import jsonschema
 import yaml
-
-try:
-    import jsonschema
-    HAS_JSONSCHEMA = True
-except ImportError:
-    HAS_JSONSCHEMA = False
 
 ROOT = Path(__file__).resolve().parent.parent.parent
 MANIFEST_PATH = ROOT / "pipeline_defs" / "ad-video.yaml"
@@ -125,9 +117,6 @@ def test_manifest_has_required_top_level_fields():
 
 def test_manifest_validates_against_json_schema():
     """Manifest validates against pipeline_manifest.schema.json."""
-    if not HAS_JSONSCHEMA:
-        print("  [SKIP] jsonschema not installed")
-        return
     m = load_manifest()
     with open(MANIFEST_SCHEMA_PATH) as f:
         schema = json.load(f)
