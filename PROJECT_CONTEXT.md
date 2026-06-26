@@ -118,7 +118,7 @@ snapshots, or components whose upstream path has not been verified yet.
 | `.agents/skills/hyperframes*/` | Generated HyperFrames Layer 3 compatibility paths (authoring contract, CLI, registry, website-to-video) |
 | `skills/core/hyperframes.md` | Layer 2 — when Video Production Buddy should pick HyperFrames vs Remotion, artifact → workspace mapping |
 | `schemas/styles/playbook.schema.json` | Playbook schema v2 with design tokens (chart_palette, scale_system, weight_matrix, color_rules) |
-| `tests/qa/` | Quality validation test scripts for tool-by-tool output inspection |
+| `tests/integration/` | Opt-in local runtime smoke tests for FFmpeg/browser/Node/HyperFrames behavior |
 
 ## Available Pipelines
 

@@ -319,7 +319,7 @@ Pull request checklist：
 2. 如果改动影响安装、runtime、provider 或 demos，请运行本 README 中的 setup path。
 3. 对代码、schema、manifest 或 tool-contract 改动添加或更新聚焦测试。
 4. 仅修改 README 时运行 `git diff --check -- README.md README.zh-CN.md`。
-5. 修改 manifest、schema、tool registry、pipeline 或 agent instructions 时运行 `make test-contracts`。
+5. 修改 manifest、schema、tool registry、pipeline 或 agent instructions 时运行 `make test-contracts`。改动涉及 FFmpeg、browser、Node 或 HyperFrames runtime 时，再运行 `make test-integration`。
 6. 请求 review 前，用 [`docs/PR_REVIEW_GUIDE.md`](docs/PR_REVIEW_GUIDE.md) 检查架构、provider、安全、依赖和文档声明风险。
 7. 在 PR 中说明用户可见影响、列出验证命令；视觉类 README 改动请附截图或 demo 链接。
 
@@ -346,6 +346,7 @@ make demo               # 渲染仓库内置零 API key 演示套件
 make demo-list          # 列出可用演示
 make hyperframes-doctor # 验证 HyperFrames runtime
 make test-contracts     # 运行 contract tests
+make test-integration   # 运行显式 opt-in 的本地 runtime smoke tests
 ```
 
 ## 给 AI 助手的说明
@@ -371,12 +372,22 @@ make test-contracts     # 运行 contract tests
 # Test dependencies
 make install-dev
 
-# Contract tests
+# 快速默认测试
+make test
+
+# 仅运行 contract tests
 make test-contracts
 
-# Full test suite
-make test
+# 显式 opt-in 的本地 runtime 检查（FFmpeg/browser/Node/HyperFrames）
+make test-integration
+
+# 手动/媒体 QA alias
+make test-qa
 ```
+
+默认测试会排除 `integration`、`qa`、`browser`、`ffmpeg`、`node`、
+`hyperframes`、`slow` 和 `live_provider` markers。Mocked provider tests 仍在默认测试中，
+用于确保路径校验和 payload contract 发生在凭据或网络调用之前。
 
 ## 许可证
 

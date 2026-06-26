@@ -35,11 +35,11 @@ Use this checklist when adding or changing `project_profile/` guidance.
 6. Run the project-profile contract test:
 
 ```bash
-pytest tests/contracts/test_phase0_contracts.py -k "project_profile or platform_wrappers or project_context_names_current_platform_wrappers or removed_legacy"
+VPB_ALLOW_BROWSER_OPEN=0 PYTHONDONTWRITEBYTECODE=1 python -m pytest -p no:cacheprovider tests/contracts/test_repo_hygiene_contracts.py -q
 ```
 
 7. Run scoped whitespace verification:
 
 ```bash
-git diff --check -- AGENT_GUIDE.md PROJECT_CONTEXT.md AGENTS.md CLAUDE.md CURSOR.md COPILOT.md tests/contracts/test_phase0_contracts.py project_profile
+git diff --check -- AGENT_GUIDE.md PROJECT_CONTEXT.md AGENTS.md CLAUDE.md CURSOR.md COPILOT.md tests/contracts/test_repo_hygiene_contracts.py project_profile
 ```

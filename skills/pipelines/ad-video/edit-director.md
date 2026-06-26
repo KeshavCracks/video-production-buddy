@@ -105,8 +105,8 @@ Write the result to `audio.music.volume_schedule` (per `edit_decisions.schema.js
 }
 ```
 
-Do not hand-author the schedule — the helper is deterministic and the unit
-tests in `tests/contracts/test_intensity_curve.py` are the spec. If
+Do not hand-author the schedule — the helper is deterministic and the schema
+contracts in `tests/contracts/test_ad_video_schema_contracts.py` are the spec. If
 `derive_duck_schedule` raises, the inputs are malformed; fix them before
 continuing.
 

@@ -320,7 +320,7 @@ Pull request checklist:
 2. Run the setup path in this README if your change affects install, runtime, providers, or demos.
 3. Add or update focused tests for code, schema, manifest, or tool-contract changes.
 4. Run `git diff --check -- README.md README.zh-CN.md` for README-only changes.
-5. Run `make test-contracts` for manifest, schema, tool registry, pipeline, or agent-instruction changes.
+5. Run `make test-contracts` for manifest, schema, tool registry, pipeline, or agent-instruction changes. Use `make test-integration` when a change touches FFmpeg, browser, Node, or HyperFrames runtime behavior.
 6. Use [`docs/PR_REVIEW_GUIDE.md`](docs/PR_REVIEW_GUIDE.md) to check architecture, provider, security, dependency, and docs risks before requesting review.
 7. In the PR, summarize the user-facing impact, list verification commands, and include screenshots or demo links for visual README changes.
 
@@ -347,6 +347,7 @@ make demo               # render the checked-in zero-key demo suite
 make demo-list          # list available demos
 make hyperframes-doctor # validate the HyperFrames runtime
 make test-contracts     # run contract tests
+make test-integration   # run opt-in local runtime smoke tests
 ```
 
 ## Agent Instructions
@@ -372,12 +373,23 @@ This repository is meant to be operated by an AI coding assistant. If you are an
 # Test dependencies
 make install-dev
 
-# Contract tests
+# Fast default suite
+make test
+
+# Contract tests only
 make test-contracts
 
-# Full test suite
-make test
+# Opt-in local runtime checks (FFmpeg/browser/Node/HyperFrames)
+make test-integration
+
+# Manual/media QA alias
+make test-qa
 ```
+
+The default suite excludes `integration`, `qa`, `browser`, `ffmpeg`, `node`,
+`hyperframes`, `slow`, and `live_provider` markers. Mocked provider tests stay
+in the default suite so path validation and payload contracts are checked before
+credentials or network calls are possible.
 
 ## License
 
