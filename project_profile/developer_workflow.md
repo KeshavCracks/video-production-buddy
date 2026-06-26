@@ -13,6 +13,18 @@ publishing this repository as code.
   GenUI, provider/runtime behavior, cost governance, or user-facing production
   instructions.
 
+## Agent Autonomy and Tool Use
+
+- Agents may use available subagents, superpowers or skills, MCPs, plugins,
+  commands, and internet research when they materially improve planning,
+  implementation, review, or verification.
+- Treat those capabilities as tools, not ceremony. Use the smallest useful
+  surface for the task and state material external-source or tool assumptions
+  when relevant.
+- Keep tests focused on touched behavior. Do not add repo-tracked throwaway,
+  duplicate, or broad temporary tests; add or update durable tests only when
+  they protect real behavior or prevent a likely regression.
+
 ## Audits
 
 - Do not stop at file-local review. Follow adjacent contract consumers:
