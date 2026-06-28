@@ -52,11 +52,15 @@
 
 ## Demos
 
-[![MacBook Air ad](assets/readme/macbook_air.jpg)](assets/readme/macbook_air.mp4)
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/df481a12-a150-41c6-97fe-24afcbeb85db" width="100%" controls></video>
+</div>
 
 > **MacBook Air ad** - "Please help me design an ad video for MacBook Air."
 
-[![织影 product ad](assets/readme/zhiying.jpg)](assets/readme/zhiying.mp4)
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/c240b2d1-5c65-41f1-8d71-454ae1f43f51" width="100%" controls></video>
+</div>
 
 > **织影 product ad** - a guided assistant flow for intake, proposal gates, asset generation, composition, and final review before delivery.
 

@@ -52,11 +52,15 @@
 
 ## 演示
 
-[![MacBook Air 广告](assets/readme/macbook_air.jpg)](assets/readme/macbook_air.mp4)
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/df481a12-a150-41c6-97fe-24afcbeb85db" width="100%" controls></video>
+</div>
 
 > **MacBook Air 广告** - “Please help me design an ad video for MacBook Air.”
 
-[![织影产品广告](assets/readme/zhiying.jpg)](assets/readme/zhiying.mp4)
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/c240b2d1-5c65-41f1-8d71-454ae1f43f51" width="100%" controls></video>
+</div>
 
 > **织影产品广告** - 展示从需求输入、方案确认、素材生成、合成到最终交付复核的引导式助手流程。
 
