@@ -1,0 +1,20 @@
+{
+  "name": "video-production-buddy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Open-source AI video production toolkit with agent-driven pipelines",
+  "scripts": {
+    "build": "cd website && npm install && npm run build",
+    "dev": "cd website && npm run dev",
+    "lint": "cd website && npm run lint"
+  },
+  "dependencies": {
+    "next": "^14.2.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
