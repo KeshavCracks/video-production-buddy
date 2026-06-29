@@ -9,11 +9,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/KeshavCracks/video-production-buddy/stargazers"><img src="https://img.shields.io/github/stars/KeshavCracks/video-production-buddy?style=flat-square&color=5CC8FF&logo=github" alt="Stars"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPLv3-blue.svg?style=flat-square" alt="License"></a>
-  <a href="#"><img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python"></a>
-  <a href="#"><img src="https://img.shields.io/badge/Remotion-React%20Video-61DAFB?style=flat-square&logo=react&logoColor=111" alt="Remotion"></a>
-  <a href="#"><img src="https://img.shields.io/badge/FFmpeg-Required-007808?style=flat-square&logo=ffmpeg&logoColor=white" alt="FFmpeg"></a>
+  <a href="https://github.com/KeshavCracks/video-production-buddy/stargazers"><img src="https://img.shields.io/github/stars/KeshavCracks/video-production-buddy?style=flat-square&color=10b981&logo=github" alt="Stars"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPLv3-10b981.svg?style=flat-square" alt="License"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Python-3.10+-10b981?style=flat-square&logo=python&logoColor=white" alt="Python"></a>
+  <a href="#"><img src="https://img.shields.io/badge/Remotion-React%20Video-10b981?style=flat-square&logo=react&logoColor=white" alt="Remotion"></a>
+  <a href="#"><img src="https://img.shields.io/badge/FFmpeg-Required-10b981?style=flat-square&logo=ffmpeg&logoColor=white" alt="FFmpeg"></a>
 </p>
 
 ---
@@ -43,9 +43,19 @@ No API keys required. The demo renders locally with Remotion + FFmpeg + Piper TT
 
 ## 🎬 Demo
 
-> Prompt: *"Please help me design an ad video for MacBook Air."*
+> **Prompt:** *"Please help me design an ad video for MacBook Air."*
 
-<video src="https://github.com/user-attachments/assets/df481a12-a150-41c6-97fe-24afcbeb85db" width="100%" controls poster="assets/readme/macbook_air.jpg"></video>
+<p align="center">
+  <a href="https://github.com/user-attachments/assets/df481a12-a150-41c6-97fe-24afcbeb85db">
+    <img src="assets/readme/macbook_air.jpg" alt="MacBook Air Ad Demo" width="100%">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/user-attachments/assets/df481a12-a150-41c6-97fe-24afcbeb85db">
+    <b>▶ Watch the demo video</b>
+  </a>
+</p>
 
 ---
 
@@ -57,7 +67,7 @@ No API keys required. The demo renders locally with Remotion + FFmpeg + Piper TT
 | HyperFrames | | Node.js 22 | ElevenLabs | DALL-E | Hunyuan |
 | | | | Google TTS | Recraft | CogVideo |
 
-11 pipelines · 47 tools · 124 skills · Auto-routed provider switching
+**11 pipelines · 47 tools · 124 skills · Auto-routed provider switching**
 
 ---
 
