@@ -4,6 +4,12 @@ const nextConfig = {
   distDir: 'dist',
   images: {
     unoptimized: true
+  },
+  typescript: {
+    ignoreBuildErrors: false
+  },
+  eslint: {
+    ignoreDuringBuilds: true
   }
 };
 

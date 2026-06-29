@@ -41,17 +41,11 @@ No API keys required. The demo renders locally with Remotion + FFmpeg + Piper TT
 
 ---
 
-## 🎬 Demos
+## 🎬 Demo
 
-### MacBook Air Ad
 > Prompt: *"Please help me design an ad video for MacBook Air."*
 
 <video src="https://github.com/user-attachments/assets/df481a12-a150-41c6-97fe-24afcbeb85db" width="100%" controls poster="assets/readme/macbook_air.jpg"></video>
-
-### Guided Product Ad
-> Full assistant flow: intake → proposal → assets → composition → review → delivery.
-
-<video src="https://github.com/user-attachments/assets/c240b2d1-5c65-41f1-8d71-454ae1f43f51" width="100%" controls poster="assets/readme/zhiying.jpg"></video>
 
 ---
 
@@ -69,7 +63,7 @@ No API keys required. The demo renders locally with Remotion + FFmpeg + Piper TT
 
 ## 🌐 Website
 
-The showcase site is built into this repo with Next.js. Deploy to Vercel in 30 seconds:
+The showcase site is built with Next.js and lives in this repo. Deploy to Vercel in seconds:
 
 1. Import this repo into [vercel.com](https://vercel.com)
 2. Vercel auto-detects Next.js → deploy
