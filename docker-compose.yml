@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  vpb-studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: video-production-buddy
+    volumes:
+      - ./projects:/app/projects
+      - ./.env:/app/.env:ro
+    ports:
+      - "3000:3000"
+    environment:
+      - PYTHON=/app/.venv/bin/python
+    working_dir: /app
+    command: bash -c "source .venv/bin/activate && make preflight && bash"
+    stdin_open: true
+    tty: true
+
+  vpb-website:
+    build:
+      context: ./website
+      dockerfile: Dockerfile
+    container_name: vpb-website
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./website:/app
+    command: npm run dev
